@@ -51,6 +51,10 @@ You need [Node.js](https://nodejs.org/) installed (v18+). npm comes with it.
 - **Linux** — `sudo apt install nodejs npm` (Debian/Ubuntu) or `sudo pacman -S nodejs npm` (Arch)
 
 ```bash
+# clone the repo
+git clone https://github.com/fr0meup/2c-client.git
+cd 2c-client
+
 # install dependencies
 npm install
 
