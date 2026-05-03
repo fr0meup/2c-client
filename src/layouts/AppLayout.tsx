@@ -44,7 +44,7 @@ export function AppLayout() {
     <MessagesProvider>
     <FollowProvider>
     <LeaderboardProvider>
-    <div className="min-h-screen pb-[88px] xl:pb-0">
+    <div className="min-h-screen bg-[#0a0907] pb-[88px] xl:pb-0">
       <HeaderLeft onToggleGuides={() => {}} guidesEnabled={false} />
       {/* {guidesEnabled && (
         <div className="hidden xl:block">
@@ -62,7 +62,7 @@ export function AppLayout() {
       <ComposeContext.Provider value={{ openCompose, openQuote }}>
       <div className="xl:ml-60">
         <HeaderRight />
-        <main>
+        <main className="bg-[#0a0907] min-h-screen">
           <Outlet />
         </main>
       </div>

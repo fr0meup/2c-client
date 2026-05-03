@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+html, #root {
+  background-color: #0a0907;
+}
+
 html {
   overflow-y: scroll;
   scrollbar-width: thin;

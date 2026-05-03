@@ -173,8 +173,8 @@ export function PostDetail() {
     if (!postData?.post) return
     const { uuid: postUuid, comment_count, upvote_count } = postData.post
 
-    const patchPosts = <T extends { uuid: string; comment_count: number; upvote_count: number }>(posts: T[]) =>
-      posts.map((p) => (p.uuid === postUuid ? { ...p, comment_count, upvote_count } : p))
+    const patchPosts = <T extends { uuid: string; comment_count: number; upvote_count: number }>(posts?: T[]) =>
+      (posts ?? []).map((p) => (p.uuid === postUuid ? { ...p, comment_count, upvote_count } : p))
 
     queryClient.setQueriesData<{ pages: ArenaResponse[] }>(
       { queryKey: ['feed'] },
