@@ -56,7 +56,7 @@ export function UserMetaPill({
 
   return (
     <div
-      className={`flex flex-1 ${sm ? 'h-[30px] text-[12px]' : 'h-[38px] text-sm'} min-w-0 items-center overflow-hidden whitespace-nowrap rounded-full border text-white/70 ${variant === 'comment' ? 'border-white/[0.08] bg-white/[0.04]' : 'border-[#c8a44d]/20 bg-gradient-to-r from-[#c8a44d]/[0.06] via-white/[0.04] to-[#c8a44d]/[0.06] shadow-[0_0_12px_rgba(218,178,87,0.05),inset_0_1px_0_rgba(255,255,255,0.1)]'} ${className}`}
+      className={`flex ${sm ? 'h-[30px] text-[12px]' : 'h-[38px] text-sm'} min-w-0 items-center overflow-hidden whitespace-nowrap rounded-full border text-white/70 ${variant === 'comment' ? 'border-white/[0.08] bg-white/[0.04]' : 'border-[#c8a44d]/20 bg-gradient-to-r from-[#c8a44d]/[0.06] via-white/[0.04] to-[#c8a44d]/[0.06] shadow-[0_0_12px_rgba(218,178,87,0.05),inset_0_1px_0_rgba(255,255,255,0.1)]'} ${className}`}
     >
       {tierColors && (
         <>

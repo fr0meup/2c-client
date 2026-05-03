@@ -1,6 +1,7 @@
 import { NetworthPill } from '@/components/networth-pill'
 import { UserMetaPill } from '@/components/user-meta-pill'
 import { useFollow } from '@/components/profile/FollowContext'
+import { useAuth } from '@/lib/auth'
 import type { LeaderboardEntry, LeaderboardMeta } from './types'
 
 function formatStat(value: number, label?: string): string {
@@ -19,6 +20,7 @@ interface Props {
 
 export function LeaderboardList({ entries, meta, startRank = 4 }: Props) {
   const { aliasFor } = useFollow()
+  const { auth } = useAuth()
   if (entries.length === 0) return null
 
   return (
@@ -28,7 +30,11 @@ export function LeaderboardList({ entries, meta, startRank = 4 }: Props) {
         return (
           <div
             key={entry.uuid}
-            className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-white/[0.01] px-4 py-4 transition-colors hover:from-white/[0.05] hover:to-white/[0.02]"
+            className={`flex items-center gap-3 rounded-2xl border px-4 py-4 transition-colors ${
+              entry.uuid === auth?.userUuid
+                ? 'border-[#c8a44d]/40 bg-gradient-to-b from-[#c8a44d]/[0.08] to-[#c8a44d]/[0.03] hover:from-[#c8a44d]/[0.11] hover:to-[#c8a44d]/[0.05]'
+                : 'border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-white/[0.01] hover:from-white/[0.05] hover:to-white/[0.02]'
+            }`}
           >
             {/* Rank */}
             <span className="w-6 shrink-0 text-center text-sm font-bold tabular-nums text-white/40">
