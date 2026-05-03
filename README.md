@@ -58,15 +58,13 @@ cd 2c-client
 # install dependencies
 npm install
 
-# start dev server
+# start the app — this is all you need
 npm run dev
-
-# type check
-npx tsc --noEmit
-
-# build for production
-npm run build
 ```
+
+This opens the app at `http://localhost:5173`. That's it, you're done.
+
+If you want to deploy it somewhere (Netlify, Vercel, etc.), you can build a production bundle with `npm run build` — but for normal use, `npm run dev` is all you need.
 
 ## Project Structure
 
