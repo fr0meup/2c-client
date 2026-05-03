@@ -26,11 +26,12 @@ export function parseNotificationMessage(
   type: string,
   message: string
 ): { actor?: string; preview?: string; isDownvote?: boolean } {
-  // Patterns with an actor: "Verb by **actor**: preview"
+  // Patterns with an actor: "Verb by **actor**: preview" or "Verb by actor: preview"
   const actorColonMatch = message.match(/^(.+?) by \*\*(.+?)\*\*:\s*(.*)$/)
+    || message.match(/^(Upvoted|Downvoted|Voted) by ([^:]+):\s*(.*)$/i)
   if (actorColonMatch) {
     const isDownvote = /^downvoted/i.test(actorColonMatch[1])
-    return { actor: actorColonMatch[2], preview: actorColonMatch[3] || undefined, isDownvote: isDownvote || undefined }
+    return { actor: actorColonMatch[2].trim(), preview: actorColonMatch[3] || undefined, isDownvote: isDownvote || undefined }
   }
 
   // "New reply from **actor**: preview"

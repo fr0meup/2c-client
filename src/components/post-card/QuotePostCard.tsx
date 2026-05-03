@@ -74,9 +74,9 @@ export function QuotePostCard({ quote, className = '' }: QuotePostCardProps) {
           )}
 
           {/* Body */}
-          <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-white/45">
+          <div className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-white/45">
             {renderPostText(quote.text)}
-          </p>
+          </div>
         </div>
 
         {/* Image thumbnail — avoids cut-off by showing as a compact square */}

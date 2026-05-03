@@ -401,9 +401,9 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
             />
           ) : (
             <>
-              <p className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed text-white/90">
+              <div className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed text-white/90">
                 {renderPostText(displayText)}
-              </p>
+              </div>
               {isLong && (
                 <button
                   onClick={(e) => { e.stopPropagation(); setExpanded((prev) => !prev) }}

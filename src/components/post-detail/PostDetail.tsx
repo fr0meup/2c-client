@@ -546,9 +546,9 @@ export function PostDetail() {
             resolutionDeadline={post.post_meta?.resolution_deadline}
           />
         ) : (
-          <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-white/90">
+          <div className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-white/90">
             {renderPostText(post.text)}
-          </p>
+          </div>
         )}
 
         {/* Likert visual */}
