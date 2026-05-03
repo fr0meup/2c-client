@@ -18,7 +18,7 @@ export function VideoPlayer({ src, compact = false, className = '' }: VideoPlaye
   const videoRef = useRef<HTMLVideoElement>(null)
   const progressRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const hideTimer = useRef<ReturnType<typeof setTimeout>>(null)
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(false)

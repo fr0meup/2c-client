@@ -31,7 +31,7 @@ export function RoomInfoModal({ room, onClose, onlineMembers, offlineMembers, to
   const online = onlineMembers ?? (room.members ?? []).filter((m) => m.is_online)
   const offline = offlineMembers ?? (room.members ?? []).filter((m) => !m.is_online)
   const memberCount = totalMembers ?? room.member_count
-  const onlineCount = online.length || room.stats.online_count
+  const onlineCount = online.length || (room.stats.online_count ?? 0)
 
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-md sm:items-center" onClick={onClose}>

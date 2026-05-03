@@ -59,7 +59,7 @@ export interface ChatMessage {
   reply_to_uuid?: string
   /** Cached preview of the message being replied to. */
   reply_preview?: string
-  reactions?: { emoji: string; count: number; userReacted: boolean }[]
+  reactions?: { emoji: string; count: number; userReacted?: boolean }[]
   deleted_at?: string | null
   author_meta?: MessageAuthorMeta
 }

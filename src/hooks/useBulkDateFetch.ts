@@ -173,8 +173,8 @@ export function useBulkDateFetch({
           page = await rpc<ArenaResponse>(
             '/v2/posts/arena',
             params,
-            auth.token,
-            auth.userUuid,
+            auth!.token,
+            auth!.userUuid,
             signal,
           )
         } catch {

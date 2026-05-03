@@ -64,7 +64,7 @@ export function BalanceChart({ history }: Props) {
 
   function handlePointerMove(e: React.PointerEvent<SVGSVGElement>) {
     const svg = svgRef.current
-    if (!svg) return
+    if (!svg || !geometry) return
     const rect = svg.getBoundingClientRect()
     const xRatio = (e.clientX - rect.left) / rect.width
     const xSvg = xRatio * W
