@@ -1,6 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { MoreHorizontal, PenSquare } from 'lucide-react'
+import { useAuth } from '@/lib/auth'
+import { useNotifications } from '@/components/notifications'
+import { useMessages } from '@/components/messages'
 import { navItems } from './navItems'
 import type { NavItem } from './types'
 
@@ -14,13 +18,33 @@ function isFeedPath(pathname: string, search: string): boolean {
 
 const PRIMARY_LABELS = ['Feed', 'Notifications', 'Messages', 'Me']
 
+const LABEL_TO_QUERY_KEY: Record<string, string[]> = {
+  Feed: ['feed'],
+  Notifications: ['notifications'],
+  Messages: ['rooms'],
+  Leaderboard: ['leaderboard'],
+  Bookmarks: ['bookmarks'],
+  Transactions: ['transactions'],
+  Me: ['userProfile'],
+}
+
 export function BottomNav({ onNewPostClick }: BottomNavProps) {
   const location = useLocation()
+  const queryClient = useQueryClient()
+  const { auth } = useAuth()
   const [moreOpen, setMoreOpen] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
 
-  const primary = navItems.filter((i) => PRIMARY_LABELS.includes(i.label))
-  const overflow = navItems.filter((i) => !PRIMARY_LABELS.includes(i.label))
+  const items = useMemo(
+    () => navItems.map((item) =>
+      item.label === 'Me' && auth?.userUuid
+        ? { ...item, path: `/user/${auth.userUuid}` }
+        : item
+    ),
+    [auth?.userUuid],
+  )
+  const primary = items.filter((i) => PRIMARY_LABELS.includes(i.label))
+  const overflow = items.filter((i) => !PRIMARY_LABELS.includes(i.label))
 
   useEffect(() => {
     if (!moreOpen) return
@@ -35,6 +59,8 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
 
   function isItemActive(item: NavItem): boolean {
     if (item.label === 'Feed') return isFeedPath(location.pathname, location.search)
+    if (item.label === 'Messages')
+      return location.pathname === '/messages' || location.pathname.startsWith('/room/')
     return location.pathname === item.path
   }
 
@@ -43,13 +69,19 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
       <nav className="pointer-events-auto inline-flex h-[68px] items-center gap-1.5 rounded-full border border-[#c8a44d]/20 bg-gradient-to-r from-[#c8a44d]/[0.06] via-white/[0.04] to-[#c8a44d]/[0.06] px-8 shadow-[0_0_12px_rgba(218,178,87,0.05),inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-md">
         {/* Primary items: always visible */}
         {primary.map((item) => (
-          <BottomNavItem key={item.path} item={item} isActive={isItemActive(item)} />
+          <BottomNavItem key={item.path} item={item} isActive={isItemActive(item)} onClick={() => {
+            const key = LABEL_TO_QUERY_KEY[item.label]
+            if (key) queryClient.removeQueries({ queryKey: key })
+          }} />
         ))}
 
         {/* Overflow items: visible on sm+, collapsed into More button below sm */}
         <div className="hidden items-center gap-1.5 sm:flex">
           {overflow.map((item) => (
-            <BottomNavItem key={item.path} item={item} isActive={isItemActive(item)} />
+            <BottomNavItem key={item.path} item={item} isActive={isItemActive(item)} onClick={() => {
+              const key = LABEL_TO_QUERY_KEY[item.label]
+              if (key) queryClient.removeQueries({ queryKey: key })
+            }} />
           ))}
         </div>
 
@@ -69,7 +101,11 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
                 <NavLink
                   key={item.path}
                   to={item.path}
-                  onClick={() => setMoreOpen(false)}
+                  onClick={() => {
+                    setMoreOpen(false)
+                    const key = LABEL_TO_QUERY_KEY[item.label]
+                    if (key) queryClient.removeQueries({ queryKey: key })
+                  }}
                   className="flex items-center gap-2 rounded-full px-3 py-2 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white"
                 >
                   <NavIconImg item={item} isActive={isItemActive(item)} size={20} />
@@ -93,13 +129,14 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
   )
 }
 
-function BottomNavItem({ item, isActive }: { item: NavItem; isActive: boolean }) {
+function BottomNavItem({ item, isActive, onClick }: { item: NavItem; isActive: boolean; onClick?: () => void }) {
   const to = item.label === 'Feed' ? '/' : item.path
 
   return (
     <NavLink
       to={to}
       end={to === '/'}
+      onClick={onClick}
       className="group flex h-14 w-14 shrink-0 items-center justify-center rounded-full transition-all duration-200 hover:bg-white/[0.06]"
     >
       <NavIconImg item={item} isActive={isActive} size={32} />
@@ -108,20 +145,31 @@ function BottomNavItem({ item, isActive }: { item: NavItem; isActive: boolean })
 }
 
 function NavIconImg({ item, isActive, size }: { item: NavItem; isActive: boolean; size: number }) {
+  const { unreadCount } = useNotifications()
+  const { totalUnread: messagesUnread } = useMessages()
   const src = isActive && item.iconSelected ? item.iconSelected : item.icon
   const transform = `scale(${item.scale}) translateX(${item.offset ?? '0px'})`
+  const badgeCount =
+    item.label === 'Notifications' ? unreadCount : item.label === 'Messages' ? messagesUnread : 0
+  const showBadge = badgeCount > 0
 
   return (
-    <div
-      className="flex shrink-0 items-center justify-center overflow-hidden transition-transform duration-200 group-hover:scale-110"
-      style={{ height: size, width: size }}
-    >
-      <img
-        src={src}
-        alt={item.label}
-        className="h-full w-full object-contain"
-        style={{ transform, opacity: isActive ? 1 : 0.65 }}
-      />
+    <div className="relative shrink-0" style={{ height: size, width: size }}>
+      <div
+        className="flex h-full w-full items-center justify-center overflow-hidden transition-transform duration-200 group-hover:scale-110"
+      >
+        <img
+          src={src}
+          alt={item.label}
+          className="h-full w-full object-contain"
+          style={{ transform, opacity: isActive ? 1 : 0.65 }}
+        />
+      </div>
+      {showBadge && (
+        <span className="pointer-events-none absolute -right-1 -top-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-[#0a0907] bg-[#c8a44d] px-1 text-[10px] font-bold leading-none tabular-nums text-[#0f0e0a]">
+          {badgeCount > 99 ? '99+' : badgeCount}
+        </span>
+      )}
     </div>
   )
 }

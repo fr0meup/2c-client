@@ -1,3 +1,9 @@
+import { LeaderboardPage } from '@/components/leaderboard'
+import { usePageLoad, LeaderboardSkeleton } from '@/components/skeleton'
+
 export function Leaderboard() {
-  return <div className="p-8" />
+  const loading = usePageLoad()
+
+  if (loading) return <LeaderboardSkeleton />
+  return <LeaderboardPage />
 }

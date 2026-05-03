@@ -1,3 +1,9 @@
+import { MessagesList, useMessages } from '@/components/messages'
+import { MessagesListSkeleton } from '@/components/skeleton'
+
 export function Messages() {
-  return <div className="p-8" />
+  const { isLoading } = useMessages()
+
+  if (isLoading) return <MessagesListSkeleton />
+  return <MessagesList />
 }

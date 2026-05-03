@@ -7,9 +7,12 @@ export function UserMetaPill({
   gender,
   age,
   arena,
+  variant = 'post',
+  size = 'default',
   children,
   className = '',
 }: UserMetaPillProps) {
+  const sm = size === 'small'
   const hasElo = elo != null && elo > 0
   const hasAlias = alias != null && alias.trim().length > 0
   const hasGender = gender != null && gender.trim().length > 0
@@ -20,7 +23,7 @@ export function UserMetaPill({
   if (!hasAny) return null
 
   function Separator() {
-    return <span className="h-5 w-px shrink-0 bg-white/[0.1]" />
+    return <span className={`${sm ? 'h-3.5' : 'h-5'} w-px shrink-0 bg-white/[0.1]`} />
   }
 
   const tier = hasElo
@@ -53,13 +56,13 @@ export function UserMetaPill({
 
   return (
     <div
-      className={`inline-flex h-[38px] min-w-0 flex-1 items-center overflow-hidden whitespace-nowrap rounded-full border border-[#c8a44d]/20 bg-gradient-to-r from-[#c8a44d]/[0.06] via-white/[0.04] to-[#c8a44d]/[0.06] text-sm text-white/70 shadow-[0_0_12px_rgba(218,178,87,0.05),inset_0_1px_0_rgba(255,255,255,0.1)] ${className}`}
+      className={`flex flex-1 ${sm ? 'h-[30px] text-[12px]' : 'h-[38px] text-sm'} min-w-0 items-center overflow-hidden whitespace-nowrap rounded-full border text-white/70 ${variant === 'comment' ? 'border-white/[0.08] bg-white/[0.04]' : 'border-[#c8a44d]/20 bg-gradient-to-r from-[#c8a44d]/[0.06] via-white/[0.04] to-[#c8a44d]/[0.06] shadow-[0_0_12px_rgba(218,178,87,0.05),inset_0_1px_0_rgba(255,255,255,0.1)]'} ${className}`}
     >
       {tierColors && (
         <>
-          <span className="px-2.5 py-2">
+          <span className={`shrink-0 ${sm ? 'px-1.5 py-1' : 'px-2.5 py-2'}`}>
             <span
-              className="flex items-center gap-1 rounded-full px-2.5 py-0.5 font-medium"
+              className={`flex items-center gap-1 rounded-full ${sm ? 'px-1.5 py-px text-[10px]' : 'px-2.5 py-0.5'} font-medium`}
               style={{
                 background: `linear-gradient(to bottom, ${tierColors.from}, ${tierColors.to})`,
                 border: `1px solid ${tierColors.border}`,
@@ -67,7 +70,7 @@ export function UserMetaPill({
                 color: tierColors.text,
               }}
             >
-              <span className="text-[10px]">★</span>
+              <span className={sm ? 'text-[8px]' : 'text-[10px]'}>★</span>
               {elo}
             </span>
           </span>
@@ -77,7 +80,7 @@ export function UserMetaPill({
 
       {hasAlias && (
         <>
-          <span className="min-w-0 truncate bg-gradient-to-r from-[#c8a44d] to-[#c8a44d]/80 bg-clip-text px-3 py-2 font-medium text-transparent">
+          <span className={`min-w-0 shrink truncate bg-gradient-to-r from-[#c8a44d] to-[#c8a44d]/80 bg-clip-text ${sm ? 'px-2 py-1' : 'px-3 py-2'} font-medium text-transparent`}>
             {alias}
           </span>
           <Separator />
@@ -86,10 +89,10 @@ export function UserMetaPill({
 
       {hasGender && (
         <>
-          <span className="flex items-center px-3 py-2">
+          <span className={`flex shrink-0 items-center ${sm ? 'px-2 py-1' : 'px-3 py-2'}`}>
             <GenderIcon
               gender={gender === 'female' || gender === 'F' ? 'female' : 'male'}
-              className="h-3.5 w-3.5 text-white/40"
+              className={`${sm ? 'h-3 w-3' : 'h-3.5 w-3.5'} text-white/40`}
             />
           </span>
           <Separator />
@@ -98,18 +101,18 @@ export function UserMetaPill({
 
       {hasAge && (
         <>
-          <span className="px-3 py-2">{age}</span>
+          <span className={`shrink-0 ${sm ? 'px-2 py-1' : 'px-3 py-2'}`}>{age}</span>
           <Separator />
         </>
       )}
 
       {hasArena && (
         <>
-          <span className="flex min-w-0 items-center gap-1 px-3 py-2">
+          <span className={`flex min-w-0 shrink items-center gap-1 ${sm ? 'px-2 py-1' : 'px-3 py-2'}`}>
             <img
               src="https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Flocation-icon.bbe094a7.png&w=48&q=75&dpl=dpl_57sq3a4okDe2tVXZVSYu9FCcDV21"
               alt=""
-              className="h-4 w-4 shrink-0 opacity-60"
+              className={`${sm ? 'h-3 w-3' : 'h-4 w-4'} shrink-0 opacity-60`}
             />
             <span className="truncate">{arena}</span>
           </span>

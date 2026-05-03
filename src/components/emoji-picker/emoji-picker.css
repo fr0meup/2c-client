@@ -1,0 +1,21 @@
+.twocents-emoji-scroll [frimousse-viewport] {
+  scrollbar-width: thin;
+  scrollbar-color: #333330 transparent;
+}
+
+.twocents-emoji-scroll [frimousse-viewport]::-webkit-scrollbar {
+  width: 6px;
+}
+
+.twocents-emoji-scroll [frimousse-viewport]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.twocents-emoji-scroll [frimousse-viewport]::-webkit-scrollbar-thumb {
+  background: #333330;
+  border-radius: 3px;
+}
+
+.twocents-emoji-scroll [frimousse-viewport]::-webkit-scrollbar-thumb:hover {
+  background: #444440;
+}

@@ -1,5 +1,11 @@
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import { FeedFilters } from '@/components/feed-filters'
+import { PostDetailHeader } from '@/components/post-detail'
+import { NotificationsHeader } from '@/components/notifications'
+import { ProfileHeader } from '@/components/profile'
+import { ChatHeader, MessagesListHeader } from '@/components/messages'
+import { LeaderboardHeader } from '@/components/leaderboard'
 
 interface HeaderProps {
   onToggleGuides: () => void
@@ -7,22 +13,75 @@ interface HeaderProps {
 }
 
 function isFeedPath(pathname: string, search: string): boolean {
-  return pathname === '/' || new URLSearchParams(search).has('feed') || pathname.startsWith('/post/')
+  return pathname === '/' || new URLSearchParams(search).has('feed')
+}
+
+function isPostDetailPath(pathname: string): boolean {
+  return pathname.startsWith('/post/')
+}
+
+function isNotificationsPath(pathname: string): boolean {
+  return pathname.startsWith('/notifications')
+}
+
+function isProfilePath(pathname: string): boolean {
+  return pathname.startsWith('/user/')
+}
+
+function isRoomPath(pathname: string): boolean {
+  return pathname.startsWith('/room/')
+}
+
+function isMessagesListPath(pathname: string): boolean {
+  return pathname === '/messages'
+}
+
+function isBookmarksPath(pathname: string): boolean {
+  return pathname === '/bookmarks'
+}
+
+function isTransactionsPath(pathname: string): boolean {
+  return pathname === '/transactions'
+}
+
+function isLeaderboardPath(pathname: string): boolean {
+  return pathname === '/leaderboard'
+}
+
+function PageHeader({ title }: { title: string }) {
+  const navigate = useNavigate()
+
+  return (
+    <div className="relative flex h-10 items-center justify-between">
+      <button
+        onClick={() => navigate(-1)}
+        title="Back"
+        className="group flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.06] text-white/70 transition-colors hover:bg-gradient-to-b hover:from-white/[0.09] hover:to-white/[0.04] hover:text-white hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+      >
+        <ArrowLeft className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" strokeWidth={2.2} />
+      </button>
+
+      <span className="text-sm font-semibold text-white/80">{title}</span>
+
+      {/* Spacer to keep title centered */}
+      <div className="h-10 w-10 shrink-0" />
+    </div>
+  )
 }
 
 /** Left side — fixed, stays on screen when scrolling */
 export function HeaderLeft({ onToggleGuides, guidesEnabled }: HeaderProps) {
   return (
     <header
-      className="fixed left-0 top-0 z-50 hidden h-[72px] bg-[#0d0d0b] xl:flex"
+      className="fixed left-0 top-0 z-50 hidden h-[72px] bg-[#0a0907] xl:flex"
       style={{ width: 'calc(50% - 372px)' }}
     >
-      <button
+      {/* <button
         onClick={onToggleGuides}
         className="absolute left-4 top-1/2 -translate-y-1/2 rounded px-3 py-1.5 text-xs font-semibold text-white/[0.6] transition-colors hover:bg-white/[0.06] hover:text-white"
       >
         {guidesEnabled ? 'Hide guides' : 'Show guides'}
-      </button>
+      </button> */}
       <div className="fixed top-0 flex h-[72px] w-60 items-start justify-start pl-7 pt-6" style={{ left: 'calc(50% - 600px)' }}>
         <img
           src="https://www.twocents.money/_next/image?url=%2F2centsLogo.png&w=1920&q=75"
@@ -38,11 +97,31 @@ export function HeaderLeft({ onToggleGuides, guidesEnabled }: HeaderProps) {
 export function HeaderRight() {
   const location = useLocation()
   const showFilters = isFeedPath(location.pathname, location.search)
+  const showPostDetail = isPostDetailPath(location.pathname)
+  const showNotifications = isNotificationsPath(location.pathname)
+  const showProfile = isProfilePath(location.pathname)
+  const showRoom = isRoomPath(location.pathname)
+  const showMessagesList = isMessagesListPath(location.pathname)
+  const showBookmarks = isBookmarksPath(location.pathname)
+  const showTransactions = isTransactionsPath(location.pathname)
+  const showLeaderboard = isLeaderboardPath(location.pathname)
 
   return (
-    <div className="flex h-[72px] w-full items-end justify-center bg-[#0d0d0b] px-4 sm:px-8">
+    <div
+      className={`flex h-[72px] w-full items-end justify-center bg-[#0a0907] px-4 sm:px-8 ${
+        showRoom ? 'sticky top-0 z-30' : ''
+      }`}
+    >
       <div className="w-full max-w-[670px] xl:-ml-[245px]">
         {showFilters && <FeedFilters />}
+        {showPostDetail && <PostDetailHeader />}
+        {showNotifications && <NotificationsHeader />}
+        {showProfile && <ProfileHeader />}
+        {showRoom && <ChatHeader />}
+        {showMessagesList && <MessagesListHeader />}
+        {showBookmarks && <PageHeader title="Bookmarks" />}
+        {showTransactions && <PageHeader title="Transactions" />}
+        {showLeaderboard && <LeaderboardHeader />}
       </div>
     </div>
   )

@@ -1,3 +1,5 @@
+import { UserProfile } from '@/components/profile'
+
 export function Profile() {
-  return <div className="p-8" />
+  return <UserProfile />
 }

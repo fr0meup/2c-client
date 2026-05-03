@@ -1,9 +1,28 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Download, Share2, MessageSquare, Triangle, MoreHorizontal, Link2, Trash2, Eye, Quote } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { X, Download, MessageSquare, Triangle, MoreHorizontal, Link2, Trash2, Eye, Quote, UserPlus, UserCheck, Mail, Ban, Bookmark, Loader2 } from 'lucide-react'
 import { NetworthPill } from '@/components/networth-pill'
 import { UserMetaPill } from '@/components/user-meta-pill'
 import type { PostCardData } from './types'
-import { cleanPostText, timeAgo } from './utils'
+import { cleanPostText, renderPostText, timeAgo } from './utils'
+import { useVotePost } from '@/hooks/useVotePost'
+import { useDeletePost } from '@/hooks/usePostMutations'
+import { useToggleBookmark } from '@/hooks/useBookmarks'
+import { useBlockUser, useUnblockUser } from '@/hooks/useBlock'
+import { useFollow } from '@/components/profile/FollowContext'
+import { useToast } from '@/components/toast/ToastContext'
+import { humanizeError } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
+import { useQueryClient } from '@tanstack/react-query'
+import { usePrefetch } from '@/hooks/usePrefetch'
+import { PollCard } from './PollCard'
+import { LikertScale } from './LikertScale'
+import { PicksCard } from './PicksCard'
+import { QuotePostCard } from './QuotePostCard'
+import { TransactionCard } from './TransactionCard'
+import { usePollResults, useLikertResults } from '@/hooks/usePostResults'
+import { ConfirmDeleteModal } from './ConfirmDeleteModal'
+import { VideoPlayer } from '@/components/video-player/VideoPlayer'
 
 const TEXT_LIMIT = 280
 
@@ -33,57 +52,44 @@ function PlatformIcon({ platform }: { platform?: string }) {
   )
 }
 
-// ── Picks visual only ──
-function PicksVisual({ post }: { post: PostCardData }) {
-  const meta = post.post_meta
-  const yes = meta?.consensus_percent ?? 50
-  const no = 100 - yes
-  const resolved = meta?.resolution_status === 'resolved'
-  const correct = meta?.correct_answer
-
-  return (
-    <div className="mt-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-white/40">Consensus</span>
-        {resolved && correct && (
-          <span className="text-[12px] font-semibold" style={{ color: '#DAA520' }}>
-            Resolved: {correct.charAt(0).toUpperCase() + correct.slice(1)}
-          </span>
-        )}
-        {!resolved && meta?.resolution_deadline && (
-          <span className="text-[12px] font-medium text-white/40">
-            Resolves {new Date(meta.resolution_deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </span>
-        )}
-      </div>
-      <div className="relative h-2 overflow-hidden rounded-full bg-white/[0.06]">
-        <div className="absolute inset-y-0 left-0 rounded-full bg-emerald-500/60" style={{ width: `${yes}%` }} />
-        <div className="absolute inset-y-0 right-0 rounded-full bg-rose-500/60" style={{ width: `${no}%` }} />
-      </div>
-      <div className="mt-2 flex items-center justify-between text-xs">
-        <span className="font-medium text-emerald-400">Yes {yes}%</span>
-        <span className="font-medium text-rose-400">No {no}%</span>
-      </div>
-    </div>
-  )
-}
-
 // ── Main component ──
 interface PostCardProps {
   post: PostCardData
   initialVote?: 1 | -1 | 0
+  pollUserVote?: number
+  pickUserVote?: 'yes' | 'no'
   alias?: string
+  onQuote?: (post: PostCardData) => void
 }
 
-export function PostCard({ post, initialVote = 0, alias }: PostCardProps) {
+export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, onQuote }: PostCardProps) {
+  const navigate = useNavigate()
+  const { auth } = useAuth()
+  const { aliasFor, isFollowing, toggleFollow } = useFollow()
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const blockUser = useBlockUser()
+  const unblockUser = useUnblockUser()
+  const { prefetchComments } = usePrefetch()
+  const alias = aliasFor(post.author_uuid)
   const imageSrc = post.post_meta?.src
   const isVideoPost = post.post_meta?.media_type === 'video'
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [blocked, setBlocked] = useState(false)
+  const [dmLoading, setDmLoading] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [showAliasInput, setShowAliasInput] = useState(false)
+  const [aliasInput, setAliasInput] = useState('')
+  const aliasInputRef = useRef<HTMLInputElement>(null)
   const [currentVote, setCurrentVote] = useState<1 | -1 | 0>(initialVote)
-  const [voteCount, setVoteCount] = useState(post.upvote_count)
+  const [voteCount, setVoteCount] = useState(post.upvote_count ?? 0)
+  const voteMutation = useVotePost()
+  const deleteMutation = useDeletePost()
+  const bookmarkMutation = useToggleBookmark()
+  const isOwn = auth?.userUuid === post.author_uuid
 
   useEffect(() => {
     if (!menuOpen) return
@@ -94,26 +100,41 @@ export function PostCard({ post, initialVote = 0, alias }: PostCardProps) {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [menuOpen])
 
+  if (!post?.author_meta) return null
+
   const pollOptions = post.post_meta?.poll
   const isPoll = post.post_type === 2 && pollOptions && pollOptions.length > 0
   const isLikert = post.post_type === 5
   const isPicks = post.post_type === 7
+  const isTransaction = post.post_type === 8
+
+  const { data: pollResults } = usePollResults(
+    isPoll ? post.uuid : undefined,
+    isPoll && (pollUserVote != null || isOwn)
+  )
+  const { data: likertData } = useLikertResults(
+    isLikert ? post.uuid : undefined,
+    isLikert
+  )
 
   const cleanText = cleanPostText(post.text)
   const isLong = cleanText.length > TEXT_LIMIT
   const displayText = !expanded && isLong ? cleanText.slice(0, TEXT_LIMIT).trimEnd() + '…' : cleanText
 
   function handleVote(dir: 1 | -1) {
-    setCurrentVote((prev) => {
-      const next = prev === dir ? 0 : dir
-      setVoteCount((c) => c + (next - prev))
-      return next
-    })
+    const next = currentVote === dir ? 0 : dir
+    setVoteCount((c) => c + (next - currentVote))
+    setCurrentVote(next)
+    voteMutation.mutate({ post_uuid: post.uuid, vote_type: next })
   }
 
   return (
     <>
-      <article className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 transition-colors hover:bg-white/[0.05]">
+      <article
+        onClick={() => navigate(`/post/${post.uuid}`)}
+        onMouseEnter={() => prefetchComments(post.uuid)}
+        className="cursor-pointer rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 transition-colors hover:bg-white/[0.05]"
+      >
         <div className="min-w-0">
           {/* Header row */}
           <div className="flex items-center justify-between">
@@ -152,28 +173,214 @@ export function PostCard({ post, initialVote = 0, alias }: PostCardProps) {
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-xl border border-white/[0.08] bg-[#1a1a1a] p-1 shadow-xl shadow-black/40">
+                <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl border border-white/[0.08] bg-[#141410] p-1 shadow-xl shadow-black/40">
                   <button
-                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      navigator.clipboard.writeText(`${window.location.origin}/post/${post.uuid}`)
+                      setMenuOpen(false)
+                    }}
                     className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
                   >
                     <Link2 className="h-3.5 w-3.5 text-white/40" />
                     Copy link
                   </button>
                   <button
-                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }}
+                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onQuote?.(post) }}
                     className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
                   >
                     <Quote className="h-3.5 w-3.5 text-white/40" />
                     Quote post
                   </button>
                   <button
-                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }}
-                    className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-400 transition-colors hover:bg-rose-400/10"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setMenuOpen(false)
+                      bookmarkMutation.mutate(post.uuid, {
+                        onSuccess: (res) => toast('success', res.bookmarked ? 'Post bookmarked' : 'Bookmark removed'),
+                        onError: (err) => toast('error', `Bookmark failed: ${humanizeError(err)}`),
+                      })
+                    }}
+                    className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Delete
+                    <Bookmark className="h-3.5 w-3.5 text-white/40" />
+                    Bookmark
                   </button>
+                  {!isOwn && (
+                    <>
+                      <div className="my-1 h-px bg-white/[0.06]" />
+                      {showAliasInput ? (
+                        <div className="flex flex-col gap-1.5 p-2" onClick={(e) => e.stopPropagation()}>
+                          <p className="text-[11px] text-white/35">Choose a nickname</p>
+                          <input
+                            ref={aliasInputRef}
+                            value={aliasInput}
+                            onChange={(e) => setAliasInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              e.stopPropagation()
+                              if (e.key === 'Enter' && aliasInput.trim()) {
+                                toggleFollow(post.author_uuid, aliasInput.trim())
+                                setShowAliasInput(false)
+                                setAliasInput('')
+                                setMenuOpen(false)
+                              }
+                              if (e.key === 'Escape') { setShowAliasInput(false); setAliasInput('') }
+                            }}
+                            maxLength={30}
+                            placeholder="e.g. John, trading-guy…"
+                            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-sm text-white/90 placeholder-white/30 outline-none focus:border-[#c8a44d]/40"
+                            autoFocus
+                          />
+                          <div className="flex justify-end">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (!aliasInput.trim()) return
+                                toggleFollow(post.author_uuid, aliasInput.trim())
+                                setShowAliasInput(false)
+                                setAliasInput('')
+                                setMenuOpen(false)
+                              }}
+                              disabled={!aliasInput.trim()}
+                              className="flex items-center gap-1.5 rounded-lg bg-[#c8a44d]/20 px-3 py-1.5 text-xs font-semibold text-[#c8a44d] transition-colors hover:bg-[#c8a44d]/30 disabled:opacity-50"
+                            >
+                              <UserPlus className="h-3 w-3" strokeWidth={2.5} />
+                              Follow
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (isFollowing(post.author_uuid)) {
+                              toggleFollow(post.author_uuid)
+                              setMenuOpen(false)
+                            } else {
+                              setShowAliasInput(true)
+                            }
+                          }}
+                          className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
+                        >
+                          {isFollowing(post.author_uuid) ? (
+                            <UserCheck className="h-3.5 w-3.5 text-[#c8a44d]" />
+                          ) : (
+                            <UserPlus className="h-3.5 w-3.5 text-white/40" />
+                          )}
+                          {isFollowing(post.author_uuid) ? 'Unfollow' : 'Follow'}
+                        </button>
+                      )}
+                      <button
+                        disabled={dmLoading}
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          if (!auth || dmLoading) return
+                          setDmLoading(true)
+                          try {
+                            const { rpc } = await import('@/lib/api')
+                            const result = await rpc<{ room: { uuid: string } }>(
+                              '/v1/rooms/startDM',
+                              { recipientUuid: post.author_uuid },
+                              auth.token,
+                              auth.userUuid,
+                            )
+                            const roomUuid = result.room.uuid
+                            const [roomData, , messagesData] = await Promise.all([
+                              rpc<import('@/lib/types').GetRoomResponse>(
+                                '/v1/rooms/getRoom',
+                                { roomUuid },
+                                auth.token,
+                                auth.userUuid,
+                              ),
+                              rpc<import('@/lib/types').GetMembersResponse>(
+                                '/v1/rooms/getMembers',
+                                { roomUuid },
+                                auth.token,
+                                auth.userUuid,
+                              ),
+                              rpc<import('@/lib/types').GetMessagesResponse>(
+                                '/v1/rooms/getMessages',
+                                { roomUuid, offset: 0, limit: 500 },
+                                auth.token,
+                                auth.userUuid,
+                              ),
+                            ])
+                            queryClient.setQueryData<import('@/lib/types').ListRoomsResponse>(
+                              ['rooms', 'dms'],
+                              (prev) => {
+                                const apiRoom = roomData.room
+                                if (!prev) return { rooms: [apiRoom] }
+                                if (prev.rooms.some((r) => r.uuid === apiRoom.uuid)) return prev
+                                return { rooms: [apiRoom, ...prev.rooms] }
+                              },
+                            )
+                            queryClient.setQueryData(['rooms', 'detail', roomUuid], roomData)
+                            queryClient.setQueryData(['rooms', 'messages', roomUuid], messagesData)
+                            setMenuOpen(false)
+                            navigate(`/room/${roomUuid}`)
+                            setTimeout(() => {
+                              queryClient.invalidateQueries({ queryKey: ['rooms', 'dms'] })
+                            }, 2000)
+                          } catch {
+                            setDmLoading(false)
+                          }
+                        }}
+                        className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
+                      >
+                        {dmLoading ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-white/40" />
+                        ) : (
+                          <Mail className="h-3.5 w-3.5 text-white/40" />
+                        )}
+                        {dmLoading ? 'Starting DM…' : 'Message'}
+                      </button>
+                      <div className="my-1 h-px bg-white/[0.06]" />
+                      <button
+                        disabled={blockUser.isPending || unblockUser.isPending}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (blocked) {
+                            unblockUser.mutate(post.author_uuid, {
+                              onSuccess: () => { setBlocked(false); setMenuOpen(false); toast('success', 'User unblocked') },
+                              onError: (err) => { toast('error', `Failed to unblock: ${humanizeError(err)}`) },
+                            })
+                          } else {
+                            blockUser.mutate(post.author_uuid, {
+                              onSuccess: () => { setBlocked(true); setMenuOpen(false); toast('success', 'User blocked') },
+                              onError: (err) => { toast('error', `Failed to block: ${humanizeError(err)}`) },
+                            })
+                          }
+                        }}
+                        className={blocked
+                          ? 'flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]'
+                          : 'flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-400 transition-colors hover:bg-rose-400/10'
+                        }
+                      >
+                        {blockUser.isPending || unblockUser.isPending ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Ban className="h-3.5 w-3.5" />
+                        )}
+                        {blocked ? 'Unblock' : 'Block'}
+                      </button>
+                    </>
+                  )}
+                  {isOwn && (
+                    <>
+                      <div className="my-1 h-px bg-white/[0.06]" />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setMenuOpen(false)
+                          setDeleteModalOpen(true)
+                        }}
+                        className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-400 transition-colors hover:bg-rose-400/10"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -186,11 +393,16 @@ export function PostCard({ post, initialVote = 0, alias }: PostCardProps) {
 
           {/* Body */}
           {isPicks ? (
-            <PicksVisual post={post} />
+            <PicksCard
+              postUuid={post.uuid}
+              priceHistory={post.post_meta?.price_history}
+              userVote={pickUserVote}
+              resolutionDeadline={post.post_meta?.resolution_deadline}
+            />
           ) : (
             <>
               <p className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed text-white/90">
-                {displayText}
+                {renderPostText(displayText)}
               </p>
               {isLong && (
                 <button
@@ -205,51 +417,31 @@ export function PostCard({ post, initialVote = 0, alias }: PostCardProps) {
 
           {/* Likert visual */}
           {isLikert && (
-            <div className="mt-3 space-y-2">
-              {['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'].map((label, i) => (
-                <div
-                  key={label}
-                  className="relative block w-full overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.03]"
-                >
-                  <div className="flex items-center justify-between px-4 py-3">
-                    <span className="text-sm font-medium text-white/80">{label}</span>
-                    <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] font-medium text-white/40">
-                      {20 + i * 5}%
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <LikertScale
+              postUuid={post.uuid}
+              results={likertData?.results}
+              userVote={likertData?.myVote}
+              isOwner={isOwn}
+            />
           )}
 
           {/* Poll visual */}
           {isPoll && pollOptions && (
-            <div className="mt-3 space-y-2">
-              {pollOptions.map((opt, i) => (
-                <div
-                  key={i}
-                  className="relative block w-full overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.03]"
-                >
-                  <div className="flex items-center justify-between px-4 py-3">
-                    <span className="text-sm font-medium text-white/80">{opt}</span>
-                    <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] font-medium text-white/40">
-                      {15 + i * 10}%
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <PollCard
+              postUuid={post.uuid}
+              options={pollOptions}
+              results={pollResults}
+              userVote={pollUserVote ?? null}
+              isOwner={isOwn}
+            />
           )}
 
           {/* Media */}
           {imageSrc && (
             isVideoPost ? (
-              <video
-                src={imageSrc}
-                controls
-                onClick={(e) => e.stopPropagation()}
-                className="mx-auto mt-3 w-[85%] max-h-[26rem] rounded-2xl"
-              />
+              <div className="mx-auto mt-3 w-[85%]" onClick={(e) => e.stopPropagation()}>
+                <VideoPlayer src={imageSrc} compact />
+              </div>
             ) : (
               <img
                 src={imageSrc}
@@ -264,25 +456,32 @@ export function PostCard({ post, initialVote = 0, alias }: PostCardProps) {
           {lightboxOpen && imageSrc && (
             <div
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-              onClick={() => setLightboxOpen(false)}
+              onClick={(e) => { e.stopPropagation(); setLightboxOpen(false) }}
             >
               <div className="absolute right-4 top-4 flex items-center gap-2">
                 <button
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    try {
+                      const resp = await fetch(imageSrc)
+                      const blob = await resp.blob()
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = `image-${post.uuid}.${blob.type.split('/')[1] || 'jpg'}`
+                      document.body.appendChild(a)
+                      a.click()
+                      document.body.removeChild(a)
+                      URL.revokeObjectURL(url)
+                    } catch { /* ignore */ }
+                  }}
                   className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
                   title="Download"
                 >
                   <Download className="h-5 w-5" />
                 </button>
                 <button
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-                  title="Share"
-                >
-                  <Share2 className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={() => setLightboxOpen(false)}
+                  onClick={(e) => { e.stopPropagation(); setLightboxOpen(false) }}
                   className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
                   title="Close"
                 >
@@ -290,37 +489,31 @@ export function PostCard({ post, initialVote = 0, alias }: PostCardProps) {
                 </button>
               </div>
               {isVideoPost ? (
-                <video src={imageSrc} controls className="max-h-[90vh] max-w-[90vw] rounded-xl" onClick={(e) => e.stopPropagation()} />
+                <div className="max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+                  <VideoPlayer src={imageSrc} />
+                </div>
               ) : (
                 <img src={imageSrc} alt="" className="max-h-[90vh] max-w-[90vw] rounded-xl object-contain" onClick={(e) => e.stopPropagation()} />
               )}
             </div>
           )}
 
+          {/* Transaction card */}
+          {isTransaction && post.post_meta && (
+            <TransactionCard
+              category={post.post_meta.category}
+              merchant={post.post_meta.merchant}
+              date={post.post_meta.date}
+              transactionValue={post.post_meta.transactionValue}
+              currencyCode={post.post_meta.currencyCode}
+              categoryIconUrl={post.post_meta.categoryIconUrl}
+            />
+          )}
+
           {/* Quote post preview */}
-          {post.post_meta?.quote_post && (() => {
-            const q = post.post_meta.quote_post
-            return (
-              <div className="mt-3 cursor-pointer rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 transition-colors hover:bg-white/[0.04]">
-                <div className="mb-2 flex items-center gap-2">
-                  <NetworthPill
-                    networth={q.author_meta.balance}
-                    subscriptionType={q.author_meta.subscription_type}
-                    authorUuid={q.author_uuid}
-                    role={q.author_meta.role}
-                    size="small"
-                  />
-                  <span className="text-xs text-white/40">{timeAgo(q.created_at)}</span>
-                  {q.topic && <span className="text-xs text-[#c8a44d]">$/{q.topic.toLowerCase()}</span>}
-                </div>
-                {q.title && <p className="mb-1 text-sm font-semibold text-white">{q.title}</p>}
-                <p className="line-clamp-3 text-sm text-white/60">{q.text}</p>
-                {q.post_meta?.src && (
-                  <img src={q.post_meta.src} alt="" className="mt-2 max-h-32 w-full rounded-lg object-cover" />
-                )}
-              </div>
-            )
-          })()}
+          {post.post_meta?.quote_post && (
+            <QuotePostCard quote={post.post_meta.quote_post} />
+          )}
 
           {/* Bottom row */}
           <div className="mt-3 flex items-center gap-2.5">
@@ -334,8 +527,11 @@ export function PostCard({ post, initialVote = 0, alias }: PostCardProps) {
             />
 
             {/* Actions */}
-            <div className="flex shrink-0 items-center gap-2.5">
-              <button className="group flex h-[38px] cursor-pointer items-center gap-1.5 rounded-full border border-[#c8a44d]/20 bg-gradient-to-b from-white/[0.07] to-white/[0.03] px-4.5 text-sm text-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_4px_rgba(0,0,0,0.15)] transition-all hover:border-[#c8a44d]/30 hover:text-[#c8a44d] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_0_10px_rgba(218,178,87,0.1)] active:scale-95">
+            <div className="ml-auto flex shrink-0 items-center gap-2.5">
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate(`/post/${post.uuid}`) }}
+                className="group flex h-[38px] cursor-pointer items-center gap-1.5 rounded-full border border-[#c8a44d]/20 bg-gradient-to-b from-white/[0.07] to-white/[0.03] px-4.5 text-sm text-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_4px_rgba(0,0,0,0.15)] transition-all hover:border-[#c8a44d]/30 hover:text-[#c8a44d] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_0_10px_rgba(218,178,87,0.1)] active:scale-95"
+              >
                 <MessageSquare className="h-3.5 w-3.5 fill-current transition-transform group-hover:scale-110" />
                 <span className="text-sm font-semibold leading-5">{post.comment_count}</span>
               </button>
@@ -365,6 +561,14 @@ export function PostCard({ post, initialVote = 0, alias }: PostCardProps) {
           </div>
         </div>
       </article>
+
+      {deleteModalOpen && (
+        <ConfirmDeleteModal
+          isPending={deleteMutation.isPending}
+          onClose={() => setDeleteModalOpen(false)}
+          onConfirm={() => deleteMutation.mutate({ post_uuid: post.uuid }, { onSuccess: () => { setDeleteModalOpen(false); toast('success', 'Post deleted') } })}
+        />
+      )}
     </>
   )
 }

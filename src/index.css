@@ -3,7 +3,7 @@
 html {
   overflow-y: scroll;
   scrollbar-width: thin;
-  scrollbar-color: #333330 #0d0d0b;
+  scrollbar-color: #333330 #0a0907;
 }
 
 ::-webkit-scrollbar {
@@ -12,7 +12,7 @@ html {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0d0d0b;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -26,8 +26,75 @@ html {
 
 body {
   margin: 0;
-  background-color: #0d0d0b;
+  background-color: #0a0907;
   font-family: 'DM Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.msg-flash > div {
+  animation: msg-flash-anim 1.4s ease-out;
+}
+
+@keyframes msg-flash-anim {
+  0% { background-color: rgba(200, 164, 77, 0); }
+  20% { background-color: rgba(200, 164, 77, 0.18); }
+  100% { background-color: rgba(200, 164, 77, 0); }
+}
+
+@keyframes comment-highlight {
+  0%   { background-color: rgba(200, 164, 77, 0.22); }
+  100% { background-color: rgba(200, 164, 77, 0); }
+}
+
+.comment-highlight {
+  animation: comment-highlight 2s ease-out forwards;
+}
+
+@keyframes balDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* ── Compose editor blockquote styles ── */
+[contenteditable] blockquote {
+  border-left: 2px solid rgba(200, 164, 77, 0.3);
+  padding-left: 0.75rem;
+  margin: 0.25rem 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+/* ── Compose editor list styles ── */
+[contenteditable] ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+[contenteditable] ul li {
+  position: relative;
+  padding-left: 1.2em;
+}
+
+[contenteditable] ul li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: rgba(200, 164, 77, 0.6);
+  font-weight: bold;
+}
+
+/* ── Toast animation ── */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Emoji picker overrides ── */
+em-emoji-picker {
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4) !important;
+  font-family: 'DM Sans', sans-serif !important;
 }

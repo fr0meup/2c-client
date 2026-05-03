@@ -1,17 +1,21 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TOPICS, TOPIC_MENU, FEED_PARAM_TO_TOPIC, getFeedUrl } from './config'
 
 export function FeedFilters() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [searchOpen, setSearchOpen] = useState(false)
+  const queryClient = useQueryClient()
+  const currentQuery = new URLSearchParams(location.search).get('q') ?? ''
+  const [searchOpen, setSearchOpen] = useState(!!currentQuery)
+  const [searchValue, setSearchValue] = useState(currentQuery)
   const [topicsOpen, setTopicsOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [indicator, setIndicator] = useState({ left: 0, width: 0 })
-
   // Derive active topic from URL query param ?feed=
   const feedParam = new URLSearchParams(location.search).get('feed')
   const activeTopic = FEED_PARAM_TO_TOPIC[feedParam ?? ''] ?? 'New'
@@ -28,12 +32,22 @@ export function FeedFilters() {
 
   useLayoutEffect(() => {
     if (!containerRef.current) return
-    const activeBtn = containerRef.current.querySelector('[data-active="true"]') as HTMLElement | null
-    if (activeBtn) {
-      const containerRect = containerRef.current.getBoundingClientRect()
+    const container = containerRef.current
+    const activeBtn = container.querySelector('[data-active="true"]') as HTMLElement | null
+    if (!activeBtn) return
+
+    const updateIndicator = () => {
+      const containerRect = container.getBoundingClientRect()
       const btnRect = activeBtn.getBoundingClientRect()
       setIndicator({ left: btnRect.left - containerRect.left, width: btnRect.width })
     }
+
+    updateIndicator()
+
+    const ro = new ResizeObserver(updateIndicator)
+    ro.observe(activeBtn)
+    ro.observe(container)
+    return () => ro.disconnect()
   }, [activeTopic, topicsOpen, isInTopicsMenu, searchOpen])
 
   useEffect(() => {
@@ -66,7 +80,9 @@ export function FeedFilters() {
           ref={inputRef}
           type="text"
           placeholder="Search..."
-          className="absolute left-10 top-0 h-10 bg-transparent pr-3 text-sm text-white placeholder:text-white/30 focus:outline-none"
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
+          className="absolute left-10 top-0 h-10 bg-transparent pr-10 text-sm text-white placeholder:text-white/30 focus:outline-none"
           style={{
             fontFamily: 'inherit',
             opacity: searchOpen ? 1 : 0,
@@ -74,9 +90,47 @@ export function FeedFilters() {
             width: 'calc(100% - 3.25rem)',
           }}
           tabIndex={searchOpen ? 0 : -1}
-          onBlur={() => setSearchOpen(false)}
-          onKeyDown={(e) => e.key === 'Escape' && setSearchOpen(false)}
+          onBlur={(e) => {
+            if (e.relatedTarget?.closest('[data-adv-search]')) return
+            if (!searchValue.trim()) setSearchOpen(false)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && searchValue.trim()) {
+              const params = new URLSearchParams(location.search)
+              params.set('q', searchValue.trim())
+              navigate(`/?${params.toString()}`)
+              inputRef.current?.blur()
+            }
+            if (e.key === 'Escape') {
+              if (searchValue) {
+                setSearchValue('')
+                const params = new URLSearchParams(location.search)
+                params.delete('q')
+                const qs = params.toString()
+                navigate(qs ? `/?${qs}` : '/')
+              }
+              setSearchOpen(false)
+            }
+          }}
         />
+
+        {/* Advanced search icon — inside the bar, right end */}
+        {searchOpen && (
+          <button
+            data-adv-search
+            tabIndex={0}
+            onMouseDown={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setSearchOpen(false)
+              navigate('/?adv=1')
+            }}
+            className="absolute right-1.5 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-white/30 transition-colors hover:bg-white/[0.08] hover:text-[#c8a44d]"
+            title="Advanced Search"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Search icon */}
@@ -98,7 +152,7 @@ export function FeedFilters() {
       <div
         ref={containerRef}
         className="relative flex items-center gap-1.5"
-        style={{ marginLeft: searchOpen ? '18.75rem' : '3rem', transition: 'margin-left 300ms ease-out' }}
+        style={{ marginLeft: searchOpen ? '18.75rem' : '3rem', transition: 'margin-left 300ms ease-out', maxWidth: searchOpen ? 'calc(100% - 19rem)' : 'calc(100% - 3.5rem)' }}
       >
         {/* Sliding gold indicator */}
         <div
@@ -118,6 +172,7 @@ export function FeedFilters() {
               key={topic}
               data-active={isActive ? 'true' : 'false'}
               onClick={() => {
+                queryClient.removeQueries({ queryKey: ['feed'] })
                 navigate(getFeedUrl(topic))
                 setTopicsOpen(false)
               }}
@@ -149,9 +204,9 @@ export function FeedFilters() {
             )}
           >
             {isInTopicsMenu ? (
-              <span className="flex items-center gap-1.5">
-                {activeTopic}
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#c8a44d]" />
+              <span className={cn('flex items-center gap-1.5', searchOpen && 'overflow-hidden')}>
+                <span className={cn('min-w-0', searchOpen && 'truncate max-w-[3ch]')}>{activeTopic}</span>
+                <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[#c8a44d]" />
               </span>
             ) : (
               'Topics'
@@ -189,6 +244,7 @@ export function FeedFilters() {
                   <button
                     key={item}
                     onClick={() => {
+                      queryClient.removeQueries({ queryKey: ['feed'] })
                       navigate(getFeedUrl(item))
                       setTopicsOpen(false)
                     }}

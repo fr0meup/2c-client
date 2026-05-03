@@ -1,4 +1,6 @@
+import { useMemo } from 'react'
 import { PenSquare } from 'lucide-react'
+import { useAuth } from '@/lib/auth'
 import { navItems } from './navItems'
 import { SidebarNavLink } from './SidebarNavLink'
 export { BottomNav } from './BottomNav'
@@ -8,10 +10,20 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onNewPostClick }: SidebarProps) {
+  const { auth } = useAuth()
+  const items = useMemo(
+    () => navItems.map((item) =>
+      item.label === 'Me' && auth?.userUuid
+        ? { ...item, path: `/user/${auth.userUuid}` }
+        : item
+    ),
+    [auth?.userUuid],
+  )
+
   return (
     <aside className="fixed left-[calc(50%-600px)] top-[72px] hidden h-[calc(100vh-72px)] w-60 flex-col px-3 py-3 font-[Inter,-apple-system,BlinkMacSystemFont,'Segoe_UI',sans-serif] xl:flex">
       <nav className="flex flex-1 flex-col gap-1.5">
-        {navItems.map((item) => (
+        {items.map((item) => (
           <SidebarNavLink key={item.path} item={item} />
         ))}
       </nav>

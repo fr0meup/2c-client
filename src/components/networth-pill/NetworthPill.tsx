@@ -1,5 +1,6 @@
 import type { MouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePrefetch } from '@/hooks/usePrefetch'
 import type { NetworthPillProps } from './types'
 import {
   PILL_IMAGES,
@@ -24,12 +25,17 @@ export function NetworthPill({
   className = '',
 }: NetworthPillProps) {
   const navigate = useNavigate()
-  const canNavigate = !!authorUuid && authorUuid !== 'admin' && authorUuid !== 'penny'
+  const { prefetchUserProfile } = usePrefetch()
+  const canNavigate = !!authorUuid
 
   function handleClick(e: MouseEvent<HTMLDivElement>) {
     if (!canNavigate) return
     e.stopPropagation()
     navigate(`/user/${authorUuid}`)
+  }
+
+  function handleHover() {
+    if (canNavigate) prefetchUserProfile(authorUuid!)
   }
 
   const actualTier =
@@ -57,10 +63,14 @@ export function NetworthPill({
     return (
       <div
         onClick={canNavigate ? handleClick : undefined}
-        className={`relative inline-flex items-center justify-center ${config.height} ${config.text} min-w-[60px] rounded-full border-2 border-gray-600 bg-transparent px-2 ${className}${canNavigate ? ' cursor-pointer' : ''}`}
+        onMouseEnter={canNavigate ? handleHover : undefined}
+        className={`relative inline-flex items-center justify-center gap-1.5 ${config.height} ${config.text} min-w-[60px] rounded-full border-2 border-gray-600 bg-transparent px-2 ${className}${canNavigate ? ' cursor-pointer' : ''}`}
       >
         <span className="font-bold" style={textStyle}>
           fag
+        </span>
+        <span className="text-[11px] font-medium text-white/30">
+          {formattedNetworth}
         </span>
       </div>
     )
@@ -69,6 +79,7 @@ export function NetworthPill({
   return (
     <div
       onClick={canNavigate ? handleClick : undefined}
+      onMouseEnter={canNavigate ? handleHover : undefined}
       className={`relative inline-flex items-center ${hasSpecialLabel ? 'justify-center px-3' : 'gap-2 pl-1 pr-2'} ${config.height} ${config.text} min-w-[50px] ${className}${canNavigate ? ' cursor-pointer' : ''}`}
       style={{
         borderStyle: 'solid',
