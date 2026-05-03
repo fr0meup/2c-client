@@ -18,6 +18,7 @@ export function NotificationItem({ notif, onRead, onOpen }: Props) {
     ? TYPE_LABELS[notif.type].replace('upvoted', 'downvoted')
     : TYPE_LABELS[notif.type]
   const isClickable = Boolean(notif.post_uuid) || notif.type === 'followed'
+  const showPreview = Boolean(notif.preview)
 
   return (
     <article
@@ -98,7 +99,7 @@ export function NotificationItem({ notif, onRead, onOpen }: Props) {
               )}
             </div>
 
-            {notif.preview && (
+            {showPreview && (
               <p
                 className={cn(
                   'mt-1 line-clamp-2 text-[13px] leading-snug',
@@ -118,7 +119,7 @@ export function NotificationItem({ notif, onRead, onOpen }: Props) {
                   {' '}
                 </span>
               )}
-              {notif.preview && (
+              {showPreview && (
                 <span className={cn(isUnread ? 'text-white/60' : 'text-white/35')}>
                   {notif.preview}
                   {' '}

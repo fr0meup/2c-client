@@ -27,15 +27,16 @@ export function parseNotificationMessage(
   message: string
 ): { actor?: string; preview?: string; isDownvote?: boolean } {
   // Patterns with an actor: "Verb by **actor**: preview" or "Verb by actor: preview"
-  const actorColonMatch = message.match(/^(.+?) by \*\*(.+?)\*\*:\s*(.*)$/)
-    || message.match(/^(Upvoted|Downvoted|Voted) by ([^:]+):\s*(.*)$/i)
+  const actorColonMatch = message.match(/^(.+?) by \*\*(.+?)\*\*:\s*(.*)$/s)
+    || message.match(/^(Upvoted|Downvoted|Voted) by ([^:]+):\s*(.*)$/is)
   if (actorColonMatch) {
     const isDownvote = /^downvoted/i.test(actorColonMatch[1])
-    return { actor: actorColonMatch[2].trim(), preview: actorColonMatch[3] || undefined, isDownvote: isDownvote || undefined }
+    const rawPreview = actorColonMatch[3]?.replace(/\s+/g, ' ').trim()
+    return { actor: actorColonMatch[2].trim(), preview: rawPreview || undefined, isDownvote: isDownvote || undefined }
   }
 
   // "New reply from **actor**: preview"
-  const replyMatch = message.match(/^New reply from \*\*(.+?)\*\*:\s*(.*)$/)
+  const replyMatch = message.match(/^New reply from \*\*(.+?)\*\*:\s*(.*)$/s)
   if (replyMatch) {
     return { actor: replyMatch[1], preview: replyMatch[2] || undefined }
   }
