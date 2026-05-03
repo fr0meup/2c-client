@@ -23,7 +23,7 @@ export function CommentThread({
       : c.reply_parent_uuid === parentUuid,
   )
 
-  children.sort((a, b) => b.upvote_count - a.upvote_count)
+  children.sort((a, b) => b.upvote_count - a.upvote_count || new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
   if (children.length === 0) return null
 
