@@ -9,6 +9,7 @@ import { usePost } from '@/hooks/usePost'
 import { useAuth } from '@/lib/auth'
 import { useFollow } from '@/components/profile/FollowContext'
 import { useToast } from '@/components/toast/ToastContext'
+import { useCompose } from '@/layouts/AppLayout'
 import { humanizeError } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -21,6 +22,7 @@ export function PostDetailHeader() {
   const bookmarkMutation = useToggleBookmark()
   const { isFollowing, toggleFollow } = useFollow()
   const { toast } = useToast()
+  const { openQuote } = useCompose()
   const queryClient = useQueryClient()
   const blockUser = useBlockUser()
   const unblockUser = useUnblockUser()
@@ -62,14 +64,17 @@ export function PostDetailHeader() {
         {menuOpen && (
           <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl border border-white/[0.08] bg-[#141410] p-1 shadow-xl shadow-black/40">
             <button
-              onClick={() => { navigator.clipboard.writeText(window.location.href); setMenuOpen(false) }}
+              onClick={() => { navigator.clipboard.writeText(`https://twocents.money/post/${uuid}`); setMenuOpen(false); toast('success', 'Link copied') }}
               className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
             >
               <Link2 className="h-3.5 w-3.5 text-white/40" />
               Copy link
             </button>
             <button
-              onClick={() => setMenuOpen(false)}
+              onClick={() => {
+                setMenuOpen(false)
+                if (postData?.post) openQuote(postData.post)
+              }}
               className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
             >
               <Quote className="h-3.5 w-3.5 text-white/40" />

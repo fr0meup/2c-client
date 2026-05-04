@@ -225,7 +225,7 @@ export function ProfileSettingsMenu() {
       {confirm?.type === 'clear' && (
         <ConfirmModal
           title="Clear all data"
-          message="This will permanently delete all your saved GIFs, favorites, emoji recents, drafts, and preferences. This cannot be undone."
+          message="This will permanently delete all your saved GIFs, favorites, emoji recents, drafts, cached posts, and preferences. This cannot be undone."
           confirmLabel="Clear everything"
           onConfirm={() => { confirm.onConfirm(); setConfirm(null) }}
           onCancel={() => setConfirm(null)}
@@ -234,7 +234,7 @@ export function ProfileSettingsMenu() {
       {confirm?.type === 'import' && (
         <ConfirmModal
           title="Import data"
-          message="Importing will replace all your current data (GIFs, favorites, emoji recents, drafts, preferences) with the backup file. Export first if you want to keep your current data."
+          message="Importing will replace all your current data (GIFs, favorites, emoji recents, drafts, cached posts, preferences) with the backup file. Export first if you want to keep your current data."
           confirmLabel="Import & replace"
           onConfirm={() => { confirm.onConfirm(); setConfirm(null) }}
           onCancel={() => setConfirm(null)}
@@ -261,7 +261,12 @@ export function ProfileSettingsMenu() {
                 mediaBlob: d.mediaBlob ? Array.from(new Uint8Array(d.mediaBlob)) : null,
               }))
             } catch { /* no drafts */ }
-            const backup = { _version: 1, localStorage: data, drafts }
+            let postCache = null
+            try {
+              const { exportPostCache } = await import('@/lib/postCache')
+              postCache = await exportPostCache()
+            } catch { /* no cache */ }
+            const backup = { _version: 2, localStorage: data, drafts, postCache }
             const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
@@ -420,10 +425,17 @@ function SettingsContent({ close, onOpenBlocked, onConfirm }: { close: () => voi
             }))
           } catch { /* no drafts */ }
 
+          let postCache = null
+          try {
+            const { exportPostCache } = await import('@/lib/postCache')
+            postCache = await exportPostCache()
+          } catch { /* no cache */ }
+
           const backup = {
-            _version: 1,
+            _version: 2,
             localStorage: data,
             drafts,
+            postCache,
           }
 
           const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
@@ -468,8 +480,12 @@ function SettingsContent({ close, onOpenBlocked, onConfirm }: { close: () => voi
                   }
                   toRemove.forEach((k) => localStorage.removeItem(k))
                   try { indexedDB.deleteDatabase('2c-drafts') } catch { /* ignore */ }
+                  try {
+                    const { clearPostCache } = await import('@/lib/postCache')
+                    await clearPostCache()
+                  } catch { /* ignore */ }
 
-                  // v1 format (has _version key)
+                  // v1/v2 format (has _version key)
                   if (data._version) {
                     if (data.localStorage) {
                       Object.entries(data.localStorage).forEach(([k, v]) => localStorage.setItem(k, v as string))
@@ -483,6 +499,10 @@ function SettingsContent({ close, onOpenBlocked, onConfirm }: { close: () => voi
                         }
                         await saveDraft(draft)
                       }
+                    }
+                    if (data.postCache) {
+                      const { importPostCache } = await import('@/lib/postCache')
+                      await importPostCache(data.postCache)
                     }
                   } else {
                     // Legacy format (flat key-value from old export)
@@ -519,6 +539,7 @@ function SettingsContent({ close, onOpenBlocked, onConfirm }: { close: () => voi
             }
             toRemove.forEach((k) => localStorage.removeItem(k))
             try { indexedDB.deleteDatabase('2c-drafts') } catch { /* ignore */ }
+            try { indexedDB.deleteDatabase('2c-post-cache') } catch { /* ignore */ }
             window.location.reload()
           })
         }}

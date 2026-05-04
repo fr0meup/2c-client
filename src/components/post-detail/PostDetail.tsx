@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useParams, useLocation, useNavigate } from 'react-router-dom'
+import { useParams, useLocation } from 'react-router-dom'
 import {
   MessageCircle,
   MessageSquare,
@@ -7,16 +7,6 @@ import {
   Eye,
   Download,
   X,
-  Trash2,
-  MoreHorizontal,
-  Link2,
-  Quote,
-  UserPlus,
-  UserCheck,
-  Mail,
-  Ban,
-  Bookmark,
-  Loader2,
 } from 'lucide-react'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { NetworthPill } from '@/components/networth-pill'
@@ -29,14 +19,12 @@ import { LikertScale } from '@/components/post-card/LikertScale'
 import { PicksCard } from '@/components/post-card/PicksCard'
 import { QuotePostCard } from '@/components/post-card/QuotePostCard'
 import { TransactionCard } from '@/components/post-card/TransactionCard'
+import { LinkCard } from '@/components/post-card/LinkCard'
 import { VideoPlayer } from '@/components/video-player/VideoPlayer'
 import { CommentThread } from './CommentThread'
 import { usePost } from '@/hooks/usePost'
 import { useComments } from '@/hooks/useComments'
 import { useVotePost } from '@/hooks/useVotePost'
-import { useDeletePost } from '@/hooks/usePostMutations'
-import { useToggleBookmark } from '@/hooks/useBookmarks'
-import { useBlockUser, useUnblockUser } from '@/hooks/useBlock'
 import { useCreateComment } from '@/hooks/useComments'
 import { useFollow } from '@/components/profile/FollowContext'
 import { useToast } from '@/components/toast/ToastContext'
@@ -53,9 +41,8 @@ import { getTextWithGifs, insertGifImage } from '@/lib/gif'
 export function PostDetail() {
   const { uuid } = useParams<{ uuid: string }>()
   const location = useLocation()
-  const navigate = useNavigate()
   const { auth } = useAuth()
-  const { aliasFor, isFollowing, toggleFollow } = useFollow()
+  const { aliasFor } = useFollow()
   const { toast } = useToast()
   const queryClient = useQueryClient()
 
@@ -117,10 +104,6 @@ export function PostDetail() {
   }
 
   const voteMutation = useVotePost()
-  const deleteMutation = useDeletePost()
-  const bookmarkMutation = useToggleBookmark()
-  const blockUser = useBlockUser()
-  const unblockUser = useUnblockUser()
   const commentMutation = useCreateComment()
   const isOwn = auth?.userUuid === post?.author_uuid
 
@@ -132,13 +115,7 @@ export function PostDetail() {
   const [commentHasText, setCommentHasText] = useState(false)
   const [hasCommentSelection, setHasCommentSelection] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [blocked, setBlocked] = useState(false)
-  const [dmLoading, setDmLoading] = useState(false)
-  const [showAliasInput, setShowAliasInput] = useState(false)
-  const [aliasInput, setAliasInput] = useState('')
   const commentRef = useRef<HTMLDivElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function checkCommentSel() {
@@ -151,14 +128,6 @@ export function PostDetail() {
     return () => document.removeEventListener('selectionchange', checkCommentSel)
   }, [])
 
-  useEffect(() => {
-    if (!menuOpen) return
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [menuOpen])
 
   // Sync vote count & vote state when post loads
   useEffect(() => {
@@ -283,6 +252,7 @@ export function PostDetail() {
   const isVideoPost = post.post_meta?.media_type === 'video'
   const isPicks = post.post_type === 7
   const isTransaction = post.post_type === 8
+  const isLink = post.post_type === 1 && !!post.post_meta?.link
 
   return (
     <div className="flex flex-col">
@@ -317,219 +287,6 @@ export function PostDetail() {
             </>
           )}
 
-          {/* 3-dot menu */}
-          <div className="relative ml-auto" ref={menuRef}>
-            <button
-              onClick={() => setMenuOpen((p) => !p)}
-              className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white"
-            >
-              <MoreHorizontal className="h-3.5 w-3.5" />
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl border border-white/[0.08] bg-[#141410] p-1 shadow-xl shadow-black/40">
-                <button
-                  onClick={() => { navigator.clipboard.writeText(window.location.href); setMenuOpen(false) }}
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
-                >
-                  <Link2 className="h-3.5 w-3.5 text-white/40" />
-                  Copy link
-                </button>
-                <button
-                  onClick={() => setMenuOpen(false)}
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
-                >
-                  <Quote className="h-3.5 w-3.5 text-white/40" />
-                  Quote post
-                </button>
-                <button
-                  onClick={() => {
-                    setMenuOpen(false)
-                    bookmarkMutation.mutate(post.uuid, {
-                      onSuccess: (res) => toast('success', res.bookmarked ? 'Post bookmarked' : 'Bookmark removed'),
-                      onError: (err) => toast('error', `Bookmark failed: ${humanizeError(err)}`),
-                    })
-                  }}
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
-                >
-                  <Bookmark className="h-3.5 w-3.5 text-white/40" />
-                  Bookmark
-                </button>
-                {!isOwn && post.author_uuid && (
-                  <>
-                    <div className="my-1 h-px bg-white/[0.06]" />
-                    {showAliasInput ? (
-                      <div className="flex flex-col gap-1.5 p-2">
-                        <p className="text-[11px] text-white/35">Choose a nickname</p>
-                        <input
-                          value={aliasInput}
-                          onChange={(e) => setAliasInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && aliasInput.trim()) {
-                              toggleFollow(post.author_uuid, aliasInput.trim())
-                              setShowAliasInput(false)
-                              setAliasInput('')
-                              setMenuOpen(false)
-                            }
-                            if (e.key === 'Escape') { setShowAliasInput(false); setAliasInput('') }
-                          }}
-                          maxLength={30}
-                          placeholder="e.g. John, trading-guy…"
-                          className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-sm text-white/90 placeholder-white/30 outline-none focus:border-[#c8a44d]/40"
-                          autoFocus
-                        />
-                        <div className="flex justify-end">
-                          <button
-                            onClick={() => {
-                              if (!aliasInput.trim()) return
-                              toggleFollow(post.author_uuid, aliasInput.trim())
-                              setShowAliasInput(false)
-                              setAliasInput('')
-                              setMenuOpen(false)
-                            }}
-                            disabled={!aliasInput.trim()}
-                            className="flex items-center gap-1.5 rounded-lg bg-[#c8a44d]/20 px-3 py-1.5 text-xs font-semibold text-[#c8a44d] transition-colors hover:bg-[#c8a44d]/30 disabled:opacity-50"
-                          >
-                            <UserPlus className="h-3 w-3" strokeWidth={2.5} />
-                            Follow
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          if (isFollowing(post.author_uuid)) {
-                            toggleFollow(post.author_uuid)
-                            setMenuOpen(false)
-                          } else {
-                            setShowAliasInput(true)
-                          }
-                        }}
-                        className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
-                      >
-                        {isFollowing(post.author_uuid) ? (
-                          <UserCheck className="h-3.5 w-3.5 text-[#c8a44d]" />
-                        ) : (
-                          <UserPlus className="h-3.5 w-3.5 text-white/40" />
-                        )}
-                        {isFollowing(post.author_uuid) ? 'Unfollow' : 'Follow'}
-                      </button>
-                    )}
-                    <button
-                      disabled={dmLoading}
-                      onClick={async () => {
-                        if (!auth || dmLoading) return
-                        setDmLoading(true)
-                        try {
-                          const { rpc } = await import('@/lib/api')
-                          const result = await rpc<{ room: { uuid: string } }>(
-                            '/v1/rooms/startDM',
-                            { recipientUuid: post.author_uuid },
-                            auth.token,
-                            auth.userUuid,
-                          )
-                          const roomUuid = result.room.uuid
-                          const [roomData, , messagesData] = await Promise.all([
-                            rpc<import('@/lib/types').GetRoomResponse>(
-                              '/v1/rooms/getRoom',
-                              { roomUuid },
-                              auth.token,
-                              auth.userUuid,
-                            ),
-                            rpc<import('@/lib/types').GetMembersResponse>(
-                              '/v1/rooms/getMembers',
-                              { roomUuid },
-                              auth.token,
-                              auth.userUuid,
-                            ),
-                            rpc<import('@/lib/types').GetMessagesResponse>(
-                              '/v1/rooms/getMessages',
-                              { roomUuid, offset: 0, limit: 500 },
-                              auth.token,
-                              auth.userUuid,
-                            ),
-                          ])
-                          queryClient.setQueryData<import('@/lib/types').ListRoomsResponse>(
-                            ['rooms', 'dms'],
-                            (prev) => {
-                              const apiRoom = roomData.room
-                              if (!prev) return { rooms: [apiRoom] }
-                              if (prev.rooms.some((r) => r.uuid === apiRoom.uuid)) return prev
-                              return { rooms: [apiRoom, ...prev.rooms] }
-                            },
-                          )
-                          queryClient.setQueryData(['rooms', 'detail', roomUuid], roomData)
-                          queryClient.setQueryData(['rooms', 'messages', roomUuid], messagesData)
-                          setMenuOpen(false)
-                          navigate(`/room/${roomUuid}`)
-                          setTimeout(() => {
-                            queryClient.invalidateQueries({ queryKey: ['rooms', 'dms'] })
-                          }, 2000)
-                        } catch {
-                          setDmLoading(false)
-                        }
-                      }}
-                      className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
-                    >
-                      {dmLoading ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-white/40" />
-                      ) : (
-                        <Mail className="h-3.5 w-3.5 text-white/40" />
-                      )}
-                      {dmLoading ? 'Starting DM\u2026' : 'Message'}
-                    </button>
-                    <div className="my-1 h-px bg-white/[0.06]" />
-                    <button
-                      disabled={blockUser.isPending || unblockUser.isPending}
-                      onClick={() => {
-                        if (blocked) {
-                          unblockUser.mutate(post.author_uuid, {
-                            onSuccess: () => { setBlocked(false); setMenuOpen(false); toast('success', 'User unblocked') },
-                            onError: (err) => { toast('error', `Failed to unblock: ${humanizeError(err)}`) },
-                          })
-                        } else {
-                          blockUser.mutate(post.author_uuid, {
-                            onSuccess: () => { setBlocked(true); setMenuOpen(false); toast('success', 'User blocked') },
-                            onError: (err) => { toast('error', `Failed to block: ${humanizeError(err)}`) },
-                          })
-                        }
-                      }}
-                      className={blocked
-                        ? 'flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]'
-                        : 'flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-400 transition-colors hover:bg-rose-400/10'
-                      }
-                    >
-                      {blockUser.isPending || unblockUser.isPending ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Ban className="h-3.5 w-3.5" />
-                      )}
-                      {blocked ? 'Unblock' : 'Block'}
-                    </button>
-                  </>
-                )}
-                {isOwn && (
-                  <>
-                    <div className="my-1 h-px bg-white/[0.06]" />
-                    <button
-                      onClick={() => {
-                        setMenuOpen(false)
-                        if (confirm('Delete this post?')) {
-                          deleteMutation.mutate(
-                            { post_uuid: post.uuid },
-                            { onSuccess: () => { toast('success', 'Post deleted'); navigate('/') } }
-                          )
-                        }
-                      }}
-                      className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-400 transition-colors hover:bg-rose-400/10"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Title */}
@@ -644,6 +401,11 @@ export function PostDetail() {
           />
         )}
 
+        {/* Link card */}
+        {isLink && (
+          <LinkCard url={post.post_meta!.link!} />
+        )}
+
         {/* Quote post preview */}
         {post.post_meta?.quote_post && (
           <QuotePostCard quote={post.post_meta.quote_post} />
@@ -657,6 +419,7 @@ export function PostDetail() {
             gender={post.author_meta.gender}
             age={post.author_meta.age}
             arena={post.author_meta.arena}
+            className="flex-1 min-w-0"
           />
 
           <div className="ml-auto flex shrink-0 items-center gap-2.5">

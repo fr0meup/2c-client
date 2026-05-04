@@ -20,6 +20,7 @@ import { LikertScale } from './LikertScale'
 import { PicksCard } from './PicksCard'
 import { QuotePostCard } from './QuotePostCard'
 import { TransactionCard } from './TransactionCard'
+import { LinkCard } from './LinkCard'
 import { usePollResults, useLikertResults } from '@/hooks/usePostResults'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 import { VideoPlayer } from '@/components/video-player/VideoPlayer'
@@ -107,6 +108,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
   const isLikert = post.post_type === 5
   const isPicks = post.post_type === 7
   const isTransaction = post.post_type === 8
+  const isLink = post.post_type === 1 && !!post.post_meta?.link
 
   const { data: pollResults } = usePollResults(
     isPoll ? post.uuid : undefined,
@@ -177,8 +179,9 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      navigator.clipboard.writeText(`${window.location.origin}/post/${post.uuid}`)
+                      navigator.clipboard.writeText(`https://twocents.money/post/${post.uuid}`)
                       setMenuOpen(false)
+                      toast('success', 'Link copied')
                     }}
                     className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
                   >
@@ -510,6 +513,11 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
             />
           )}
 
+          {/* Link card */}
+          {isLink && (
+            <LinkCard url={post.post_meta!.link!} />
+          )}
+
           {/* Quote post preview */}
           {post.post_meta?.quote_post && (
             <QuotePostCard quote={post.post_meta.quote_post} />
@@ -524,6 +532,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
               gender={post.author_meta.gender}
               age={post.author_meta.age}
               arena={post.author_meta.arena}
+              className="flex-1 min-w-0"
             />
 
             {/* Actions */}

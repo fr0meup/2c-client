@@ -38,6 +38,8 @@ export interface PostMeta {
   currencyCode?: string
   gradient?: string
   categoryIconUrl?: string
+  // link post (post_type 1)
+  link?: string
 }
 
 export interface PostCardData {

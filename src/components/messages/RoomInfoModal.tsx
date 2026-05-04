@@ -1,24 +1,26 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { X, Loader2 } from 'lucide-react'
 import { NetworthPill } from '@/components/networth-pill'
 import { UserMetaPill } from '@/components/user-meta-pill'
 import { useFollow } from '@/components/profile/FollowContext'
+import { useRoomMembers } from '@/hooks/useRooms'
 import { fmtCount, gradientCss } from './utils'
 import type { Room, RoomMember } from './types'
+
+const BATCH = 30
 
 interface Props {
   room: Room
   onClose: () => void
-  /** Pre-fetched online members from useRoomMembers */
-  onlineMembers?: RoomMember[]
-  /** Pre-fetched offline members from useRoomMembers */
-  offlineMembers?: RoomMember[]
-  /** Total member count from API */
-  totalMembers?: number
 }
 
-export function RoomInfoModal({ room, onClose, onlineMembers, offlineMembers, totalMembers }: Props) {
+export function RoomInfoModal({ room, onClose }: Props) {
+  const { data: membersData, isLoading } = useRoomMembers(room.uuid)
+  const [visibleCount, setVisibleCount] = useState(BATCH)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
@@ -27,11 +29,59 @@ export function RoomInfoModal({ room, onClose, onlineMembers, offlineMembers, to
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  // Use API-fetched members if available, fallback to room.members
-  const online = onlineMembers ?? (room.members ?? []).filter((m) => m.is_online)
-  const offline = offlineMembers ?? (room.members ?? []).filter((m) => !m.is_online)
-  const memberCount = totalMembers ?? room.member_count
+  // Map API members → UI RoomMember, dedup + filter left
+  const { online, offline } = useMemo(() => {
+    const raw = membersData?.members ?? []
+    const active = raw.filter((m) => !m.left_at)
+    const deduped = [...new Map(active.map((m) => [m.user_uuid, m])).values()]
+    const mapped: RoomMember[] = deduped.map((m) => ({
+      user_uuid: m.user_uuid,
+      username: m.alias ?? m.systemAlias ?? undefined,
+      balance: Number(m.balance),
+      subscription_type: m.subscription_type,
+      age: m.age,
+      gender: m.gender as 'M' | 'F',
+      arena: m.arena,
+      is_online: m.is_online,
+    }))
+    return {
+      online: mapped.filter((m) => m.is_online),
+      offline: mapped.filter((m) => !m.is_online),
+    }
+  }, [membersData])
+
+  // Flat list for progressive rendering: online first, then offline
+  const allMembers = useMemo(() => [...online, ...offline], [online, offline])
+  const totalReady = allMembers.length
+  const hasMore = visibleCount < totalReady
+
+  // IntersectionObserver to auto-expand visible count on scroll
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const sentinelCb = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (observerRef.current) observerRef.current.disconnect()
+      if (!node) return
+      sentinelRef.current = node
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0]?.isIntersecting) {
+            setVisibleCount((prev) => Math.min(prev + BATCH, totalReady))
+          }
+        },
+        { root: scrollRef.current, rootMargin: '200px' }
+      )
+      observerRef.current.observe(node)
+    },
+    [totalReady]
+  )
+
+  const memberCount = totalReady || room.member_count
   const onlineCount = online.length || (room.stats.online_count ?? 0)
+
+  // Figure out section splits within the visible slice
+  const visible = allMembers.slice(0, visibleCount)
+  const visOnline = visible.filter((m) => m.is_online)
+  const visOffline = visible.filter((m) => !m.is_online)
 
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-md sm:items-center" onClick={onClose}>
@@ -67,22 +117,28 @@ export function RoomInfoModal({ room, onClose, onlineMembers, offlineMembers, to
         </div>
 
         {/* Members */}
-        <div className="flex flex-col gap-1 overflow-y-auto px-3 py-3" style={{ scrollbarWidth: 'thin', scrollbarColor: '#333330 transparent' }}>
-          {online.length > 0 && (
+        <div ref={scrollRef} className="flex flex-col gap-1 overflow-y-auto px-3 py-3" style={{ scrollbarWidth: 'thin', scrollbarColor: '#333330 transparent' }}>
+          {isLoading && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-white/40" />
+            </div>
+          )}
+          {!isLoading && visOnline.length > 0 && (
             <>
               <SectionLabel label="Online" count={online.length} accent />
-              {online.map((m) => <MemberRow key={m.user_uuid} m={m} />)}
+              {visOnline.map((m) => <MemberRow key={m.user_uuid} m={m} />)}
             </>
           )}
-          {offline.length > 0 && (
+          {!isLoading && visOffline.length > 0 && (
             <>
               <SectionLabel label="Offline" count={offline.length} />
-              {offline.map((m) => <MemberRow key={m.user_uuid} m={m} />)}
+              {visOffline.map((m) => <MemberRow key={m.user_uuid} m={m} />)}
             </>
           )}
-          {online.length === 0 && offline.length === 0 && (
+          {!isLoading && online.length === 0 && offline.length === 0 && (
             <p className="py-8 text-center text-sm text-white/40">No member info available</p>
           )}
+          {hasMore && <div ref={sentinelCb} className="h-1 shrink-0" />}
         </div>
       </div>
     </div>,

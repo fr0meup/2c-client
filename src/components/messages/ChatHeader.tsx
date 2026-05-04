@@ -2,11 +2,9 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Hash, Lock, Users } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
-import { useRoomMembers } from '@/hooks/useRooms'
 import { useMessages } from './MessagesContext'
 import { fmtCount, gradientCss } from './utils'
 import { RoomInfoModal } from './RoomInfoModal'
-import type { RoomMember } from './types'
 
 export function ChatHeader() {
   const navigate = useNavigate()
@@ -15,7 +13,6 @@ export function ChatHeader() {
   const { getRoom } = useMessages()
   const [infoOpen, setInfoOpen] = useState(false)
   const room = uuid ? getRoom(uuid) : undefined
-  const { data: membersData } = useRoomMembers(uuid)
 
   if (!room) {
     return (
@@ -28,24 +25,8 @@ export function ChatHeader() {
   const isDm = room.type === 'dm'
   const Icon = room.is_private ? Lock : Hash
 
-  // Map API members to UI RoomMember shape, filtering out those who left and deduplicating by user_uuid
-  const activeMembers = (membersData?.members ?? []).filter((m) => !m.left_at)
-  const deduped = [...new Map(activeMembers.map((m) => [m.user_uuid, m])).values()]
-  const mapped: RoomMember[] = deduped.map((m) => ({
-    user_uuid: m.user_uuid,
-    username: m.alias ?? m.systemAlias ?? undefined,
-    balance: Number(m.balance),
-    subscription_type: m.subscription_type,
-    age: m.age,
-    gender: m.gender as 'M' | 'F',
-    arena: m.arena,
-    is_online: m.is_online,
-  }))
-  const onlineMembers = mapped.filter((m) => m.is_online)
-  const offlineMembers = mapped.filter((m) => !m.is_online)
-
-  const memberCount = mapped.length || room.member_count
-  const onlineCount = onlineMembers.length || room.stats.online_count
+  const memberCount = room.member_count
+  const onlineCount = room.stats.online_count ?? 0
 
   let displayName = room.name
   if (isDm) {
@@ -90,9 +71,6 @@ export function ChatHeader() {
         <RoomInfoModal
           room={room}
           onClose={() => setInfoOpen(false)}
-          onlineMembers={onlineMembers}
-          offlineMembers={offlineMembers}
-          totalMembers={memberCount}
         />
       )}
     </>
