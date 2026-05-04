@@ -510,6 +510,20 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
             />
           )}
 
+          {/* Link attachment */}
+          {post.post_meta?.link && (
+            <a
+              href={post.post_meta.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="mt-3 flex items-center gap-3 rounded-xl border border-[#c8a44d]/15 bg-[#c8a44d]/[0.04] px-4 py-3 transition-colors hover:bg-[#c8a44d]/[0.08]"
+            >
+              <Link2 className="h-4 w-4 shrink-0 text-[#c8a44d]/60" />
+              <span className="min-w-0 truncate text-sm text-[#c8a44d]">{post.post_meta.link}</span>
+            </a>
+          )}
+
           {/* Quote post preview */}
           {post.post_meta?.quote_post && (
             <QuotePostCard quote={post.post_meta.quote_post} />
