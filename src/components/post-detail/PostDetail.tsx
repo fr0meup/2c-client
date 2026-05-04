@@ -488,6 +488,11 @@ export function PostDetail() {
             ref={commentRef}
             contentEditable
             data-placeholder="Add your twocents"
+            onPaste={(e) => {
+              e.preventDefault()
+              const text = e.clipboardData?.getData('text/plain') ?? ''
+              if (text) document.execCommand('insertText', false, text)
+            }}
             onInput={() => {
               const el = commentRef.current
               if (!el) return

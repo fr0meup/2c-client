@@ -330,6 +330,11 @@ export function CommentItem({
             ref={replyRef}
             contentEditable
             data-placeholder="Reply..."
+            onPaste={(e) => {
+              e.preventDefault()
+              const text = e.clipboardData?.getData('text/plain') ?? ''
+              if (text) document.execCommand('insertText', false, text)
+            }}
             onInput={() => {
               const el = replyRef.current
               if (!el) return

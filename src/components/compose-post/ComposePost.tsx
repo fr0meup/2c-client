@@ -185,6 +185,10 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
         return
       }
     }
+    // Strip rich text formatting — paste as plain text only
+    e.preventDefault()
+    const text = e.clipboardData?.getData('text/plain') ?? ''
+    if (text) document.execCommand('insertText', false, text)
   }
 
   const topicRef = useRef<HTMLDivElement>(null)

@@ -37,7 +37,7 @@ export function getTextWithGifs(el: HTMLElement): string {
         const inner = getTextWithGifs(node as HTMLElement)
         if (inner) text += (text.length > 0 && !text.endsWith('\n') ? '\n' : '') + inner
       } else {
-        text += (node as HTMLElement).textContent ?? ''
+        text += getTextWithGifs(node as HTMLElement)
       }
     }
   }
