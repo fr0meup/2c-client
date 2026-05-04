@@ -157,6 +157,8 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
       })
       .replace(/<li>(.*?)<\/li>/gi, '- $1\n')
       .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/div>/gi, '\n').replace(/<div[^>]*>/gi, '')
+      .replace(/<\/p>/gi, '\n').replace(/<p[^>]*>/gi, '')
       .replace(/<(strong|b)>(.*?)<\/\1>/gi, '**$2**')
       .replace(/<[^>]+>/g, '')
       .replace(/&nbsp;/g, ' ')
