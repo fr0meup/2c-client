@@ -185,6 +185,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         },
       )
       queryClient.invalidateQueries({ queryKey: ['rooms'] })
+      // Refetch messages to get full author_meta (WS payload may lack it)
+      queryClient.invalidateQueries({ queryKey: ['rooms', 'messages', payload.room_uuid] })
       return
     }
 

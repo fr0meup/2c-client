@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import { useMessages } from './MessagesContext'
@@ -6,16 +6,56 @@ import { MessageBubble } from './MessageBubble'
 import { MessageComposer } from './MessageComposer'
 import type { ChatMessage } from './types'
 
+const BATCH = 50
+
 export function RoomChat() {
   const { uuid } = useParams<{ uuid: string }>()
   const { auth } = useAuth()
   const { getRoom, getMessages, sendMessage, markRoomRead, setActiveRoom, isMessagesLoading, isLoading, activeRoomUuid } = useMessages()
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
+  const [visibleCount, setVisibleCount] = useState(BATCH)
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const messagesRef = useRef<HTMLDivElement>(null)
 
   const room = uuid ? getRoom(uuid) : undefined
-  const messages = uuid ? getMessages(uuid) : []
+  const allMessages = uuid ? getMessages(uuid) : []
+
+  // Only render the last `visibleCount` messages
+  const startIdx = Math.max(0, allMessages.length - visibleCount)
+  const messages = allMessages.slice(startIdx)
+  const hasMore = startIdx > 0
+
+  // Reset visible count when switching rooms
+  useEffect(() => { setVisibleCount(BATCH) }, [uuid])
+
+  // Load more when scrolling near the top
+  const onScroll = useCallback(() => {
+    const el = messagesRef.current
+    if (!el || !hasMore) return
+    if (el.scrollTop < 200) {
+      const prevHeight = el.scrollHeight
+      setVisibleCount((c) => c + BATCH)
+      // Preserve scroll position after new items are prepended
+      requestAnimationFrame(() => {
+        el.scrollTop += el.scrollHeight - prevHeight
+      })
+    }
+  }, [hasMore])
+
+  // Lock page scroll but keep scrollbar visible (non-functional)
+  useEffect(() => {
+    const html = document.documentElement
+    const body = document.body
+    const prevHO = html.style.overflowY
+    const prevHH = html.style.height
+    const prevBO = body.style.overflow
+    const prevBH = body.style.height
+    html.style.overflowY = 'scroll'
+    html.style.height = '100vh'
+    body.style.overflow = 'hidden'
+    body.style.height = '100vh'
+    return () => { html.style.overflowY = prevHO; html.style.height = prevHH; body.style.overflow = prevBO; body.style.height = prevBH }
+  }, [])
 
   // Set active room so context fetches messages for this room
   useEffect(() => {
@@ -27,9 +67,12 @@ export function RoomChat() {
     if (uuid) markRoomRead(uuid)
   }, [uuid, markRoomRead])
 
+  // Auto-scroll only when a genuinely new message arrives (not when loading older ones)
+  const lastMsgUuid = allMessages.length > 0 ? allMessages[allMessages.length - 1].uuid : null
   useLayoutEffect(() => {
-    bottomRef.current?.scrollIntoView()
-  }, [messages.length])
+    const el = messagesRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [lastMsgUuid])
 
   function jumpTo(targetUuid: string) {
     const el = messageRefs.current[targetUuid]
@@ -58,13 +101,10 @@ export function RoomChat() {
   }
 
   return (
-    <div className="flex justify-center px-4 sm:px-8">
-      <div
-        className="flex w-full max-w-[670px] flex-col xl:-ml-[245px]"
-        style={{ minHeight: 'calc(100vh - 72px)' }}
-      >
+    <div className="flex justify-center px-4 sm:px-8" style={{ height: 'calc(100vh - 72px)' }}>
+      <div className="flex h-full w-full max-w-[670px] flex-col xl:-ml-[245px]">
         {/* Messages */}
-        <div className="flex flex-1 flex-col gap-3 py-4">
+        <div ref={messagesRef} onScroll={onScroll} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-4">
           {(isMessagesLoading || activeRoomUuid !== uuid) && messages.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-2">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-transparent border-t-[#c8a44d]/60" />
@@ -74,7 +114,13 @@ export function RoomChat() {
               <p className="text-sm text-white/40">No messages yet — say hi.</p>
             </div>
           ) : (
-            messages.map((msg, i) => {
+            <>
+            {hasMore && (
+              <div className="flex justify-center py-2">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-transparent border-t-[#c8a44d]/40" />
+              </div>
+            )}
+            {messages.map((msg, i) => {
               const prev = messages[i - 1]
               const showAuthor =
                 msg.author_uuid !== auth?.userUuid &&
@@ -91,9 +137,10 @@ export function RoomChat() {
                   }}
                 />
               )
-            })
+            })}
+            </>
           )}
-          <div ref={bottomRef} />
+          <div />
         </div>
 
         {/* Composer */}

@@ -50,7 +50,7 @@ export function MessageComposer({ onSend, replyTo, onCancelReply }: Props) {
   }
 
   return (
-    <div className="sticky bottom-0 border-t border-white/[0.06] bg-[#0a0907]/95 px-3 py-[14px] backdrop-blur-md sm:px-4">
+    <div className="shrink-0 border-t border-white/[0.06] bg-[#0a0907]/95 px-3 py-[14px] backdrop-blur-md sm:px-4">
       {replyTo && (
         <div className="mb-2 flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-1.5">
           <CornerUpLeft className="h-3.5 w-3.5 shrink-0 text-[#c8a44d]/60" strokeWidth={2.4} />

@@ -22,6 +22,7 @@ export function useNotificationsQuery() {
     enabled: !!auth,
     staleTime: 4_000,
     refetchInterval: 5_000, // poll every 5s for new notifications
+    refetchOnWindowFocus: 'always',
     placeholderData: keepPreviousData,
   })
 }
