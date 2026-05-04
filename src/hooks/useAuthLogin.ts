@@ -5,7 +5,7 @@ import { rpc } from '@/lib/api'
 export const OFFLINE_KEY = '2c_appear_offline'
 
 export function useAuthLogin() {
-  const { auth } = useAuth()
+  const { auth, logout } = useAuth()
   const called = useRef(false)
 
   useEffect(() => {
@@ -20,7 +20,8 @@ export function useAuthLogin() {
       auth.token,
       auth.userUuid,
     ).catch((err) => {
-      console.warn('[useAuthLogin] /v2/auth/login failed:', err)
+      console.warn('[useAuthLogin] /v2/auth/login failed, logging out:', err)
+      logout()
     })
-  }, [auth])
+  }, [auth, logout])
 }

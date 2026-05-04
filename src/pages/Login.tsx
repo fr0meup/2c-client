@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Copy, Check, ChevronRight, ShieldCheck, Terminal, ClipboardPaste } from 'lucide-react'
+import { Copy, Check, ChevronRight, ShieldCheck, Terminal, ClipboardPaste, Loader2 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
+import { rpc } from '@/lib/api'
 
 const EXTRACT_SCRIPT = `(function() {
   const token = document.cookie.split('; ').find(r => r.startsWith('twocentsToken='))?.split('=')[1];
@@ -32,6 +33,7 @@ export function Login() {
   const [pasteValue, setPasteValue] = useState('')
   const [error, setError] = useState('')
   const [persist, setPersist] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   function handleCopy() {
     navigator.clipboard.writeText(EXTRACT_SCRIPT)
@@ -39,25 +41,52 @@ export function Login() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  function handleLogin() {
+  async function handleLogin() {
     setError('')
+    let token: string, uuid: string, secretKey: string
     try {
       const parsed = JSON.parse(pasteValue.trim())
-      const token = parsed.TOKEN || parsed.token
-      const uuid = parsed.USER_UUID || parsed.user_uuid
-      const secretKey = parsed.SECRET_KEY || parsed.secret_key
+      token = parsed.TOKEN || parsed.token
+      uuid = parsed.USER_UUID || parsed.user_uuid
+      secretKey = parsed.SECRET_KEY || parsed.secret_key
       if (!token || !uuid || !secretKey) {
         setError('Missing TOKEN, USER_UUID, or SECRET_KEY in the pasted JSON.')
         return
       }
+    } catch {
+      setError('Invalid JSON. Paste the exact output from the console.')
+      return
+    }
+
+    // Validate UUID matches the token's sub claim
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      if (payload.sub !== uuid) {
+        setError('USER_UUID does not match the token. Make sure you copied the output correctly.')
+        return
+      }
+    } catch {
+      setError('Token is malformed — could not decode JWT payload.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      // Validate token + secret_key: /v1/users/blocked requires a valid secret_key
+      await Promise.all([
+        rpc('/v2/auth/login', { version: 'web-v0.1.3', secret_key: secretKey }, token, uuid),
+        rpc('/v1/users/blocked', { secret_key: secretKey }, token, uuid),
+      ])
       login(token, uuid, secretKey, persist)
       navigate('/', { replace: true })
     } catch {
-      setError('Invalid JSON. Paste the exact output from the console.')
+      setError('Invalid or expired credentials. Go back to twocents.money and re-run the script.')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const canLogin = pasteValue.trim().length > 10
+  const canLogin = pasteValue.trim().length > 10 && !loading
 
   return (
     <div
@@ -218,8 +247,8 @@ export function Login() {
                   color: canLogin ? '#0f0e0a' : 'rgba(255,255,255,0.25)',
                 }}
               >
-                Login
-                <ChevronRight className="h-4 w-4" />
+                {loading ? 'Verifying…' : 'Login'}
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}
               </button>
             </div>
           </div>
