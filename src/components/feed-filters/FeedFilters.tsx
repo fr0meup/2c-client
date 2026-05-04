@@ -12,6 +12,7 @@ export function FeedFilters() {
   const currentQuery = new URLSearchParams(location.search).get('q') ?? ''
   const [searchOpen, setSearchOpen] = useState(!!currentQuery)
   const [searchValue, setSearchValue] = useState(currentQuery)
+  const [advLoading, setAdvLoading] = useState(false)
   const [topicsOpen, setTopicsOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -29,6 +30,21 @@ export function FeedFilters() {
       inputRef.current.focus()
     }
   }, [searchOpen])
+
+  // Collapse the search bar only after the AdvancedSearchPanel has rendered
+  useEffect(() => {
+    if (!advLoading) return
+    const check = () => {
+      if (document.querySelector('[data-onboarding="adv-filters"]')) {
+        setAdvLoading(false)
+        setSearchOpen(false)
+      }
+    }
+    check()
+    const id = setInterval(check, 20)
+    const fallback = setTimeout(() => { clearInterval(id); setAdvLoading(false); setSearchOpen(false) }, 3000)
+    return () => { clearInterval(id); clearTimeout(fallback) }
+  }, [advLoading])
 
   useLayoutEffect(() => {
     if (!containerRef.current) return
@@ -114,15 +130,20 @@ export function FeedFilters() {
           }}
         />
 
-        {/* Advanced search icon — inside the bar, right end */}
-        {searchOpen && (
+        {/* Advanced search icon / loading spinner — inside the bar, right end */}
+        {searchOpen && (advLoading ? (
+          <div className="absolute right-1.5 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center">
+            <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-transparent border-t-[#c8a44d]/60" />
+          </div>
+        ) : (
           <button
             data-adv-search
+            data-onboarding="adv-search"
             tabIndex={0}
             onMouseDown={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              setSearchOpen(false)
+              setAdvLoading(true)
               navigate('/?adv=1')
             }}
             className="absolute right-1.5 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-white/30 transition-colors hover:bg-white/[0.08] hover:text-[#c8a44d]"
@@ -130,11 +151,12 @@ export function FeedFilters() {
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
           </button>
-        )}
+        ))}
       </div>
 
       {/* Search icon */}
       <div
+        data-onboarding="search"
         className="group absolute left-0 top-0 z-10 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 hover:bg-white/[0.08]"
         onMouseDown={(e) => {
           e.preventDefault()

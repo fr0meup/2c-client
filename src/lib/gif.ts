@@ -1,3 +1,23 @@
+// ── GIF API Helpers ──
+
+const GIF_URL_RE = /(https?:\/\/\S+\.gif(?:\?\S*)?)/i
+
+/** Extract the first .gif URL from text so we can pass it as giphy_url to the API */
+export function extractGifMeta(text: string): { giphy_url: string; giphy_id: string } | null {
+  const m = text.match(GIF_URL_RE)
+  if (!m) return null
+  const url = m[1]
+  // Derive a giphy_id from the URL path (filename without extension)
+  try {
+    const segments = new URL(url).pathname.split('/').filter(Boolean)
+    const last = segments[segments.length - 1] ?? ''
+    const id = last.replace(/\.gif$/i, '') || url
+    return { giphy_url: url, giphy_id: id }
+  } catch {
+    return { giphy_url: url, giphy_id: url }
+  }
+}
+
 // ── GIF Input Helpers ──
 
 /** Extract text from a contentEditable div, converting <img> elements back to their src URLs */

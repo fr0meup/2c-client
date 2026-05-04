@@ -12,7 +12,7 @@ import { useToast } from '@/components/toast/ToastContext'
 import { humanizeError } from '@/lib/api'
 import type { Comment } from './types'
 import { obfuscateText } from '@/lib/obfuscate'
-import { saveGif, removeGif, isGifSaved, getTextWithGifs, insertGifImage } from '@/lib/gif'
+import { saveGif, removeGif, isGifSaved, getTextWithGifs, insertGifImage, extractGifMeta } from '@/lib/gif'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
 
 function GifWithStar({ url }: { url: string }) {
@@ -124,12 +124,14 @@ export function CommentItem({
   function handleSubmitReply() {
     const text = replyRef.current ? getTextWithGifs(replyRef.current).trim() : ''
     if (!text) return
+    const gifMeta = extractGifMeta(text)
 
     replyMutation.mutate(
       {
         post_uuid: comment.post_uuid,
         text,
         in_reply_to_uuid: comment.uuid,
+        ...gifMeta,
       },
       {
         onSuccess: () => {
@@ -227,6 +229,8 @@ export function CommentItem({
         const gifUrls: string[] = text.match(gifRegex) ?? []
         const strippedText = text.replace(gifRegex, '').trim()
         const gifFromMeta = comment.comment_meta?.giphy_url
+          ? comment.comment_meta.giphy_url.replace(/\/\d+\.gif/, '/giphy.gif')
+          : undefined
         const allGifs: string[] = [...gifUrls, ...(gifFromMeta && !gifUrls.includes(gifFromMeta) ? [gifFromMeta] : [])]
 
         return (
@@ -344,10 +348,17 @@ export function CommentItem({
               onMouseDown={(e) => {
                 e.preventDefault()
                 const sel = window.getSelection()
-                if (!sel || sel.isCollapsed || !replyRef.current?.contains(sel.anchorNode)) return
+                if (!sel || sel.isCollapsed || !replyRef.current?.contains(sel.anchorNode)) {
+                  toast('error', 'Select some text first, then click ZWJ')
+                  return
+                }
                 const selected = sel.toString()
-                if (!selected) return
+                if (!selected) {
+                  toast('error', 'Select some text first, then click ZWJ')
+                  return
+                }
                 document.execCommand('insertText', false, obfuscateText(selected))
+                toast('success', 'ZWJ applied \u2014 text is now obfuscated')
               }}
               className={`flex h-[28px] cursor-pointer items-center justify-center rounded-full px-1.5 text-[10px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
                 hasReplySelection

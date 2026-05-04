@@ -74,11 +74,18 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
 
   function handleObfuscate() {
     const sel = window.getSelection()
-    if (!sel || sel.isCollapsed || !editorRef.current?.contains(sel.anchorNode)) return
+    if (!sel || sel.isCollapsed || !editorRef.current?.contains(sel.anchorNode)) {
+      toast('error', 'Select some text first, then click ZWJ')
+      return
+    }
     const selected = sel.toString()
-    if (!selected) return
+    if (!selected) {
+      toast('error', 'Select some text first, then click ZWJ')
+      return
+    }
     document.execCommand('insertText', false, obfuscateText(selected))
     handleEditorInput()
+    toast('success', 'ZWJ applied — text is now obfuscated')
   }
 
   function getBlockquoteAncestor(node: Node | null): HTMLElement | null {
@@ -360,6 +367,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
           </div>
           {onClose && (
             <button
+              data-onboarding="close-compose"
               onClick={onClose}
               className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-white/60 hover:bg-white/[0.06] hover:text-white transition-colors"
             >
@@ -548,6 +556,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
             className="hidden"
           />
           <button
+            data-onboarding="media"
             onClick={() => imageFile ? clearImage() : fileInputRef.current?.click()}
             className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors ${
               imageFile
@@ -618,6 +627,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
           </button>
 
           <button
+            data-onboarding="zwj"
             onClick={handleObfuscate}
             disabled={!hasEditorSelection}
             className={`flex h-8 cursor-pointer items-center justify-center rounded-full px-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
@@ -645,6 +655,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
           <div className="mx-0.5 h-4 w-px bg-white/[0.08]" />
 
           <button
+            data-onboarding="drafts"
             onClick={() => setDraftsOpen(true)}
             className="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white"
             title="Drafts"
@@ -660,6 +671,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
 
         <div className="flex items-center gap-2">
           <button
+            data-onboarding="save-draft"
             onClick={handleSaveDraft}
             disabled={!canPost}
             className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border transition-all disabled:cursor-not-allowed disabled:opacity-30 ${

@@ -30,6 +30,7 @@ export function Sidebar({ onNewPostClick }: SidebarProps) {
 
       <div className="border-t border-white/[0.06] pt-4">
         <button
+          data-onboarding="compose"
           onClick={onNewPostClick}
           className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#c8a44d] px-4 py-2.5 text-[15px] font-semibold text-[#0f0e0a] transition-all duration-200 hover:bg-[#c8a44d]/85 hover:shadow-lg hover:shadow-[#c8a44d]/20 active:scale-[0.98]"
         >

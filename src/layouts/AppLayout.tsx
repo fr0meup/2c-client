@@ -10,6 +10,7 @@ import { Sidebar, BottomNav } from '@/components/sidebar/Sidebar'
 import { HeaderLeft, HeaderRight } from './Header'
 import type { PostCardData } from '@/components/post-card/types'
 import { useAuthLogin } from '@/hooks/useAuthLogin'
+import { OnboardingTutorial } from '@/components/onboarding/OnboardingTutorial'
 
 // ── Compose context so any component can open the compose modal ──
 interface ComposeCtx {
@@ -68,8 +69,10 @@ export function AppLayout() {
       </div>
       </ComposeContext.Provider>
 
+      <OnboardingTutorial />
+
       {composeOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+        <div className="fixed inset-0 z-[210] flex items-center justify-center">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
             onClick={closeCompose}

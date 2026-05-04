@@ -8,6 +8,7 @@ import {
   Check,
   ChevronDown,
   ChevronLeft,
+  BookOpen,
   ExternalLink,
   FileText,
   Github,
@@ -38,6 +39,7 @@ import { useBlockUser, useUnblockUser } from '@/hooks/useBlock'
 import { useToast } from '@/components/toast/ToastContext'
 import { humanizeError } from '@/lib/api'
 import { OFFLINE_KEY } from '@/hooks/useAuthLogin'
+import { ONBOARDING_KEY } from '@/components/onboarding/OnboardingTutorial'
 import { BlockedUsersModal } from './BlockedUsersModal'
 
 const TRIGGER_BTN =
@@ -62,10 +64,11 @@ const MENU_HEADER =
 interface PopoverMenuProps {
   trigger: ReactNode
   triggerTitle?: string
+  onboardingId?: string
   children: (close: () => void) => ReactNode
 }
 
-function PopoverMenu({ trigger, triggerTitle, children }: PopoverMenuProps) {
+function PopoverMenu({ trigger, triggerTitle, onboardingId, children }: PopoverMenuProps) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
 
@@ -94,6 +97,7 @@ function PopoverMenu({ trigger, triggerTitle, children }: PopoverMenuProps) {
         title={triggerTitle}
         className={TRIGGER_BTN}
         data-active={open ? 'true' : 'false'}
+        {...(onboardingId ? { 'data-onboarding': onboardingId } : {})}
       >
         {trigger}
       </button>
@@ -211,6 +215,7 @@ export function ProfileSettingsMenu() {
     <>
       <PopoverMenu
         triggerTitle="Settings"
+        onboardingId="settings"
         trigger={<Settings className="h-4 w-4" strokeWidth={2.2} />}
       >
         {(close) => (
@@ -399,6 +404,19 @@ function SettingsContent({ close, onOpenBlocked, onConfirm }: { close: () => voi
       <p className="px-3 pb-1 text-[11px] leading-tight text-white/30">
         You won't be able to send or receive any messages while appearing offline.
       </p>
+
+      <button
+        onClick={() => {
+          localStorage.removeItem(ONBOARDING_KEY)
+          close()
+          navigate('/')
+          window.location.reload()
+        }}
+        className={MENU_ITEM}
+      >
+        <BookOpen className="h-4 w-4 text-white/50" strokeWidth={2.2} />
+        <span>Tutorial</span>
+      </button>
 
       <div className="my-1 h-px bg-white/[0.06]" />
 

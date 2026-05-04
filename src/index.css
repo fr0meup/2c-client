@@ -6,6 +6,7 @@ html, #root {
 
 html {
   overflow-y: scroll;
+  overscroll-behavior: none;
   scrollbar-width: thin;
   scrollbar-color: #333330 #0a0907;
 }

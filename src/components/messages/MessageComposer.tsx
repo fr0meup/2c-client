@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import type { ChatMessage } from './types'
 import { obfuscateText } from '@/lib/obfuscate'
+import { useToast } from '@/components/toast/ToastContext'
 
 interface Props {
   onSend: (text: string, replyTo?: string) => void
@@ -15,6 +16,7 @@ export function MessageComposer({ onSend, replyTo, onCancelReply }: Props) {
   const [text, setText] = useState('')
   const [hasMsgSelection, setHasMsgSelection] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     if (replyTo) ref.current?.focus()
@@ -95,12 +97,17 @@ export function MessageComposer({ onSend, replyTo, onCancelReply }: Props) {
                 const end = el.selectionEnd
                 if (start === end) return
                 const selected = text.slice(start, end)
+                if (!selected) {
+                  toast('error', 'Select some text first, then click ZWJ')
+                  return
+                }
                 const obfuscated = obfuscateText(selected)
                 setText(text.slice(0, start) + obfuscated + text.slice(end))
                 requestAnimationFrame(() => {
                   el.setSelectionRange(start, start + obfuscated.length)
                   el.focus()
                 })
+                toast('success', 'ZWJ applied — text is now obfuscated')
               }}
               disabled={!hasMsgSelection}
               className={`flex h-7 cursor-pointer items-center justify-center rounded-full px-1.5 text-[10px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${

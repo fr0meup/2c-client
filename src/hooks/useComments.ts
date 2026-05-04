@@ -31,6 +31,8 @@ interface CreateCommentParams {
   post_uuid: string
   text: string
   in_reply_to_uuid: string
+  giphy_url?: string
+  giphy_id?: string
 }
 
 interface CreateCommentResponse {
@@ -51,12 +53,18 @@ export function useCreateComment() {
     mutationFn: async (params: CreateCommentParams) => {
       if (!auth) throw new Error('Not authenticated')
 
+      // Strip GIF URL from text when sending via comment_meta so OG client doesn't show the raw link
+      const text = params.giphy_url
+        ? params.text.replace(params.giphy_url, '').trim()
+        : params.text
+
       return rpc<CreateCommentResponse>(
         '/v1/comments/create',
         {
           post_uuid: params.post_uuid,
-          text: params.text,
+          text: text || params.text,
           in_reply_to_uuid: params.in_reply_to_uuid,
+          ...(params.giphy_url ? { giphy_url: params.giphy_url, giphy_id: params.giphy_id ?? params.giphy_url } : {}),
         },
         auth.token,
         auth.userUuid

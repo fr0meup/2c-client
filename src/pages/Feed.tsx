@@ -238,7 +238,9 @@ export function Feed() {
   return (
     <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pt-3 pb-6 sm:px-8">
       <div className="w-full max-w-[670px] space-y-4 xl:-ml-[245px]">
-        {hasAdvancedParams(location.search) ? <AdvancedSearchPanel /> : !hideCompose ? <ComposePost defaultTopic={activeTopic} /> : null}
+        <div data-onboarding="feed-compose">
+          {hasAdvancedParams(location.search) ? <AdvancedSearchPanel /> : !hideCompose ? <ComposePost defaultTopic={activeTopic} /> : null}
+        </div>
         {posts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/[0.04]">

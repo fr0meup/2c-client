@@ -36,7 +36,7 @@ import { PostDetailSkeleton, CommentsSkeleton } from '@/components/skeleton'
 import type { Comment } from './types'
 import { obfuscateText } from '@/lib/obfuscate'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
-import { getTextWithGifs, insertGifImage } from '@/lib/gif'
+import { getTextWithGifs, insertGifImage, extractGifMeta } from '@/lib/gif'
 
 export function PostDetail() {
   const { uuid } = useParams<{ uuid: string }>()
@@ -220,9 +220,10 @@ export function PostDetail() {
     if (!uuid || !commentRef.current) return
     const text = getTextWithGifs(commentRef.current).trim()
     if (!text) return
+    const gifMeta = extractGifMeta(text)
 
     commentMutation.mutate(
-      { post_uuid: uuid, text, in_reply_to_uuid: uuid },
+      { post_uuid: uuid, text, in_reply_to_uuid: uuid, ...gifMeta },
       {
         onSuccess: () => {
           if (commentRef.current) {
@@ -502,10 +503,17 @@ export function PostDetail() {
               onMouseDown={(e) => {
                 e.preventDefault()
                 const sel = window.getSelection()
-                if (!sel || sel.isCollapsed || !commentRef.current?.contains(sel.anchorNode)) return
+                if (!sel || sel.isCollapsed || !commentRef.current?.contains(sel.anchorNode)) {
+                  toast('error', 'Select some text first, then click ZWJ')
+                  return
+                }
                 const selected = sel.toString()
-                if (!selected) return
+                if (!selected) {
+                  toast('error', 'Select some text first, then click ZWJ')
+                  return
+                }
                 document.execCommand('insertText', false, obfuscateText(selected))
+                toast('success', 'ZWJ applied \u2014 text is now obfuscated')
               }}
               className={`flex h-[28px] cursor-pointer items-center justify-center rounded-full px-1.5 text-[10px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
                 hasCommentSelection

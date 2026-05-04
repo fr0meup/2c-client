@@ -90,7 +90,8 @@ export function ProfileCommentCard({ comment, postTitle, initialVote = 0 }: Prop
         const gifRegex = /(https?:\/\/\S+\.gif(?:\?\S*)?)/gi
         const gifUrls: string[] = text.match(gifRegex) ?? []
         const strippedText = text.replace(gifRegex, '').trim()
-        const gifFromMeta = (comment.comment_meta as { giphy_url?: string })?.giphy_url
+        const rawGifFromMeta = (comment.comment_meta as { giphy_url?: string })?.giphy_url
+        const gifFromMeta = rawGifFromMeta ? rawGifFromMeta.replace(/\/\d+\.gif/, '/giphy.gif') : undefined
         const allGifs: string[] = [...gifUrls, ...(gifFromMeta && !gifUrls.includes(gifFromMeta) ? [gifFromMeta] : [])]
 
         return (

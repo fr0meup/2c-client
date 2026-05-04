@@ -138,6 +138,7 @@ function BottomNavItem({ item, isActive, onClick }: { item: NavItem; isActive: b
       end={to === '/'}
       onClick={onClick}
       className="group flex h-14 w-14 shrink-0 items-center justify-center rounded-full transition-all duration-200 hover:bg-white/[0.06]"
+      {...(item.label === 'Me' ? { 'data-onboarding': 'me-nav' } : {})}
     >
       <NavIconImg item={item} isActive={isActive} size={32} />
     </NavLink>

@@ -74,6 +74,7 @@ export function SidebarNavLink({ item }: SidebarNavLinkProps) {
       end={item.path === '/'}
       onClick={handleClick}
       className={({ isActive }) => `${baseClass} ${isActive ? baseActive : baseInactive}`}
+      {...(item.label === 'Me' ? { 'data-onboarding': 'me-nav' } : {})}
     >
       {({ isActive }) => (
         <>
