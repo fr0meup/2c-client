@@ -4,6 +4,7 @@ import { MessageSquare, Triangle, Star } from 'lucide-react'
 import { UserMetaPill } from '@/components/user-meta-pill'
 import { timeAgo, cleanPostText } from '@/components/post-card'
 import { useFollow } from './FollowContext'
+import { useVoteComment } from '@/hooks/useVotes'
 import type { Comment } from '@/lib/types'
 import { saveGif, removeGif, isGifSaved } from '@/lib/gif'
 
@@ -60,12 +61,16 @@ export function ProfileCommentCard({ comment, postTitle, initialVote = 0 }: Prop
   const isDeleted = !!comment.deleted_at
   const [currentVote, setCurrentVote] = useState<1 | -1 | 0>(initialVote)
   const [voteCount, setVoteCount] = useState(comment.upvote_count)
+  const voteMutation = useVoteComment()
 
   function handleVote(dir: 1 | -1) {
-    setCurrentVote((prev) => {
-      const next = prev === dir ? 0 : dir
-      setVoteCount((c) => c + (next - prev))
-      return next
+    const next = currentVote === dir ? 0 : dir
+    setVoteCount((c) => c + (next - currentVote))
+    setCurrentVote(next)
+    voteMutation.mutate({
+      comment_uuid: comment.uuid,
+      post_uuid: comment.post_uuid,
+      vote_type: next,
     })
   }
 

@@ -19,7 +19,8 @@ function patchVotesAndPosts<T extends { votes: Vote[]; posts: { uuid: string; up
   postUuid: string,
   voteType: 1 | -1 | 0,
 ): T {
-  const oldVote = section.votes?.find((v) => v.content_uuid === postUuid)
+  if (!section?.posts) return section
+  const oldVote = (section.votes ?? []).find((v) => v.content_uuid === postUuid)
   const oldVoteType = oldVote?.vote_type ?? 0
   const delta = voteType - oldVoteType
 
@@ -31,7 +32,7 @@ function patchVotesAndPosts<T extends { votes: Vote[]; posts: { uuid: string; up
         ? [{ ...oldVote, content_uuid: postUuid, vote_type: voteType } as Vote]
         : []),
     ],
-    posts: section.posts.map((p) =>
+    posts: (section.posts ?? []).map((p) =>
       p.uuid === postUuid ? { ...p, upvote_count: p.upvote_count + delta } : p,
     ),
   }

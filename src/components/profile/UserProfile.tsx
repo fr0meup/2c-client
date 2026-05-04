@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Triangle, Users, UserPlus, UserCheck, Loader2, X } from 'lucide-react'
 
 import { useAuth } from '@/lib/auth'
@@ -26,7 +26,9 @@ export function UserProfile() {
   const { isFollowing, toggleFollow, aliasFor } = useFollow()
   const { data: followsMeData } = useFollowsMe(isOwnProfile ? undefined : targetUuid)
   const followsMe = followsMeData?.hasAlias ?? false
-  const [tab, setTab] = useState<ProfileTab>('posts')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = (searchParams.get('tab') as ProfileTab) || 'posts'
+  const setTab = (t: ProfileTab) => setSearchParams(t === 'posts' ? {} : { tab: t }, { replace: true })
   const [showFollowing, setShowFollowing] = useState(false)
 
   const { data, isLoading, isError, fetchNextPage, isFetchingNextPage } = useUserProfile(targetUuid)
