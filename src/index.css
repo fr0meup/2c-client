@@ -22,8 +22,9 @@
   background: #444440;
 }
 
-html, #root {
+html, body, #root {
   background-color: #0a0907;
+  min-height: 100%;
 }
 
 html {
@@ -31,6 +32,15 @@ html {
   overscroll-behavior: none;
   scrollbar-width: thin;
   scrollbar-color: #333330 #0a0907;
+}
+
+html::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: #0a0907;
+  pointer-events: none;
 }
 
 ::-webkit-scrollbar {

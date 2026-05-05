@@ -7,6 +7,7 @@ import { usePrefetch } from '@/hooks/usePrefetch'
 import { useNotifications } from '@/components/notifications/NotificationsContext'
 import { useMessages } from '@/components/messages/MessagesContext'
 import { navItems, type NavItem } from './navItems'
+import { announceNavigationPending } from '@/lib/navigationPending'
 
 interface BottomNavProps {
   onNewPostClick?: () => void
@@ -72,6 +73,7 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
         {/* Primary items: always visible */}
         {primary.map((item) => (
           <BottomNavItem key={item.path} item={item} isActive={isItemActive(item)} onClick={() => {
+            announceNavigationPending(item.label === 'Feed' ? '/' : item.path)
             prefetchItem(item)
           }} onPreload={() => prefetchItem(item)} />
         ))}
@@ -80,6 +82,7 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
         <div className="hidden items-center gap-1.5 sm:flex">
           {overflow.map((item) => (
             <BottomNavItem key={item.path} item={item} isActive={isItemActive(item)} onClick={() => {
+              announceNavigationPending(item.path)
               prefetchItem(item)
             }} onPreload={() => prefetchItem(item)} />
           ))}
@@ -103,6 +106,7 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
                   to={item.path}
                   onClick={() => {
                     setMoreOpen(false)
+                    announceNavigationPending(item.path)
                     prefetchItem(item)
                   }}
                   className="flex items-center gap-2 rounded-full px-3 py-2 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white"

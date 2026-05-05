@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -36,7 +37,9 @@ export function FeedFilters() {
 
   function navigateTopic(topic: string) {
     const url = getFeedUrl(topic)
-    setPendingTopic(topic)
+    flushSync(() => {
+      setPendingTopic(topic)
+    })
     announceNavigationPending(url)
     prefetchTopic(topic)
     navigate(url)
@@ -50,8 +53,19 @@ export function FeedFilters() {
   }, [searchOpen])
 
   useEffect(() => {
-    setPendingTopic(null)
-  }, [location.search])
+    if (!pendingTopic) return
+    if (pendingTopic !== urlTopic) return
+    let secondFrame: number | undefined
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        setPendingTopic(null)
+      })
+    })
+    return () => {
+      window.cancelAnimationFrame(firstFrame)
+      if (secondFrame) window.cancelAnimationFrame(secondFrame)
+    }
+  }, [pendingTopic, urlTopic])
 
   // Collapse the search bar only after the AdvancedSearchPanel has rendered
   useEffect(() => {
@@ -207,9 +221,10 @@ export function FeedFilters() {
         <div
           className="pointer-events-none absolute top-0 z-0 h-8 rounded-full bg-gradient-to-b from-[#c8a44d]/15 to-[#c8a44d]/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-300 ease-out"
           style={{
-            left: indicator.left,
+            transform: `translate3d(${indicator.left}px, 0, 0)`,
             width: indicator.width,
             opacity: indicator.width > 0 ? 1 : 0,
+            willChange: 'transform, width',
           }}
         />
 

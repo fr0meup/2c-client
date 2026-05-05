@@ -1,7 +1,9 @@
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { headerLoaders } from '@/lib/routePreload'
+import { NAVIGATION_PENDING_EVENT } from '@/lib/navigationPending'
 
 const FeedFilters = lazy(headerLoaders.feed)
 const PostDetailHeader = lazy(headerLoaders.post)
@@ -68,6 +70,28 @@ function PageHeader({ title }: { title: string }) {
   )
 }
 
+function PendingHeaderShell({ title }: { title?: string }) {
+  return (
+    <div className="relative flex h-10 items-center justify-between">
+      <div className="h-10 w-10 shrink-0 rounded-full border border-white/[0.08] bg-white/[0.06]" />
+      <span className="text-sm font-semibold text-white/45">{title}</span>
+      <div className="h-10 w-10 shrink-0" />
+    </div>
+  )
+}
+
+function pendingHeaderTitle(pathname: string): string | undefined {
+  if (pathname.startsWith('/user/')) return 'Profile'
+  if (pathname.startsWith('/post/')) return 'Post'
+  if (pathname === '/notifications') return 'Notifications'
+  if (pathname === '/messages') return 'Messages'
+  if (pathname.startsWith('/room/')) return 'Messages'
+  if (pathname === '/leaderboard') return 'Leaderboard'
+  if (pathname === '/bookmarks') return 'Bookmarks'
+  if (pathname === '/transactions') return 'Transactions'
+  return undefined
+}
+
 /** Left side — fixed, stays on screen when scrolling */
 export function HeaderLeft() {
   return (
@@ -89,15 +113,68 @@ export function HeaderLeft() {
 /** Right side — scrolls with the page */
 export function HeaderRight() {
   const location = useLocation()
-  const showFilters = isFeedPath(location.pathname, location.search)
-  const showPostDetail = isPostDetailPath(location.pathname)
-  const showNotifications = isNotificationsPath(location.pathname)
-  const showProfile = isProfilePath(location.pathname)
-  const showRoom = isRoomPath(location.pathname)
-  const showMessagesList = isMessagesListPath(location.pathname)
-  const showBookmarks = isBookmarksPath(location.pathname)
-  const showTransactions = isTransactionsPath(location.pathname)
-  const showLeaderboard = isLeaderboardPath(location.pathname)
+  const [pendingHeader, setPendingHeader] = useState<{ pathname: string; search: string } | null>(null)
+  const pathname = pendingHeader?.pathname ?? location.pathname
+  const search = pendingHeader?.search ?? location.search
+  const showFilters = isFeedPath(pathname, search)
+  const showPostDetail = isPostDetailPath(pathname)
+  const showNotifications = isNotificationsPath(pathname)
+  const showProfile = isProfilePath(pathname)
+  const showRoom = isRoomPath(pathname)
+  const showMessagesList = isMessagesListPath(pathname)
+  const showBookmarks = isBookmarksPath(pathname)
+  const showTransactions = isTransactionsPath(pathname)
+  const showLeaderboard = isLeaderboardPath(pathname)
+  const showPendingShell = pendingHeader !== null && !showFilters
+
+  useEffect(() => {
+    function handlePending(e: Event) {
+      const detail = (e as CustomEvent<{ pathname?: string; search?: string }>).detail
+      if (!detail?.pathname) return
+      const nextSearch = detail.search ?? ''
+      if (detail.pathname !== location.pathname || nextSearch !== location.search) {
+        flushSync(() => {
+          setPendingHeader({ pathname: detail.pathname, search: nextSearch })
+        })
+      }
+    }
+    window.addEventListener(NAVIGATION_PENDING_EVENT, handlePending)
+    return () => window.removeEventListener(NAVIGATION_PENDING_EVENT, handlePending)
+  }, [location.pathname, location.search])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+      const target = e.target instanceof Element ? e.target.closest('a[href]') : null
+      if (!(target instanceof HTMLAnchorElement)) return
+      const url = new URL(target.href, window.location.href)
+      if (url.origin !== window.location.origin) return
+      const next = `${url.pathname}${url.search}`
+      const current = `${location.pathname}${location.search}`
+      if (next !== current) {
+        flushSync(() => {
+          setPendingHeader({ pathname: url.pathname, search: url.search })
+        })
+      }
+    }
+    document.addEventListener('click', handleClick, true)
+    return () => document.removeEventListener('click', handleClick, true)
+  }, [location.pathname, location.search])
+
+  useEffect(() => {
+    if (!pendingHeader) return
+    if (location.pathname !== pendingHeader.pathname || location.search !== pendingHeader.search) return
+    let secondFrame: number | undefined
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        setPendingHeader(null)
+      })
+    })
+    return () => {
+      window.cancelAnimationFrame(firstFrame)
+      if (secondFrame) window.cancelAnimationFrame(secondFrame)
+    }
+  }, [location.pathname, location.search, pendingHeader])
 
   return (
     <div
@@ -107,15 +184,21 @@ export function HeaderRight() {
     >
       <div className="w-full max-w-[670px] xl:-ml-[245px]">
         <Suspense fallback={<div className="h-10" />}>
-          {showFilters && <FeedFilters />}
-          {showPostDetail && <PostDetailHeader />}
-          {showNotifications && <NotificationsHeader />}
-          {showProfile && <ProfileHeader />}
-          {showRoom && <ChatHeader />}
-          {showMessagesList && <MessagesListHeader />}
-          {showBookmarks && <PageHeader title="Bookmarks" />}
-          {showTransactions && <PageHeader title="Transactions" />}
-          {showLeaderboard && <LeaderboardHeader />}
+          {showPendingShell ? (
+            <PendingHeaderShell title={pendingHeaderTitle(pathname)} />
+          ) : (
+            <>
+              {showFilters && <FeedFilters />}
+              {showPostDetail && <PostDetailHeader />}
+              {showNotifications && <NotificationsHeader />}
+              {showProfile && <ProfileHeader />}
+              {showRoom && <ChatHeader />}
+              {showMessagesList && <MessagesListHeader />}
+              {showBookmarks && <PageHeader title="Bookmarks" />}
+              {showTransactions && <PageHeader title="Transactions" />}
+              {showLeaderboard && <LeaderboardHeader />}
+            </>
+          )}
         </Suspense>
       </div>
     </div>

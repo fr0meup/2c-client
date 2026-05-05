@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { flushSync } from 'react-dom'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { Triangle, Users, UserPlus, UserCheck, Loader2, X } from 'lucide-react'
 
@@ -68,12 +69,22 @@ export function UserProfile() {
   const [searchParams, setSearchParams] = useSearchParams()
   const tab = (searchParams.get('tab') as ProfileTab) || 'posts'
   const [pendingTab, setPendingTab] = useState<ProfileTab | null>(null)
+  const [pendingContentTab, setPendingContentTab] = useState<ProfileTab | null>(null)
+  const pendingTabRun = useRef(0)
   const activeTab = pendingTab ?? tab
-  const isTabPending = pendingTab !== null
+  const isTabPending = pendingContentTab !== null
   const setTab = (t: ProfileTab) => {
     if (t === activeTab) return
-    setPendingTab(t)
-    setSearchParams(t === 'posts' ? {} : { tab: t }, { replace: true })
+    const run = pendingTabRun.current + 1
+    pendingTabRun.current = run
+    flushSync(() => {
+      setPendingTab(t)
+    })
+    window.requestAnimationFrame(() => {
+      if (pendingTabRun.current !== run) return
+      setPendingContentTab(t)
+      setSearchParams(t === 'posts' ? {} : { tab: t }, { replace: true })
+    })
   }
   const [showFollowing, setShowFollowing] = useState(false)
 
@@ -165,7 +176,18 @@ export function UserProfile() {
   const hasMoreComments = lastPage?.pagination.hasMoreComments ?? false
 
   useEffect(() => {
-    if (pendingTab === tab) setPendingTab(null)
+    if (pendingTab !== tab) return
+    let secondFrame: number | undefined
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        setPendingTab(null)
+        setPendingContentTab(null)
+      })
+    })
+    return () => {
+      window.cancelAnimationFrame(firstFrame)
+      if (secondFrame) window.cancelAnimationFrame(secondFrame)
+    }
   }, [pendingTab, tab])
 
   if (isLoading) {

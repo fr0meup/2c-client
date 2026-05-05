@@ -1,4 +1,5 @@
 import { Suspense, lazy, useState, useEffect, useCallback, useRef, createContext, useContext, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import { Outlet, useLocation } from 'react-router-dom'
 import { NotificationsProvider } from '@/components/notifications/NotificationsContext'
 import { MessagesProvider } from '@/components/messages/MessagesContext'
@@ -150,13 +151,28 @@ export function AppLayout() {
   }, [])
 
   useEffect(() => {
-    setPendingPath(null)
-  }, [location.pathname, location.search])
+    if (!pendingPath) return
+    if (location.pathname !== pendingPath) return
+    let secondFrame: number | undefined
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        setPendingPath(null)
+      })
+    })
+    return () => {
+      window.cancelAnimationFrame(firstFrame)
+      if (secondFrame) window.cancelAnimationFrame(secondFrame)
+    }
+  }, [location.pathname, location.search, pendingPath])
 
   useEffect(() => {
     function handlePending(e: Event) {
       const detail = (e as CustomEvent<{ pathname?: string }>).detail
-      if (detail?.pathname && detail.pathname !== location.pathname) setPendingPath(detail.pathname)
+      if (detail?.pathname && detail.pathname !== location.pathname) {
+        flushSync(() => {
+          setPendingPath(detail.pathname!)
+        })
+      }
     }
     window.addEventListener(NAVIGATION_PENDING_EVENT, handlePending)
     return () => window.removeEventListener(NAVIGATION_PENDING_EVENT, handlePending)
@@ -171,7 +187,11 @@ export function AppLayout() {
       if (url.origin !== window.location.origin) return
       const next = `${url.pathname}${url.search}`
       const current = `${location.pathname}${location.search}`
-      if (next !== current && url.pathname !== location.pathname) setPendingPath(url.pathname)
+      if (next !== current && url.pathname !== location.pathname) {
+        flushSync(() => {
+          setPendingPath(url.pathname)
+        })
+      }
     }
     document.addEventListener('click', handleClick, true)
     return () => document.removeEventListener('click', handleClick, true)

@@ -9,6 +9,7 @@ import { useFeed } from '@/hooks/useFeed'
 import { useBulkDateFetch } from '@/hooks/useBulkDateFetch'
 import { FEED_PARAM_TO_TOPIC } from '@/components/feed-filters/config'
 import { useCompose } from '@/layouts/AppLayout'
+import { NAVIGATION_PENDING_EVENT } from '@/lib/navigationPending'
 import { cn } from '@/lib/utils'
 
 export function Feed() {
@@ -40,6 +41,7 @@ export function Feed() {
   const hideCompose = ['Hot', 'Picks', 'Following', 'Announcements'].includes(activeTopic)
   const [searchTriggered, setSearchTriggered] = useState(isDateFiltering)
   const [bulkRefreshKey, setBulkRefreshKey] = useState(location.search)
+  const [pendingFeedNav, setPendingFeedNav] = useState<{ search: string; run: number } | null>(null)
   const prevSearch = useRef(location.search)
   useEffect(() => {
     if (prevSearch.current !== location.search) {
@@ -56,10 +58,26 @@ export function Feed() {
   const {
     data,
     isLoading,
+    isFetching,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
+    refetch,
   } = useFeed(activeTopic, searchQuery, undefined, undefined, !isDateFiltering)
+
+  useEffect(() => {
+    function handlePending(e: Event) {
+      const detail = (e as CustomEvent<{ pathname?: string; search?: string; run?: number }>).detail
+      if (detail?.pathname !== '/') return
+      const nextSearch = detail.search ?? ''
+      setPendingFeedNav({ search: nextSearch, run: detail.run ?? Date.now() })
+      if (nextSearch === location.search && !isDateFiltering) {
+        refetch()
+      }
+    }
+    window.addEventListener(NAVIGATION_PENDING_EVENT, handlePending)
+    return () => window.removeEventListener(NAVIGATION_PENDING_EVENT, handlePending)
+  }, [isDateFiltering, location.search, refetch])
 
   // ── Concurrent bulk fetch — enabled when date filtering ──
   // serverParams is empty so changing client-side filters won't re-fetch
@@ -72,6 +90,22 @@ export function Feed() {
     refreshKey: bulkRefreshKey,
     enabled: isDateFiltering && searchTriggered,
   })
+
+  useEffect(() => {
+    if (!pendingFeedNav) return
+    if (pendingFeedNav.search !== location.search) return
+    if (isDateFiltering ? bulk.isLoading : (isLoading || isFetching)) return
+    let secondFrame: number | undefined
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        setPendingFeedNav(null)
+      })
+    })
+    return () => {
+      window.cancelAnimationFrame(firstFrame)
+      if (secondFrame) window.cancelAnimationFrame(secondFrame)
+    }
+  }, [bulk.isLoading, isDateFiltering, isFetching, isLoading, location.search, pendingFeedNav])
 
   // ── Merge data from the active source ──
   const { rawPosts, voteMap, pollVoteMap, pickVoteMap } = useMemo(() => {
@@ -241,7 +275,7 @@ export function Feed() {
         <div data-onboarding="feed-compose">
           {hasAdvancedParams(location.search) ? <AdvancedSearchPanel /> : !hideCompose ? <ComposePost defaultTopic={activeTopic} /> : null}
         </div>
-        {isLoading && !isDateFiltering ? (
+        {(pendingFeedNav !== null && !isDateFiltering) || (isLoading && !isDateFiltering) ? (
           <div className="space-y-4">
             {[...Array(4)].map((_, i) => <PostCardSkeleton key={i} />)}
           </div>

@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth'
 import { preloadRoute, routeForPath } from '@/lib/routePreload'
 import { usePrefetch } from '@/hooks/usePrefetch'
 import { navItems, type NavItem } from './navItems'
+import { announceNavigationPending } from '@/lib/navigationPending'
 export { BottomNav } from './BottomNav'
 
 const baseInactive = 'text-[#6b6b6b] font-bold hover:bg-gradient-to-b hover:from-white/[0.06] hover:to-white/[0.02] hover:text-white hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
@@ -76,6 +77,7 @@ function SidebarNavLink({ item }: { item: NavItem }) {
   }
 
   function handleClick() {
+    announceNavigationPending(to)
     handlePreload()
   }
 

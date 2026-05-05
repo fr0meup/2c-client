@@ -44,9 +44,10 @@ export function ProfileTabs({ active, onChange, isOwnProfile = true }: Props) {
       <div
         className="pointer-events-none absolute top-0 z-0 h-8 rounded-full bg-gradient-to-b from-[#c8a44d]/15 to-[#c8a44d]/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-300 ease-out"
         style={{
-          left: indicator.left,
+          transform: `translate3d(${indicator.left}px, 0, 0)`,
           width: indicator.width,
           opacity: indicator.width > 0 ? 1 : 0,
+          willChange: 'transform, width',
         }}
       />
       {TABS.map((tab) => {
