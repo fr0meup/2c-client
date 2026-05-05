@@ -11,7 +11,6 @@ import {
   BookOpen,
   ExternalLink,
   FileText,
-  Github,
   Download,
   EyeOff,
   Loader2,
@@ -140,7 +139,7 @@ const CONTACT_LINKS = [
   { label: 'twocents feedback', href: '/?feed=bugs-and-feedback', icon: Mail, external: false },
   { label: 'X / Twitter', href: 'https://x.com/twocents', icon: ExternalLink, external: true },
   { label: 'Discord', href: 'https://discord.gg/w6NnSua4aH', icon: ExternalLink, external: true },
-  { label: 'GitHub', href: 'https://github.com/fr0meup/2c-client', icon: Github, external: true },
+  { label: 'GitHub', href: 'https://github.com/fr0meup/2c-client', icon: ExternalLink, external: true },
 ]
 
 const LOCAL_PREFIXES = ['2c_', 'twocents']

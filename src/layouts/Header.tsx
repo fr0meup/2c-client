@@ -131,10 +131,11 @@ export function HeaderRight() {
     function handlePending(e: Event) {
       const detail = (e as CustomEvent<{ pathname?: string; search?: string }>).detail
       if (!detail?.pathname) return
+      const nextPathname = detail.pathname
       const nextSearch = detail.search ?? ''
-      if (detail.pathname !== location.pathname || nextSearch !== location.search) {
+      if (nextPathname !== location.pathname || nextSearch !== location.search) {
         flushSync(() => {
-          setPendingHeader({ pathname: detail.pathname, search: nextSearch })
+          setPendingHeader({ pathname: nextPathname, search: nextSearch })
         })
       }
     }
