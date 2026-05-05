@@ -25,3 +25,7 @@ dist-ssr
 
 # Environment variables
 .env*
+
+# Codex
+.codex-vite
+.codex-vite.err
