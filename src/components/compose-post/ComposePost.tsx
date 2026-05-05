@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { ImagePlus, X, ChevronDown, BarChart3, List, Bold, Plus, Minus, Loader2, FileText, Save, Check } from 'lucide-react'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
+import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
+import { insertGifImage, extractGifMeta } from '@/lib/gif'
 import { NetworthPill } from '@/components/networth-pill'
 import { GenderIcon } from '@/components/gender-icon'
 import { QuotePostCard } from '@/components/post-card/QuotePostCard'
@@ -160,6 +162,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
       .replace(/<\/div>/gi, '\n').replace(/<div[^>]*>/gi, '')
       .replace(/<\/p>/gi, '\n').replace(/<p[^>]*>/gi, '')
       .replace(/<(strong|b)>(.*?)<\/\1>/gi, '**$2**')
+      .replace(/<img[^>]*data-gif-url="([^"]+)"[^>]*>/gi, '\n$1')
       .replace(/<[^>]+>/g, '')
       .replace(/&nbsp;/g, ' ')
       .replace(/&amp;/g, '&')
@@ -284,9 +287,18 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
     const topic = TOPIC_SLUG[selectedTopic] ?? selectedTopic.toLowerCase()
     const meta: Record<string, unknown> = { version: 1, platform: 'web' }
 
+    const gifMeta = extractGifMeta(body)
+    if (gifMeta) {
+      meta.giphy_url = gifMeta.giphy_url
+      meta.giphy_id = gifMeta.giphy_id
+      meta.src = gifMeta.giphy_url
+    }
+
     let postType = 0
 
-    if (quotedPost) {
+    if (gifMeta) {
+      postType = 4
+    } else if (quotedPost) {
       postType = 3
       meta.quote_post = { uuid: quotedPost.uuid }
     } else if (activeOption === 'poll') {
@@ -310,7 +322,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
       {
         title: title.trim(),
         topic,
-        text: body,
+        text: gifMeta ? body.replace(gifMeta.giphy_url, '').trim() || body : body,
         post_type: postType,
         post_meta: meta,
       },
@@ -654,6 +666,15 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
               if (!el) return
               el.focus()
               document.execCommand('insertText', false, emoji)
+              handleEditorInput()
+            }}
+          />
+
+          <GifPickerButton
+            onSelect={(url) => {
+              const el = editorRef.current
+              if (!el) return
+              insertGifImage(el, url)
               handleEditorInput()
             }}
           />

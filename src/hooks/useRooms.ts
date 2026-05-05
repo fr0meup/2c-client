@@ -1,4 +1,4 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { rpc } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import type {
@@ -123,5 +123,25 @@ export function useRoomMessages(roomUuid: string | undefined, limit = 500) {
       ),
     enabled: !!auth && !!roomUuid,
     staleTime: 20_000,
+  })
+}
+
+/** Join a public room */
+export function useJoinRoom() {
+  const { auth } = useAuth()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (roomUuid: string) =>
+      rpc<unknown>(
+        '/v1/rooms/joinRoom',
+        { roomUuid },
+        auth!.token,
+        auth!.userUuid,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rooms', 'user'] })
+      queryClient.invalidateQueries({ queryKey: ['rooms', 'explore'] })
+    },
   })
 }

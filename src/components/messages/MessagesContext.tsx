@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useUserRooms, useUserDMs, useExploreRooms, useRoomMessages } from '@/hooks/useRooms'
+import { useUserRooms, useUserDMs, useExploreRooms, useRoomMessages, useJoinRoom } from '@/hooks/useRooms'
 import { useAuth } from '@/lib/auth'
 import { useSocket } from '@/hooks/useSocket'
 import type { ApiRoom, ApiMessage, ApiReaction, GetMessagesResponse, GetRoomResponse, ListRoomsResponse } from '@/lib/types'
@@ -108,6 +108,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const [joinedRooms, setJoinedRooms] = useState<Set<string>>(new Set())
   const [activeRoomUuid, setActiveRoom] = useState<string | null>(null)
+  const joinRoomMutation = useJoinRoom()
 
   const { data: roomsData, isLoading: roomsLoading } = useUserRooms()
   const { data: dmsData, isLoading: dmsLoading } = useUserDMs()
@@ -318,15 +319,26 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   }, [queryClient])
 
   const joinRoom = useCallback((uuid: string) => {
-    setJoinedRooms((prev) => {
-      if (prev.has(uuid)) return prev
-      const next = new Set(prev)
-      next.add(uuid)
-      return next
+    if (joinedRooms.has(uuid) || joinRoomMutation.isPending) return
+    joinRoomMutation.mutate(uuid, {
+      onSuccess: () => {
+        setJoinedRooms((prev) => {
+          const next = new Set(prev)
+          next.add(uuid)
+          return next
+        })
+      },
     })
-  }, [])
+  }, [joinedRooms, joinRoomMutation])
 
   const isLoading = roomsLoading || dmsLoading
+
+  // Merge server-side joined rooms with locally-tracked new joins
+  const allJoinedRooms = useMemo(() => {
+    const set = new Set(joinedRooms)
+    for (const r of rooms) set.add(r.uuid)
+    return set
+  }, [joinedRooms, rooms])
 
   const value = useMemo<MessagesContextValue>(() => {
     const totalUnread =
@@ -343,12 +355,12 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       toggleReaction,
       markRoomRead,
       joinRoom,
-      joinedRooms,
+      joinedRooms: allJoinedRooms,
       activeRoomUuid,
       setActiveRoom,
       isMessagesLoading: messagesLoading,
     }
-  }, [rooms, dms, publicRooms, isLoading, getRoom, getMessages, sendMessage, toggleReaction, markRoomRead, joinRoom, joinedRooms, activeRoomUuid, messagesLoading])
+  }, [rooms, dms, publicRooms, isLoading, getRoom, getMessages, sendMessage, toggleReaction, markRoomRead, joinRoom, allJoinedRooms, activeRoomUuid, messagesLoading])
 
   return <MessagesContext.Provider value={value}>{children}</MessagesContext.Provider>
 }

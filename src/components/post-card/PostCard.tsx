@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, Download, MessageSquare, Triangle, MoreHorizontal, Link2, Trash2, Eye, Quote, UserPlus, UserCheck, Mail, Ban, Bookmark, Loader2 } from 'lucide-react'
+import { X, Download, MessageSquare, Triangle, MoreHorizontal, Link2, Trash2, Eye, Quote, UserPlus, UserCheck, Mail, Ban, Bookmark, Loader2, Star } from 'lucide-react'
 import { NetworthPill } from '@/components/networth-pill'
 import { UserMetaPill } from '@/components/user-meta-pill'
 import type { PostCardData } from './types'
@@ -24,8 +24,38 @@ import { LinkCard } from './LinkCard'
 import { usePollResults, useLikertResults } from '@/hooks/usePostResults'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 import { VideoPlayer } from '@/components/video-player/VideoPlayer'
+import { saveGif, removeGif, isGifSaved } from '@/lib/gif'
 
 const TEXT_LIMIT = 280
+
+function GifWithStar({ url }: { url: string }) {
+  const [saved, setSaved] = useState(() => isGifSaved(url))
+
+  useEffect(() => {
+    function onSync() { setSaved(isGifSaved(url)) }
+    window.addEventListener('gif-storage-change', onSync)
+    return () => window.removeEventListener('gif-storage-change', onSync)
+  }, [url])
+
+  return (
+    <div className="group/gif relative mt-1.5 w-fit" onClick={(e) => e.stopPropagation()}>
+      <img src={url} alt="GIF" className="max-w-[240px] rounded-lg" loading="lazy" />
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          if (saved) { removeGif(url); setSaved(false) }
+          else { saveGif(url); setSaved(true) }
+        }}
+        className={`absolute right-1.5 top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full opacity-0 transition-all group-hover/gif:opacity-100 ${
+          saved ? 'bg-[#c8a44d]/90 text-[#0f0e0a]' : 'bg-black/60 text-white/60 hover:bg-black/80 hover:text-white'
+        }`}
+        title={saved ? 'Remove from saved GIFs' : 'Save GIF'}
+      >
+        <Star className={`h-3 w-3 ${saved ? 'fill-current' : ''}`} />
+      </button>
+    </div>
+  )
+}
 
 function PlatformIcon({ platform }: { platform?: string }) {
   if (platform === 'ios') {
@@ -120,8 +150,15 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
   )
 
   const cleanText = cleanPostText(post.text)
-  const isLong = cleanText.length > TEXT_LIMIT
-  const displayText = !expanded && isLong ? cleanText.slice(0, TEXT_LIMIT).trimEnd() + '…' : cleanText
+  const gifRegex = /(https?:\/\/\S+\.gif(?:\?\S*)?)/gi
+  const postGifUrls: string[] = cleanText.match(gifRegex) ?? []
+  const textWithoutGifs = cleanText.replace(gifRegex, '').trim()
+  const gifFromMeta = post.post_meta?.giphy_url
+    ? post.post_meta.giphy_url.replace(/\/\d+\.gif/, '/giphy.gif')
+    : undefined
+  const allPostGifs: string[] = [...postGifUrls, ...(gifFromMeta && !postGifUrls.includes(gifFromMeta) ? [gifFromMeta] : [])].filter((u) => u !== imageSrc)
+  const isLong = textWithoutGifs.length > TEXT_LIMIT
+  const displayText = !expanded && isLong ? textWithoutGifs.slice(0, TEXT_LIMIT).trimEnd() + '…' : textWithoutGifs
 
   function handleVote(dir: 1 | -1) {
     const next = currentVote === dir ? 0 : dir
@@ -415,6 +452,9 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
                   {expanded ? 'Show less' : 'Show more'}
                 </button>
               )}
+              {allPostGifs.map((url, i) => (
+                <GifWithStar key={i} url={url} />
+              ))}
             </>
           )}
 

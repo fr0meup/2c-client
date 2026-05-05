@@ -63,6 +63,9 @@ export interface PostMeta {
   categoryIconUrl?: string
   // link post (post_type 1)
   link?: string
+  // gif
+  giphy_url?: string
+  giphy_id?: string
 }
 
 export interface Post {

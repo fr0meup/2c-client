@@ -7,11 +7,12 @@ import {
   Eye,
   Download,
   X,
+  Star,
 } from 'lucide-react'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { NetworthPill } from '@/components/networth-pill'
 import { UserMetaPill } from '@/components/user-meta-pill'
-import { timeAgo, renderPostText } from '@/components/post-card'
+import { timeAgo, renderPostText, cleanPostText } from '@/components/post-card'
 import { usePollResults, useLikertResults } from '@/hooks/usePostResults'
 
 import { PollCard } from '@/components/post-card/PollCard'
@@ -36,7 +37,35 @@ import { PostDetailSkeleton, CommentsSkeleton } from '@/components/skeleton'
 import type { Comment } from './types'
 import { obfuscateText } from '@/lib/obfuscate'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
-import { getTextWithGifs, insertGifImage, extractGifMeta } from '@/lib/gif'
+import { getTextWithGifs, insertGifImage, extractGifMeta, saveGif, removeGif, isGifSaved } from '@/lib/gif'
+
+function GifWithStar({ url }: { url: string }) {
+  const [saved, setSaved] = useState(() => isGifSaved(url))
+
+  useEffect(() => {
+    function onSync() { setSaved(isGifSaved(url)) }
+    window.addEventListener('gif-storage-change', onSync)
+    return () => window.removeEventListener('gif-storage-change', onSync)
+  }, [url])
+
+  return (
+    <div className="group/gif relative mt-1.5 w-fit">
+      <img src={url} alt="GIF" className="max-w-[240px] rounded-lg" loading="lazy" />
+      <button
+        onClick={() => {
+          if (saved) { removeGif(url); setSaved(false) }
+          else { saveGif(url); setSaved(true) }
+        }}
+        className={`absolute right-1.5 top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full opacity-0 transition-all group-hover/gif:opacity-100 ${
+          saved ? 'bg-[#c8a44d]/90 text-[#0f0e0a]' : 'bg-black/60 text-white/60 hover:bg-black/80 hover:text-white'
+        }`}
+        title={saved ? 'Remove from saved GIFs' : 'Save GIF'}
+      >
+        <Star className={`h-3 w-3 ${saved ? 'fill-current' : ''}`} />
+      </button>
+    </div>
+  )
+}
 
 export function PostDetail() {
   const { uuid } = useParams<{ uuid: string }>()
@@ -303,11 +332,28 @@ export function PostDetail() {
             userVote={pickUserVote}
             resolutionDeadline={post.post_meta?.resolution_deadline}
           />
-        ) : (
-          <div className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-white/90">
-            {renderPostText(post.text)}
-          </div>
-        )}
+        ) : (() => {
+          const cleaned = cleanPostText(post.text)
+          const gifRegex = /(https?:\/\/\S+\.gif(?:\?\S*)?)/gi
+          const postGifUrls: string[] = cleaned.match(gifRegex) ?? []
+          const strippedText = cleaned.replace(gifRegex, '').trim()
+          const gifFromMeta = post.post_meta?.giphy_url
+            ? post.post_meta.giphy_url.replace(/\/\d+\.gif/, '/giphy.gif')
+            : undefined
+          const allPostGifs: string[] = [...postGifUrls, ...(gifFromMeta && !postGifUrls.includes(gifFromMeta) ? [gifFromMeta] : [])].filter((u) => u !== post.post_meta?.src)
+          return (
+            <>
+              {strippedText && (
+                <div className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-white/90">
+                  {renderPostText(strippedText)}
+                </div>
+              )}
+              {allPostGifs.map((url, i) => (
+                <GifWithStar key={i} url={url} />
+              ))}
+            </>
+          )
+        })()}
 
         {/* Likert visual */}
         {isLikert && (
