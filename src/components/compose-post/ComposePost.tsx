@@ -304,8 +304,35 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
     if (gifUrl) {
       postType = 4
     } else if (quotedPost) {
-      postType = 3
-      meta.quote_post = { uuid: quotedPost.uuid }
+      meta.quote_post = {
+        uuid: quotedPost.uuid,
+        title: quotedPost.title ?? '',
+        text: quotedPost.text,
+        upvote_count: quotedPost.upvote_count,
+        comment_count: quotedPost.comment_count,
+        view_count: quotedPost.view_count,
+        report_count: quotedPost.report_count ?? 0,
+        bookmark_count: quotedPost.bookmark_count ?? 0,
+        post_type: quotedPost.post_type,
+        author_uuid: quotedPost.author_uuid,
+        post_meta: quotedPost.post_meta ?? {},
+        topic: quotedPost.topic ?? '',
+        author_meta: quotedPost.author_meta,
+        created_at: quotedPost.created_at,
+        updated_at: quotedPost.updated_at ?? quotedPost.created_at,
+      }
+      if (imageFile) {
+        postType = 4
+        try {
+          const result = await uploadImage.mutateAsync(imageFile)
+          meta.src = result.publicURL
+          if (result.isVideo) meta.media_type = 'video'
+        } catch {
+          return
+        }
+      } else {
+        postType = 3
+      }
     } else if (activeOption === 'poll') {
       postType = 2
       meta.poll = pollOptions.filter((o) => o.trim().length > 0)
