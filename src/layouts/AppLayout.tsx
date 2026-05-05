@@ -153,16 +153,10 @@ export function AppLayout() {
   useEffect(() => {
     if (!pendingPath) return
     if (location.pathname !== pendingPath) return
-    let secondFrame: number | undefined
-    const firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        setPendingPath(null)
-      })
+    const frame = window.requestAnimationFrame(() => {
+      setPendingPath(null)
     })
-    return () => {
-      window.cancelAnimationFrame(firstFrame)
-      if (secondFrame) window.cancelAnimationFrame(secondFrame)
-    }
+    return () => window.cancelAnimationFrame(frame)
   }, [location.pathname, location.search, pendingPath])
 
   useEffect(() => {

@@ -164,16 +164,10 @@ export function HeaderRight() {
   useEffect(() => {
     if (!pendingHeader) return
     if (location.pathname !== pendingHeader.pathname || location.search !== pendingHeader.search) return
-    let secondFrame: number | undefined
-    const firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        setPendingHeader(null)
-      })
+    const frame = window.requestAnimationFrame(() => {
+      setPendingHeader(null)
     })
-    return () => {
-      window.cancelAnimationFrame(firstFrame)
-      if (secondFrame) window.cancelAnimationFrame(secondFrame)
-    }
+    return () => window.cancelAnimationFrame(frame)
   }, [location.pathname, location.search, pendingHeader])
 
   return (

@@ -177,17 +177,11 @@ export function UserProfile() {
 
   useEffect(() => {
     if (pendingTab !== tab) return
-    let secondFrame: number | undefined
-    const firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        setPendingTab(null)
-        setPendingContentTab(null)
-      })
+    const frame = window.requestAnimationFrame(() => {
+      setPendingTab(null)
+      setPendingContentTab(null)
     })
-    return () => {
-      window.cancelAnimationFrame(firstFrame)
-      if (secondFrame) window.cancelAnimationFrame(secondFrame)
-    }
+    return () => window.cancelAnimationFrame(frame)
   }, [pendingTab, tab])
 
   if (isLoading) {

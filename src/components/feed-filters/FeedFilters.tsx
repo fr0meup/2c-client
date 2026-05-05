@@ -55,16 +55,10 @@ export function FeedFilters() {
   useEffect(() => {
     if (!pendingTopic) return
     if (pendingTopic !== urlTopic) return
-    let secondFrame: number | undefined
-    const firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        setPendingTopic(null)
-      })
+    const frame = window.requestAnimationFrame(() => {
+      setPendingTopic(null)
     })
-    return () => {
-      window.cancelAnimationFrame(firstFrame)
-      if (secondFrame) window.cancelAnimationFrame(secondFrame)
-    }
+    return () => window.cancelAnimationFrame(frame)
   }, [pendingTopic, urlTopic])
 
   // Collapse the search bar only after the AdvancedSearchPanel has rendered

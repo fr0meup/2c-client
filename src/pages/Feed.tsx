@@ -95,16 +95,10 @@ export function Feed() {
     if (!pendingFeedNav) return
     if (pendingFeedNav.search !== location.search) return
     if (isDateFiltering ? bulk.isLoading : (isLoading || isFetching)) return
-    let secondFrame: number | undefined
-    const firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        setPendingFeedNav(null)
-      })
+    const frame = window.requestAnimationFrame(() => {
+      setPendingFeedNav(null)
     })
-    return () => {
-      window.cancelAnimationFrame(firstFrame)
-      if (secondFrame) window.cancelAnimationFrame(secondFrame)
-    }
+    return () => window.cancelAnimationFrame(frame)
   }, [bulk.isLoading, isDateFiltering, isFetching, isLoading, location.search, pendingFeedNav])
 
   // ── Merge data from the active source ──
