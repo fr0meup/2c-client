@@ -12,7 +12,7 @@ import { useToast } from '@/components/toast/ToastContext'
 import { humanizeError } from '@/lib/api'
 import type { Comment } from './types'
 import { obfuscateText } from '@/lib/obfuscate'
-import { saveGif, removeGif, isGifSaved, getTextWithGifs, insertGifImage, extractGifMeta } from '@/lib/gif'
+import { saveGif, removeGif, isGifSaved, getTextWithGifs, insertGifImage } from '@/lib/gif'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
 
 function GifWithStar({ url }: { url: string }) {
@@ -122,9 +122,18 @@ export function CommentItem({
   }
 
   function handleSubmitReply() {
-    const text = replyRef.current ? getTextWithGifs(replyRef.current).trim() : ''
-    if (!text) return
-    const gifMeta = extractGifMeta(text)
+    if (!replyRef.current) return
+
+    // Extract GIF URL directly from the DOM before converting to text
+    const gifImg = replyRef.current.querySelector('img[data-gif-url]') as HTMLImageElement | null
+    const gifMeta = gifImg
+      ? { giphy_url: gifImg.getAttribute('data-gif-url')!, giphy_id: gifImg.getAttribute('data-gif-url')! }
+      : null
+
+    if (gifImg) gifImg.remove()
+    const text = getTextWithGifs(replyRef.current).trim()
+
+    if (!text && !gifMeta) return
 
     replyMutation.mutate(
       {

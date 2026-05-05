@@ -55,14 +55,14 @@ export function useCreateComment() {
 
       // Strip GIF URL from text when sending via comment_meta so OG client doesn't show the raw link
       const text = params.giphy_url
-        ? params.text.replace(params.giphy_url, '').trim()
+        ? params.text.replace(params.giphy_url, '').trim() || '\u200b'
         : params.text
 
       return rpc<CreateCommentResponse>(
         '/v1/comments/create',
         {
           post_uuid: params.post_uuid,
-          text: text || params.text,
+          text,
           in_reply_to_uuid: params.in_reply_to_uuid,
           ...(params.giphy_url ? { giphy_url: params.giphy_url, giphy_id: params.giphy_id ?? params.giphy_url } : {}),
         },

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { ImagePlus, X, ChevronDown, BarChart3, List, Bold, Plus, Minus, Loader2, FileText, Save, Check } from 'lucide-react'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
-import { insertGifImage, extractGifMeta } from '@/lib/gif'
+import { insertGifImage } from '@/lib/gif'
 import { NetworthPill } from '@/components/networth-pill'
 import { GenderIcon } from '@/components/gender-icon'
 import { QuotePostCard } from '@/components/post-card/QuotePostCard'
@@ -50,6 +50,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
   const [pollOptions, setPollOptions] = useState(['', ''])
   const [likertValue, setLikertValue] = useState<number | null>(null)
   const editorRef = useRef<HTMLDivElement>(null)
+  const [gifUrl, setGifUrl] = useState<string | null>(null)
   const [isBoldActive, setIsBoldActive] = useState(false)
   const [isListActive, setIsListActive] = useState(false)
   const [hasEditorSelection, setHasEditorSelection] = useState(false)
@@ -162,7 +163,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
       .replace(/<\/div>/gi, '\n').replace(/<div[^>]*>/gi, '')
       .replace(/<\/p>/gi, '\n').replace(/<p[^>]*>/gi, '')
       .replace(/<(strong|b)>(.*?)<\/\1>/gi, '**$2**')
-      .replace(/<img[^>]*data-gif-url="([^"]+)"[^>]*>/gi, '\n$1')
+      .replace(/<img[^>]*data-gif-url="[^"]*"[^>]*>/gi, '')
       .replace(/<[^>]+>/g, '')
       .replace(/&nbsp;/g, ' ')
       .replace(/&amp;/g, '&')
@@ -172,6 +173,11 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
 
   function handleEditorInput() {
     setBody(getEditorText())
+    // Sync gifUrl state: clear if the GIF img was removed from the editor
+    const el = editorRef.current
+    if (el && gifUrl && !el.querySelector('img[data-gif-url]')) {
+      setGifUrl(null)
+    }
   }
 
   function handlePaste(e: React.ClipboardEvent) {
@@ -215,7 +221,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
     if (opt === 'likert') setLikertValue(null)
   }, [])
 
-  const canPost = title.trim().length > 0 || body.trim().length > 0 || imageFile !== null
+  const canPost = title.trim().length > 0 || body.trim().length > 0 || imageFile !== null || gifUrl !== null
   const isSubmitting = createPost.isPending || uploadImage.isPending
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -287,16 +293,15 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
     const topic = TOPIC_SLUG[selectedTopic] ?? selectedTopic.toLowerCase()
     const meta: Record<string, unknown> = { version: 1, platform: 'web' }
 
-    const gifMeta = extractGifMeta(body)
-    if (gifMeta) {
-      meta.giphy_url = gifMeta.giphy_url
-      meta.giphy_id = gifMeta.giphy_id
-      meta.src = gifMeta.giphy_url
+    if (gifUrl) {
+      meta.giphy_url = gifUrl
+      meta.giphy_id = gifUrl
+      meta.src = gifUrl
     }
 
     let postType = 0
 
-    if (gifMeta) {
+    if (gifUrl) {
       postType = 4
     } else if (quotedPost) {
       postType = 3
@@ -322,7 +327,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
       {
         title: title.trim(),
         topic,
-        text: gifMeta ? body.replace(gifMeta.giphy_url, '').trim() || body : body,
+        text: body.trim() || '\u200b',
         post_type: postType,
         post_meta: meta,
       },
@@ -330,6 +335,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
         onSuccess: () => {
           setTitle('')
           setBody('')
+          setGifUrl(null)
           if (editorRef.current) editorRef.current.innerHTML = ''
           setActiveOption(null)
           setPollOptions(['', ''])
@@ -675,6 +681,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
               const el = editorRef.current
               if (!el) return
               insertGifImage(el, url)
+              setGifUrl(url)
               handleEditorInput()
             }}
           />

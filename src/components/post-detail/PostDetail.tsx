@@ -37,7 +37,7 @@ import { PostDetailSkeleton, CommentsSkeleton } from '@/components/skeleton'
 import type { Comment } from './types'
 import { obfuscateText } from '@/lib/obfuscate'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
-import { getTextWithGifs, insertGifImage, extractGifMeta, saveGif, removeGif, isGifSaved } from '@/lib/gif'
+import { getTextWithGifs, insertGifImage, saveGif, removeGif, isGifSaved } from '@/lib/gif'
 
 function GifWithStar({ url }: { url: string }) {
   const [saved, setSaved] = useState(() => isGifSaved(url))
@@ -247,9 +247,18 @@ export function PostDetail() {
 
   function handleSubmitComment() {
     if (!uuid || !commentRef.current) return
+
+    // Extract GIF URL directly from the DOM before converting to text
+    const gifImg = commentRef.current.querySelector('img[data-gif-url]') as HTMLImageElement | null
+    const gifMeta = gifImg
+      ? { giphy_url: gifImg.getAttribute('data-gif-url')!, giphy_id: gifImg.getAttribute('data-gif-url')! }
+      : null
+
+    // Get text content, stripping the GIF img element
+    if (gifImg) gifImg.remove()
     const text = getTextWithGifs(commentRef.current).trim()
-    if (!text) return
-    const gifMeta = extractGifMeta(text)
+
+    if (!text && !gifMeta) return
 
     commentMutation.mutate(
       { post_uuid: uuid, text, in_reply_to_uuid: uuid, ...gifMeta },
