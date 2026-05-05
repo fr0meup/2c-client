@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useNotifications } from './NotificationsContext'
-import { FILTER_TABS } from './config'
-import type { FilterTab } from './types'
+import { FILTER_TABS, type FilterTab } from './config'
 
 export function NotificationsHeader() {
   const navigate = useNavigate()

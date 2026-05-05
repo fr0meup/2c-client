@@ -10,9 +10,9 @@ import {
   Star,
 } from 'lucide-react'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
-import { NetworthPill } from '@/components/networth-pill'
-import { UserMetaPill } from '@/components/user-meta-pill'
-import { timeAgo, renderPostText, cleanPostText } from '@/components/post-card'
+import { NetworthPill } from '@/components/networth-pill/NetworthPill'
+import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
+import { timeAgo, renderPostText, cleanPostText } from '@/components/post-card/utils'
 import { usePollResults, useLikertResults } from '@/hooks/usePostResults'
 
 import { PollCard } from '@/components/post-card/PollCard'
@@ -22,7 +22,7 @@ import { QuotePostCard } from '@/components/post-card/QuotePostCard'
 import { TransactionCard } from '@/components/post-card/TransactionCard'
 import { LinkCard } from '@/components/post-card/LinkCard'
 import { VideoPlayer } from '@/components/video-player/VideoPlayer'
-import { CommentThread } from './CommentThread'
+import { CommentThread, type Comment } from './CommentThread'
 import { usePost } from '@/hooks/usePost'
 import { useComments } from '@/hooks/useComments'
 import { useVotePost } from '@/hooks/useVotePost'
@@ -33,11 +33,20 @@ import { humanizeError } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { useQueryClient } from '@tanstack/react-query'
 import type { ArenaResponse, UserProfileResponse } from '@/lib/types'
-import { PostDetailSkeleton, CommentsSkeleton } from '@/components/skeleton'
-import type { Comment } from './types'
-import { obfuscateText } from '@/lib/obfuscate'
+import { PostDetailSkeleton, CommentsSkeleton } from '@/components/skeleton/Skeleton'
+import { obfuscateText } from '@/lib/utils'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
 import { getTextWithGifs, insertGifImage, saveGif, removeGif, isGifSaved } from '@/lib/gif'
+
+export function PostDetailPage() {
+  return (
+    <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pb-6 sm:px-8">
+      <div className="w-full max-w-[670px] xl:-ml-[245px]">
+        <PostDetail />
+      </div>
+    </div>
+  )
+}
 
 function GifWithStar({ url }: { url: string }) {
   const [saved, setSaved] = useState(() => isGifSaved(url))

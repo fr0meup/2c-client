@@ -21,7 +21,9 @@ export function useComments(postUuid: string | undefined) {
       )
     },
     enabled: !!auth && !!postUuid,
-    staleTime: 20_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
   })
 }
 

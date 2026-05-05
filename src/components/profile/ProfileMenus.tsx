@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
-import { useAuth } from '@/lib/auth'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { OFFLINE_KEY, useAuth } from '@/lib/auth'
 import {
   AlertTriangle,
   Ban,
@@ -32,15 +32,15 @@ import {
   Link2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useUpdateUser } from '@/hooks/useUpdateUser'
 import { useCities } from '@/hooks/useCities'
 import type { ApiUserProfile } from '@/lib/types'
 import { useBlockUser, useUnblockUser } from '@/hooks/useBlock'
 import { useToast } from '@/components/toast/ToastContext'
-import { humanizeError } from '@/lib/api'
-import { OFFLINE_KEY } from '@/hooks/useAuthLogin'
-import { ONBOARDING_KEY } from '@/components/onboarding/OnboardingTutorial'
+import { humanizeError, rpc } from '@/lib/api'
+import { ONBOARDING_KEY } from '@/components/onboarding/constants'
 import { BlockedUsersModal } from './BlockedUsersModal'
+import type { Draft } from '@/lib/drafts'
+import type { importPostCache } from '@/lib/postCache'
 
 const TRIGGER_BTN =
   'group flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.06] text-white/70 transition-colors hover:bg-gradient-to-b hover:from-white/[0.09] hover:to-white/[0.04] hover:text-white hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
@@ -56,6 +56,32 @@ const MENU_ITEM_DANGER =
 
 const MENU_HEADER =
   'px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30'
+
+interface UpdateUserParams {
+  bio?: string
+  age?: number
+  gender?: string
+  arena?: string
+  balance?: number
+}
+
+function useUpdateUser() {
+  const { auth } = useAuth()
+  const queryClient = useQueryClient()
+
+  return useMutation<{ message: string }, Error, UpdateUserParams>({
+    mutationFn: (params) =>
+      rpc<{ message: string }>(
+        '/v1/users/update',
+        params as Record<string, unknown>,
+        auth!.token,
+        auth!.userUuid,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['userProfile', auth?.userUuid] })
+    },
+  })
+}
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /* Generic popover wrapper — handles outside-click + escape                  */
@@ -116,6 +142,89 @@ const CONTACT_LINKS = [
   { label: 'Discord', href: 'https://discord.gg/w6NnSua4aH', icon: ExternalLink, external: true },
   { label: 'GitHub', href: 'https://github.com/fr0meup/2c-client', icon: Github, external: true },
 ]
+
+const LOCAL_PREFIXES = ['2c_', 'twocents']
+const AUTH_KEYS = ['2c_auth']
+
+type ImportedDraft = Omit<Draft, 'mediaBlob'> & { mediaBlob?: number[] | null }
+type PostCacheBackup = Parameters<typeof importPostCache>[0]
+type BackupData = {
+  _version?: number
+  localStorage?: Record<string, string>
+  drafts?: ImportedDraft[]
+  postCache?: PostCacheBackup
+} & Record<string, unknown>
+
+function appLocalStorage(excludeKeys = AUTH_KEYS) {
+  const data: Record<string, string> = {}
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key && LOCAL_PREFIXES.some((p) => key.startsWith(p)) && !excludeKeys.includes(key)) {
+      data[key] = localStorage.getItem(key)!
+    }
+  }
+  return data
+}
+
+async function buildBackup() {
+  let drafts: unknown[] = []
+  try {
+    const { getDrafts } = await import('@/lib/drafts')
+    const raw = await getDrafts()
+    drafts = raw.map((d) => ({
+      ...d,
+      mediaBlob: d.mediaBlob ? Array.from(new Uint8Array(d.mediaBlob)) : null,
+    }))
+  } catch { /* no drafts */ }
+
+  let postCache = null
+  try {
+    const { exportPostCache } = await import('@/lib/postCache')
+    postCache = await exportPostCache()
+  } catch { /* no cache */ }
+
+  return { _version: 2, localStorage: appLocalStorage(), drafts, postCache }
+}
+
+async function exportBackup() {
+  const blob = new Blob([JSON.stringify(await buildBackup(), null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `2c-backup-${new Date().toISOString().slice(0, 10)}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+async function clearLocalData() {
+  Object.keys(appLocalStorage()).forEach((key) => localStorage.removeItem(key))
+  try { indexedDB.deleteDatabase('2c-drafts') } catch { /* ignore */ }
+  try {
+    const { clearPostCache } = await import('@/lib/postCache')
+    await clearPostCache()
+  } catch {
+    try { indexedDB.deleteDatabase('2c-post-cache') } catch { /* ignore */ }
+  }
+}
+
+async function importBackup(data: BackupData) {
+  await clearLocalData()
+  if (data._version) {
+    Object.entries(data.localStorage ?? {}).forEach(([key, value]) => localStorage.setItem(key, value as string))
+    if (data.drafts?.length) {
+      const { saveDraft } = await import('@/lib/drafts')
+      for (const d of data.drafts) {
+        await saveDraft({ ...d, mediaBlob: d.mediaBlob ? new Uint8Array(d.mediaBlob).buffer : null })
+      }
+    }
+    if (data.postCache) {
+      const { importPostCache } = await import('@/lib/postCache')
+      await importPostCache(data.postCache)
+    }
+  } else {
+    Object.entries(data).forEach(([key, value]) => localStorage.setItem(key, String(value)))
+  }
+}
 
 interface ConfirmModalProps {
   title: string
@@ -247,39 +356,7 @@ export function ProfileSettingsMenu() {
       )}
       {confirm?.type === 'logout' && (
         <LogoutModal
-          onExport={async () => {
-            const OUR_PREFIXES = ['2c_', 'twocents']
-            const SKIP_KEYS = ['2c_auth']
-            const data: Record<string, string> = {}
-            for (let i = 0; i < localStorage.length; i++) {
-              const k = localStorage.key(i)
-              if (k && OUR_PREFIXES.some((p) => k.startsWith(p)) && !SKIP_KEYS.includes(k)) {
-                data[k] = localStorage.getItem(k)!
-              }
-            }
-            let drafts: unknown[] = []
-            try {
-              const { getDrafts } = await import('@/lib/drafts')
-              const raw = await getDrafts()
-              drafts = raw.map((d) => ({
-                ...d,
-                mediaBlob: d.mediaBlob ? Array.from(new Uint8Array(d.mediaBlob)) : null,
-              }))
-            } catch { /* no drafts */ }
-            let postCache = null
-            try {
-              const { exportPostCache } = await import('@/lib/postCache')
-              postCache = await exportPostCache()
-            } catch { /* no cache */ }
-            const backup = { _version: 2, localStorage: data, drafts, postCache }
-            const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `2c-backup-${new Date().toISOString().slice(0, 10)}.json`
-            a.click()
-            URL.revokeObjectURL(url)
-          }}
+          onExport={exportBackup}
           onLogout={() => { confirm.onConfirm(); setConfirm(null) }}
           onCancel={() => setConfirm(null)}
         />
@@ -421,50 +498,7 @@ function SettingsContent({ close, onOpenBlocked, onConfirm }: { close: () => voi
       <div className="my-1 h-px bg-white/[0.06]" />
 
       <button
-        onClick={async () => {
-          const OUR_PREFIXES = ['2c_', 'twocents']
-          const SKIP_KEYS = ['2c_auth']
-          const data: Record<string, string> = {}
-          for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i)
-            if (k && OUR_PREFIXES.some((p) => k.startsWith(p)) && !SKIP_KEYS.includes(k)) {
-              data[k] = localStorage.getItem(k)!
-            }
-          }
-
-          // Drafts from IndexedDB
-          let drafts: unknown[] = []
-          try {
-            const { getDrafts } = await import('@/lib/drafts')
-            const raw = await getDrafts()
-            drafts = raw.map((d) => ({
-              ...d,
-              mediaBlob: d.mediaBlob ? Array.from(new Uint8Array(d.mediaBlob)) : null,
-            }))
-          } catch { /* no drafts */ }
-
-          let postCache = null
-          try {
-            const { exportPostCache } = await import('@/lib/postCache')
-            postCache = await exportPostCache()
-          } catch { /* no cache */ }
-
-          const backup = {
-            _version: 2,
-            localStorage: data,
-            drafts,
-            postCache,
-          }
-
-          const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `2c-backup-${new Date().toISOString().slice(0, 10)}.json`
-          a.click()
-          URL.revokeObjectURL(url)
-          close()
-        }}
+        onClick={async () => { await exportBackup(); close() }}
         className={MENU_ITEM}
       >
         <Download className="h-4 w-4 text-white/50" strokeWidth={2.2} />
@@ -486,46 +520,7 @@ function SettingsContent({ close, onOpenBlocked, onConfirm }: { close: () => voi
                   const data = JSON.parse(reader.result as string)
                   if (typeof data !== 'object' || data === null) throw new Error('bad format')
 
-                  // Clear existing data first
-                  const OUR_PREFIXES = ['2c_', 'twocents']
-                  const KEEP_KEYS = ['2c_auth']
-                  const toRemove: string[] = []
-                  for (let i = 0; i < localStorage.length; i++) {
-                    const k = localStorage.key(i)
-                    if (k && OUR_PREFIXES.some((p) => k.startsWith(p)) && !KEEP_KEYS.includes(k)) {
-                      toRemove.push(k)
-                    }
-                  }
-                  toRemove.forEach((k) => localStorage.removeItem(k))
-                  try { indexedDB.deleteDatabase('2c-drafts') } catch { /* ignore */ }
-                  try {
-                    const { clearPostCache } = await import('@/lib/postCache')
-                    await clearPostCache()
-                  } catch { /* ignore */ }
-
-                  // v1/v2 format (has _version key)
-                  if (data._version) {
-                    if (data.localStorage) {
-                      Object.entries(data.localStorage).forEach(([k, v]) => localStorage.setItem(k, v as string))
-                    }
-                    if (data.drafts?.length) {
-                      const { saveDraft } = await import('@/lib/drafts')
-                      for (const d of data.drafts) {
-                        const draft = {
-                          ...d,
-                          mediaBlob: d.mediaBlob ? new Uint8Array(d.mediaBlob).buffer : null,
-                        }
-                        await saveDraft(draft)
-                      }
-                    }
-                    if (data.postCache) {
-                      const { importPostCache } = await import('@/lib/postCache')
-                      await importPostCache(data.postCache)
-                    }
-                  } else {
-                    // Legacy format (flat key-value from old export)
-                    Object.entries(data).forEach(([k, v]) => localStorage.setItem(k, v as string))
-                  }
+                  await importBackup(data)
 
                   window.location.reload()
                 } catch {
@@ -545,21 +540,7 @@ function SettingsContent({ close, onOpenBlocked, onConfirm }: { close: () => voi
 
       <button
         onClick={() => {
-          onConfirm('clear', () => {
-            const OUR_PREFIXES = ['2c_', 'twocents']
-            const KEEP_KEYS = ['2c_auth']
-            const toRemove: string[] = []
-            for (let i = 0; i < localStorage.length; i++) {
-              const k = localStorage.key(i)
-              if (k && OUR_PREFIXES.some((p) => k.startsWith(p)) && !KEEP_KEYS.includes(k)) {
-                toRemove.push(k)
-              }
-            }
-            toRemove.forEach((k) => localStorage.removeItem(k))
-            try { indexedDB.deleteDatabase('2c-drafts') } catch { /* ignore */ }
-            try { indexedDB.deleteDatabase('2c-post-cache') } catch { /* ignore */ }
-            window.location.reload()
-          })
+          onConfirm('clear', async () => { await clearLocalData(); window.location.reload() })
         }}
         className={MENU_ITEM_DANGER}
       >
@@ -598,12 +579,12 @@ export function ProfileEditMenu({ user }: ProfileEditMenuProps) {
       triggerTitle="Edit profile"
       trigger={<Pencil className="h-4 w-4" strokeWidth={2.2} />}
     >
-      {(close) => <EditMenuContent user={user} close={close} />}
+      {() => <EditMenuContent user={user} />}
     </PopoverMenu>
   )
 }
 
-function EditMenuContent({ user, close }: { user?: ApiUserProfile; close: () => void }) {
+function EditMenuContent({ user }: { user?: ApiUserProfile }) {
   const [editing, setEditing] = useState<EditField>(null)
   const updateUser = useUpdateUser()
 

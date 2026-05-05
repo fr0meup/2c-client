@@ -3,7 +3,7 @@ import { CornerUpLeft, Send, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import type { ChatMessage } from './types'
-import { obfuscateText } from '@/lib/obfuscate'
+import { obfuscateText } from '@/lib/utils'
 import { useToast } from '@/components/toast/ToastContext'
 
 interface Props {

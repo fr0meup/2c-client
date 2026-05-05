@@ -1,24 +1,23 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import { ImagePlus, X, ChevronDown, BarChart3, List, Bold, Plus, Minus, Loader2, FileText, Save, Check } from 'lucide-react'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
 import { insertGifImage } from '@/lib/gif'
-import { NetworthPill } from '@/components/networth-pill'
-import { GenderIcon } from '@/components/gender-icon'
+import { NetworthPill } from '@/components/networth-pill/NetworthPill'
+import { GenderIcon } from '@/components/gender-icon/GenderIcon'
 import { QuotePostCard } from '@/components/post-card/QuotePostCard'
 import { useAuth } from '@/lib/auth'
 import { useUserProfile } from '@/hooks/useUserProfile'
 import { useCreatePost } from '@/hooks/usePostMutations'
-import { useUploadImage } from '@/hooks/useUploadImage'
 import { useToast } from '@/components/toast/ToastContext'
-import { humanizeError } from '@/lib/api'
+import { humanizeError, rpc } from '@/lib/api'
 import { saveDraft, getDraftCount } from '@/lib/drafts'
 import type { Draft } from '@/lib/drafts'
 import { DraftsModal } from './DraftsModal'
-import { TOPIC_MENU, TOPIC_SLUG } from './config'
-import type { PostOption } from './types'
+import { TOPIC_MENU, TOPIC_SLUG, type PostOption } from './config'
 import type { PostCardData } from '@/components/post-card/types'
-import { obfuscateText } from '@/lib/obfuscate'
+import { obfuscateText } from '@/lib/utils'
 
 interface ComposePostProps {
   onClose?: () => void
@@ -28,6 +27,44 @@ interface ComposePostProps {
 }
 
 const COMPOSE_TOPICS = new Set(TOPIC_MENU.flatMap((g) => g.items))
+
+interface UploadImageResult {
+  presignedURL: string
+  publicURL: string
+}
+
+function useUploadImage() {
+  const { auth } = useAuth()
+
+  return useMutation({
+    mutationFn: async (file: File): Promise<{ publicURL: string; isVideo: boolean }> => {
+      if (!auth) throw new Error('Not authenticated')
+
+      const isVideo = file.type.startsWith('video/')
+      const upload = await rpc<UploadImageResult>(
+        '/v1/media/uploadImage',
+        { contentType: 'image/png', size: file.size },
+        auth.token,
+        auth.userUuid
+      )
+      const presigned = new URL(upload.presignedURL)
+      const putRes = await fetch('/s3-upload' + presigned.pathname + presigned.search, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type || 'image/png',
+          'x-amz-server-side-encryption': 'AES256',
+        },
+        body: file,
+      })
+
+      if (!putRes.ok) {
+        throw new Error(`S3 upload failed: ${putRes.status} ${putRes.statusText}`)
+      }
+
+      return { publicURL: upload.publicURL, isVideo }
+    },
+  })
+}
 
 export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, defaultTopic }: ComposePostProps) {
   const { auth } = useAuth()

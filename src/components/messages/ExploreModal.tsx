@@ -1,16 +1,22 @@
 import { useEffect } from 'react'
 import { Compass, Hash, Lock, Users, X, ChevronRight, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { fmtCount, gradientCss } from './utils'
-import { useMessages } from './MessagesContext'
-import type { Room } from './types'
+import { mapRoom, useMessages } from './MessagesContext'
+import { useExploreRooms } from '@/hooks/useRooms'
+import { useAuth } from '@/lib/auth'
+import { fmtCount, gradientCss, type Room } from './types'
 
 interface Props {
   onClose: () => void
 }
 
 export function ExploreModal({ onClose }: Props) {
-  const { publicRooms, joinedRooms, joinRoom } = useMessages()
+  const { auth } = useAuth()
+  const { joinedRooms, joinRoom } = useMessages()
+  const { data } = useExploreRooms()
+  const publicRooms = (data?.rooms ?? [])
+    .filter((r) => r.room_type === 'room')
+    .map((r) => mapRoom(r, auth?.userUuid))
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

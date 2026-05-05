@@ -21,14 +21,14 @@ export function cleanPostText(text: string): string {
       const code = parseInt(match.replace(/&#|;/g, ''), 10)
       return String.fromCodePoint(code)
     })
-    .replace(/[\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF\u00AD\u034F\u061C\u180E\uFFFC\uFFF9-\uFFFB]/g, '')
+    .replace(/[\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF\u00AD\u061C\u180E\uFFFC\uFFF9-\uFFFB]|\u034F/g, '')
     .replace(/\n{3,}/g, '\n')
     .trim()
 }
 
 function parseInline(text: string) {
   // Matches: markdown links [text](url), bold **text**, or plain URLs
-  const INLINE_RE = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+)\))|(\*\*.*?\*\*)|(https?:\/\/[^\s<>\[\]()]+)/g
+  const INLINE_RE = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+)\))|(\*\*.*?\*\*)|(https?:\/\/[^\s<>[\]()]+)/g
 
   const parts: (string | ReturnType<typeof createElement>)[] = []
   let lastIndex = 0
@@ -131,11 +131,4 @@ export function formatCompact(n: number): string {
   if (abs >= 1_000_000) return `${(abs / 1_000_000).toFixed(1)}M`
   if (abs >= 1_000) return `${Math.round(abs / 1_000)}K`
   return String(Math.round(abs))
-}
-
-const EMOJI_REGEX =
-  /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F018}-\u{1F270}\u{238C}\u{2B06}\u{2B07}\u{2B1B}\u{2B1C}\u{2B50}\u{2B55}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{1F100}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1F910}-\u{1F96B}\u{1F980}-\u{1F9E0}]/gu
-
-export function hasEmoji(str: string): boolean {
-  return EMOJI_REGEX.test(str)
 }

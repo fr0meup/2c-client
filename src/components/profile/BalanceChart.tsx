@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { formatCompact } from './utils'
-import type { BalancePoint } from './types'
+import type { BalancePoint } from './UserProfile'
+
+function formatCompact(n: number): string {
+  if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}k`
+  return n.toLocaleString('en-US')
+}
 
 interface Props {
   history: BalancePoint[]

@@ -9,18 +9,34 @@ const VOTES_STORE = 'votes'
 const POLLS_STORE = 'polls'
 const PICKS_STORE = 'picks'
 
-// Lightweight meta kept in localStorage (tiny, <200 bytes)
+// Lightweight meta kept in localStorage.
 const META_KEY = '2c_post_cache_meta'
+
+export interface CachedRange {
+  from: string
+  to: string
+}
 
 export interface CacheMeta {
   newestPostDate: string | null
   oldestPostDate: string | null
   count: number
   updatedAt: string
+  coveredRanges: CachedRange[]
+}
+
+interface CoveredRangeInput {
+  fromTs: number
+  toTs: number
+}
+
+function emptyMeta(): CacheMeta {
+  return { newestPostDate: null, oldestPostDate: null, count: 0, updatedAt: '', coveredRanges: [] }
 }
 
 function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  if (dbPromise) return dbPromise
+  dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION)
     req.onupgradeneeded = () => {
       const db = req.result
@@ -39,9 +55,15 @@ function openDb(): Promise<IDBDatabase> {
       }
     }
     req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
+    req.onerror = () => {
+      dbPromise = null
+      reject(req.error)
+    }
   })
+  return dbPromise
 }
+
+let dbPromise: Promise<IDBDatabase> | null = null
 
 // ── Helpers ──
 
@@ -61,6 +83,17 @@ function getAll<T>(db: IDBDatabase, storeName: string): Promise<T[]> {
     const tx = db.transaction(storeName, 'readonly')
     const req = tx.objectStore(storeName).getAll()
     req.onsuccess = () => resolve(req.result as T[])
+    req.onerror = () => reject(req.error)
+  })
+}
+
+function getPostsByDateRange(db: IDBDatabase, fromTs: number, toTs: number): Promise<Post[]> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(POSTS_STORE, 'readonly')
+    const index = tx.objectStore(POSTS_STORE).index('created_at')
+    const range = IDBKeyRange.bound(new Date(fromTs).toISOString(), new Date(toTs).toISOString())
+    const req = index.getAll(range)
+    req.onsuccess = () => resolve(req.result as Post[])
     req.onerror = () => reject(req.error)
   })
 }
@@ -88,10 +121,17 @@ function clearStore(db: IDBDatabase, storeName: string): Promise<void> {
 export function getCacheMeta(): CacheMeta {
   try {
     const raw = localStorage.getItem(META_KEY)
-    if (!raw) return { newestPostDate: null, oldestPostDate: null, count: 0, updatedAt: '' }
-    return JSON.parse(raw) as CacheMeta
+    if (!raw) return emptyMeta()
+    const parsed = JSON.parse(raw) as Partial<CacheMeta>
+    return {
+      newestPostDate: parsed.newestPostDate ?? null,
+      oldestPostDate: parsed.oldestPostDate ?? null,
+      count: parsed.count ?? 0,
+      updatedAt: parsed.updatedAt ?? '',
+      coveredRanges: Array.isArray(parsed.coveredRanges) ? parsed.coveredRanges : [],
+    }
   } catch {
-    return { newestPostDate: null, oldestPostDate: null, count: 0, updatedAt: '' }
+    return emptyMeta()
   }
 }
 
@@ -99,11 +139,77 @@ function writeMeta(meta: CacheMeta) {
   localStorage.setItem(META_KEY, JSON.stringify(meta))
 }
 
+function mergeCoveredRanges(ranges: CachedRange[], next?: CoveredRangeInput): CachedRange[] {
+  const normalized = ranges
+    .map((range) => ({
+      fromTs: new Date(range.from).getTime(),
+      toTs: new Date(range.to).getTime(),
+    }))
+    .filter((range) => Number.isFinite(range.fromTs) && Number.isFinite(range.toTs))
+
+  if (next) normalized.push(next)
+  normalized.sort((a, b) => a.fromTs - b.fromTs)
+
+  const merged: CoveredRangeInput[] = []
+  for (const range of normalized) {
+    const last = merged[merged.length - 1]
+    if (last && range.fromTs <= last.toTs + 1000) {
+      last.toTs = Math.max(last.toTs, range.toTs)
+    } else {
+      merged.push({ ...range })
+    }
+  }
+
+  return merged.map((range) => ({
+    from: new Date(range.fromTs).toISOString(),
+    to: new Date(range.toTs).toISOString(),
+  }))
+}
+
+export function isPostRangeCached(fromTs: number, toTs: number): boolean {
+  const ranges = mergeCoveredRanges(getCacheMeta().coveredRanges)
+  return ranges.some((range) => {
+    const cachedFromTs = new Date(range.from).getTime()
+    const cachedToTs = new Date(range.to).getTime()
+    return cachedFromTs <= fromTs && cachedToTs >= toTs
+  })
+}
+
+export function getMissingPostRanges(fromTs: number, toTs: number): CoveredRangeInput[] {
+  const covered = mergeCoveredRanges(getCacheMeta().coveredRanges)
+    .map((range) => ({
+      fromTs: Math.max(new Date(range.from).getTime(), fromTs),
+      toTs: Math.min(new Date(range.to).getTime(), toTs),
+    }))
+    .filter((range) => Number.isFinite(range.fromTs) && Number.isFinite(range.toTs) && range.fromTs <= range.toTs)
+
+  if (covered.length === 0) return [{ fromTs, toTs }]
+
+  const missing: CoveredRangeInput[] = []
+  let cursorTs = fromTs
+  for (const range of covered) {
+    if (range.fromTs > cursorTs) {
+      missing.push({ fromTs: cursorTs, toTs: range.fromTs })
+    }
+    cursorTs = Math.max(cursorTs, range.toTs)
+  }
+  if (cursorTs < toTs) {
+    missing.push({ fromTs: cursorTs, toTs })
+  }
+
+  return missing.filter((range) => range.toTs - range.fromTs > 1000)
+}
+
 // ── Public API ──
 
 export async function getCachedPosts(): Promise<Post[]> {
   const db = await openDb()
   return getAll<Post>(db, POSTS_STORE)
+}
+
+export async function getCachedPostsInRange(fromTs: number, toTs: number): Promise<Post[]> {
+  const db = await openDb()
+  return getPostsByDateRange(db, fromTs, toTs)
 }
 
 export async function getCachedVotes(): Promise<Vote[]> {
@@ -130,6 +236,7 @@ export async function mergePosts(
   newVotes: Vote[],
   newPolls: PollVote[],
   newPicks: PickVote[],
+  coveredRange?: CoveredRangeInput,
 ): Promise<void> {
   const db = await openDb()
 
@@ -149,7 +256,13 @@ export async function mergePosts(
     if (!newest || p.created_at > newest) newest = p.created_at
     if (!oldest || p.created_at < oldest) oldest = p.created_at
   }
-  writeMeta({ newestPostDate: newest, oldestPostDate: oldest, count, updatedAt: new Date().toISOString() })
+  writeMeta({
+    newestPostDate: newest,
+    oldestPostDate: oldest,
+    count,
+    updatedAt: new Date().toISOString(),
+    coveredRanges: mergeCoveredRanges(prev.coveredRanges, coveredRange),
+  })
 }
 
 export async function clearPostCache(): Promise<void> {
@@ -207,7 +320,10 @@ export async function importPostCache(data: {
     bulkPut(db, PICKS_STORE, data.picks),
   ])
   if (data.meta) {
-    writeMeta(data.meta)
+    writeMeta({
+      ...data.meta,
+      coveredRanges: mergeCoveredRanges(data.meta.coveredRanges ?? []),
+    })
   } else {
     // Rebuild meta from posts
     const count = data.posts.length
@@ -217,6 +333,6 @@ export async function importPostCache(data: {
       if (!newest || p.created_at > newest) newest = p.created_at
       if (!oldest || p.created_at < oldest) oldest = p.created_at
     }
-    writeMeta({ newestPostDate: newest, oldestPostDate: oldest, count, updatedAt: new Date().toISOString() })
+    writeMeta({ newestPostDate: newest, oldestPostDate: oldest, count, updatedAt: new Date().toISOString(), coveredRanges: [] })
   }
 }

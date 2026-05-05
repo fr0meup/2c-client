@@ -41,6 +41,7 @@ export function useCreatePost() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] })
+      queryClient.invalidateQueries({ queryKey: ['userProfile', auth?.userUuid] })
     },
   })
 }
@@ -70,8 +71,11 @@ export function useDeletePost() {
         auth.userUuid
       )
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['feed'] })
+      queryClient.invalidateQueries({ queryKey: ['userProfile'] })
+      queryClient.invalidateQueries({ queryKey: ['bookmarks'] })
+      queryClient.removeQueries({ queryKey: ['post', variables.post_uuid] })
     },
   })
 }

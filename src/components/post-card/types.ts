@@ -63,8 +63,3 @@ export interface PostCardData {
   deleted_at?: string | null
   updated_at?: string
 }
-
-export interface PostCardProps {
-  post: PostCardData
-  initialVote?: 1 | -1 | 0
-}

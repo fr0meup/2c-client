@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react'
 import { ChevronRight, ChevronLeft, X, MousePointerClick } from 'lucide-react'
 import { cn } from '@/lib/utils'
-
-const ONBOARDING_KEY = '2c_onboarding_done'
+import { ONBOARDING_KEY } from './constants'
 
 // ── Step definitions ──
 // selector: data-onboarding="<id>" attribute on the target element
@@ -323,7 +322,7 @@ export function OnboardingTutorial() {
     }
     el.addEventListener('mousedown', handleInteraction, { once: true })
     return () => el.removeEventListener('mousedown', handleInteraction)
-  }, [visible, step, waiting])
+  }, [visible, step, waiting, goToStep])
 
   // ── Dismiss open popovers (e.g. settings menu) when leaving an action step ──
   const prevStepRef = useRef(step)
@@ -583,5 +582,3 @@ export function OnboardingTutorial() {
     </>
   )
 }
-
-export { ONBOARDING_KEY }

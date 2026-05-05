@@ -1,35 +1,57 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TOPICS, TOPIC_MENU, FEED_PARAM_TO_TOPIC, getFeedUrl } from './config'
+import { usePrefetch } from '@/hooks/usePrefetch'
+import { preloadRoute } from '@/lib/routePreload'
+import { announceNavigationPending } from '@/lib/navigationPending'
 
 export function FeedFilters() {
   const navigate = useNavigate()
   const location = useLocation()
-  const queryClient = useQueryClient()
+  const { prefetchFeed } = usePrefetch()
   const currentQuery = new URLSearchParams(location.search).get('q') ?? ''
   const [searchOpen, setSearchOpen] = useState(!!currentQuery)
   const [searchValue, setSearchValue] = useState(currentQuery)
   const [advLoading, setAdvLoading] = useState(false)
   const [topicsOpen, setTopicsOpen] = useState(false)
+  const [pendingTopic, setPendingTopic] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [indicator, setIndicator] = useState({ left: 0, width: 0 })
   // Derive active topic from URL query param ?feed=
   const feedParam = new URLSearchParams(location.search).get('feed')
-  const activeTopic = FEED_PARAM_TO_TOPIC[feedParam ?? ''] ?? 'New'
+  const urlTopic = FEED_PARAM_TO_TOPIC[feedParam ?? ''] ?? 'New'
+  const activeTopic = pendingTopic ?? urlTopic
 
   const topicMenuItems = TOPIC_MENU.flatMap((g) => g.items)
   const mainTabLabels = ['New', 'Hot', 'Following', 'Picks'] as const
   const isInTopicsMenu = !mainTabLabels.includes(activeTopic as unknown as typeof mainTabLabels[number]) && topicMenuItems.some((item) => item === activeTopic)
+
+  function prefetchTopic(topic: string) {
+    preloadRoute('feed')
+    prefetchFeed(topic)
+  }
+
+  function navigateTopic(topic: string) {
+    const url = getFeedUrl(topic)
+    setPendingTopic(topic)
+    announceNavigationPending(url)
+    prefetchTopic(topic)
+    navigate(url)
+    setTopicsOpen(false)
+  }
 
   useEffect(() => {
     if (searchOpen && inputRef.current) {
       inputRef.current.focus()
     }
   }, [searchOpen])
+
+  useEffect(() => {
+    setPendingTopic(null)
+  }, [location.search])
 
   // Collapse the search bar only after the AdvancedSearchPanel has rendered
   useEffect(() => {
@@ -114,7 +136,9 @@ export function FeedFilters() {
             if (e.key === 'Enter' && searchValue.trim()) {
               const params = new URLSearchParams(location.search)
               params.set('q', searchValue.trim())
-              navigate(`/?${params.toString()}`)
+              const url = `/?${params.toString()}`
+              announceNavigationPending(url)
+              navigate(url)
               inputRef.current?.blur()
             }
             if (e.key === 'Escape') {
@@ -123,7 +147,9 @@ export function FeedFilters() {
                 const params = new URLSearchParams(location.search)
                 params.delete('q')
                 const qs = params.toString()
-                navigate(qs ? `/?${qs}` : '/')
+                const url = qs ? `/?${qs}` : '/'
+                announceNavigationPending(url)
+                navigate(url)
               }
               setSearchOpen(false)
             }
@@ -144,6 +170,7 @@ export function FeedFilters() {
               e.preventDefault()
               e.stopPropagation()
               setAdvLoading(true)
+              announceNavigationPending('/?adv=1')
               navigate('/?adv=1')
             }}
             className="absolute right-1.5 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-white/30 transition-colors hover:bg-white/[0.08] hover:text-[#c8a44d]"
@@ -193,11 +220,10 @@ export function FeedFilters() {
             <button
               key={topic}
               data-active={isActive ? 'true' : 'false'}
-              onClick={() => {
-                queryClient.removeQueries({ queryKey: ['feed'] })
-                navigate(getFeedUrl(topic))
-                setTopicsOpen(false)
-              }}
+              onMouseEnter={() => prefetchTopic(topic)}
+              onFocus={() => prefetchTopic(topic)}
+              onTouchStart={() => prefetchTopic(topic)}
+              onClick={() => navigateTopic(topic)}
               className={cn(
                 'relative z-10 inline-flex h-8 cursor-pointer items-center justify-center rounded-full px-3.5 text-sm font-medium transition-all duration-200',
                 isActive
@@ -265,11 +291,10 @@ export function FeedFilters() {
                 {group.items.map((item) => (
                   <button
                     key={item}
-                    onClick={() => {
-                      queryClient.removeQueries({ queryKey: ['feed'] })
-                      navigate(getFeedUrl(item))
-                      setTopicsOpen(false)
-                    }}
+                    onMouseEnter={() => prefetchTopic(item)}
+                    onFocus={() => prefetchTopic(item)}
+                    onTouchStart={() => prefetchTopic(item)}
+                    onClick={() => navigateTopic(item)}
                     className={cn(
                       'flex w-full items-center px-3 py-2 text-sm transition-colors',
                       item === activeTopic

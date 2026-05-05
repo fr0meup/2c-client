@@ -1,6 +1,6 @@
-import { PostCard } from '@/components/post-card'
-import type { PostCardData } from '@/components/post-card'
-import { PostCardSkeleton } from '@/components/skeleton'
+import { PostCard } from '@/components/post-card/PostCard'
+import type { PostCardData } from '@/components/post-card/types'
+import { PostCardSkeleton } from '@/components/skeleton/Skeleton'
 import { useBookmarks } from '@/hooks/useBookmarks'
 
 export function Bookmarks() {

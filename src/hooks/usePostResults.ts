@@ -46,7 +46,8 @@ export function useLikertResults(postUuid: string | undefined, enabled = true) {
       } as LikertData
     },
     enabled: enabled && !!auth && !!postUuid,
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 
@@ -82,7 +83,8 @@ export function usePollResults(postUuid: string | undefined, enabled = true) {
       return mapped
     },
     enabled: enabled && !!auth && !!postUuid,
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 
@@ -105,6 +107,7 @@ export function usePicksResults(postUuid: string | undefined, enabled = true) {
       )
     },
     enabled: enabled && !!auth && !!postUuid,
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }

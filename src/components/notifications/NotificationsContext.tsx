@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import { REPLY_TYPES } from './config'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { REPLY_TYPES, type FilterTab, type Notification } from './config'
 import { parseNotificationMessage } from './utils'
-import type { FilterTab, Notification } from './types'
-import { useNotificationsQuery, useMarkNotificationRead } from '@/hooks/useNotifications'
-import type { ApiNotification } from '@/lib/types'
+import { rpc } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
+import type { ApiNotification, MarkReadResponse, NotificationsResponse } from '@/lib/types'
 
 interface NotificationsContextValue {
   notifications: Notification[]
@@ -17,6 +18,59 @@ interface NotificationsContextValue {
 }
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null)
+
+function useNotificationsQuery() {
+  const { auth } = useAuth()
+
+  return useQuery({
+    queryKey: ['notifications'],
+    queryFn: ({ signal }) => {
+      if (!auth) throw new Error('Not authenticated')
+      return rpc<NotificationsResponse>('/v1/notifications/get', {}, auth.token, auth.userUuid, signal)
+    },
+    enabled: !!auth,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+  })
+}
+
+function useMarkNotificationRead() {
+  const { auth } = useAuth()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (notificationUuid: string) => {
+      if (!auth) throw new Error('Not authenticated')
+      return rpc<MarkReadResponse>(
+        '/v1/notifications/read',
+        { notification_uuid: notificationUuid },
+        auth.token,
+        auth.userUuid
+      )
+    },
+    onMutate: async (notificationUuid) => {
+      await queryClient.cancelQueries({ queryKey: ['notifications'] })
+      const prev = queryClient.getQueryData<NotificationsResponse>(['notifications'])
+
+      if (prev) {
+        queryClient.setQueryData<NotificationsResponse>(['notifications'], {
+          notifications: prev.notifications.map((n: ApiNotification) =>
+            n.uuid === notificationUuid ? { ...n, read_at: new Date().toISOString() } : n
+          ),
+        })
+      }
+
+      return { prev }
+    },
+    onError: (_err, _uuid, context) => {
+      if (context?.prev) {
+        queryClient.setQueryData(['notifications'], context.prev)
+      }
+    },
+  })
+}
 
 /** Transform API notification into the shape the UI expects */
 function mapApiNotification(n: ApiNotification): Notification {

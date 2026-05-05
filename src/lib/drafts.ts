@@ -1,4 +1,4 @@
-import type { PostOption } from '@/components/compose-post/types'
+import type { PostOption } from '@/components/compose-post/config'
 
 export interface Draft {
   id: string

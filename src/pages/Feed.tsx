@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { ComposePost } from '@/components/compose-post'
+import { ComposePost } from '@/components/compose-post/ComposePost'
 import { AdvancedSearchPanel, hasAdvancedParams } from '@/components/feed-filters/AdvancedSearchModal'
-import { PostCard } from '@/components/post-card'
-import type { PostCardData } from '@/components/post-card'
-import { PostCardSkeleton } from '@/components/skeleton'
+import { PostCard } from '@/components/post-card/PostCard'
+import type { PostCardData } from '@/components/post-card/types'
+import { PostCardSkeleton } from '@/components/skeleton/Skeleton'
 import { useFeed } from '@/hooks/useFeed'
 import { useBulkDateFetch } from '@/hooks/useBulkDateFetch'
 import { FEED_PARAM_TO_TOPIC } from '@/components/feed-filters/config'
@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 export function Feed() {
   const location = useLocation()
   const { openQuote } = useCompose()
-  const searchParams = new URLSearchParams(location.search)
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search])
   const feedParam = searchParams.get('feed')
   const searchQuery = searchParams.get('q') || undefined
   const activeTopic = FEED_PARAM_TO_TOPIC[feedParam ?? ''] ?? 'New'
@@ -39,10 +39,12 @@ export function Feed() {
   // Only run bulk fetch when user clicks Apply (URL change), not on page refresh
   const hideCompose = ['Hot', 'Picks', 'Following', 'Announcements'].includes(activeTopic)
   const [searchTriggered, setSearchTriggered] = useState(isDateFiltering)
+  const [bulkRefreshKey, setBulkRefreshKey] = useState(location.search)
   const prevSearch = useRef(location.search)
   useEffect(() => {
     if (prevSearch.current !== location.search) {
       setSearchTriggered(true)
+      setBulkRefreshKey(location.search)
       prevSearch.current = location.search
     }
   }, [location.search])
@@ -64,38 +66,42 @@ export function Feed() {
   const bulk = useBulkDateFetch({
     dateFrom: dateFrom || '',
     dateTo: dateTo || '',
-    concurrency: 15,
+    concurrency: 20,
     topic: advTopic,
-    searchQuery,
     serverParams: {},
+    refreshKey: bulkRefreshKey,
     enabled: isDateFiltering && searchTriggered,
   })
 
   // ── Merge data from the active source ──
-  const voteMap = new Map<string, 1 | -1 | 0>()
-  const pollVoteMap = new Map<string, number>()
-  const pickVoteMap = new Map<string, 'yes' | 'no'>()
-  if (isDateFiltering) {
-    for (const v of bulk.votes) voteMap.set(v.content_uuid, v.vote_type)
-    for (const p of bulk.polls) pollVoteMap.set(p.post_uuid, p.option)
-    for (const pk of bulk.pickVotes) pickVoteMap.set(pk.post_uuid, pk.vote)
-  } else if (data) {
-    for (const page of data.pages) {
-      for (const v of page.votes ?? []) voteMap.set(v.content_uuid, v.vote_type)
-      for (const p of page.polls ?? []) pollVoteMap.set(p.post_uuid, p.option)
-      for (const pk of page.pickVotes ?? []) pickVoteMap.set(pk.post_uuid, pk.vote)
-    }
-  }
+  const { rawPosts, voteMap, pollVoteMap, pickVoteMap } = useMemo(() => {
+    const voteMap = new Map<string, 1 | -1 | 0>()
+    const pollVoteMap = new Map<string, number>()
+    const pickVoteMap = new Map<string, 'yes' | 'no'>()
+    const rawPosts: PostCardData[] = []
 
-  const rawPosts: PostCardData[] = isDateFiltering
-    ? (bulk.posts as unknown as PostCardData[])
-    : data
-      ? data.pages.flatMap((page) => page.posts as unknown as PostCardData[])
-      : []
+    if (isDateFiltering) {
+      for (const v of bulk.votes) voteMap.set(v.content_uuid, v.vote_type)
+      for (const p of bulk.polls) pollVoteMap.set(p.post_uuid, p.option)
+      for (const pk of bulk.pickVotes) pickVoteMap.set(pk.post_uuid, pk.vote)
+      rawPosts.push(...(bulk.posts as unknown as PostCardData[]))
+    } else if (data) {
+      for (const page of data.pages) {
+        rawPosts.push(...(page.posts as unknown as PostCardData[]))
+        for (const v of page.votes ?? []) voteMap.set(v.content_uuid, v.vote_type)
+        for (const p of page.polls ?? []) pollVoteMap.set(p.post_uuid, p.option)
+        for (const pk of page.pickVotes ?? []) pickVoteMap.set(pk.post_uuid, pk.vote)
+      }
+    }
+
+    return { rawPosts, voteMap, pollVoteMap, pickVoteMap }
+  }, [bulk.pickVotes, bulk.polls, bulk.posts, bulk.votes, data, isDateFiltering])
 
   // Client-side filtering for worker results
-  let posts = [...rawPosts]
+  const posts = useMemo(() => {
+  let nextPosts = [...rawPosts]
   if (isDateFiltering && hasAdv) {
+    const fSearch = searchQuery?.trim().toLowerCase()
     const fMinBal = searchParams.get('min_balance')
     const fMaxBal = searchParams.get('max_balance')
     const fVotesMin = searchParams.get('votes_min')
@@ -120,7 +126,8 @@ export function Feed() {
     if (fHasPoll) contentFilters.push((p) => p.post_type === 2)
     if (fHasLikert) contentFilters.push((p) => p.post_type === 5)
 
-    posts = posts.filter((p) => {
+    nextPosts = nextPosts.filter((p) => {
+      if (fSearch && !`${p.title ?? ''} ${p.text ?? ''}`.toLowerCase().includes(fSearch)) return false
       if (fMinBal && p.author_meta.balance < Number(fMinBal)) return false
       if (fMaxBal && p.author_meta.balance > Number(fMaxBal)) return false
       if (fVotesMin && p.upvote_count < Number(fVotesMin)) return false
@@ -150,24 +157,29 @@ export function Feed() {
   if (hasAdv && isDateFiltering) {
     switch (resultSort) {
       case 'oldest':
-        posts.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        nextPosts.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
         break
       case 'most_upvoted':
-        posts.sort((a, b) => b.upvote_count - a.upvote_count)
+        nextPosts.sort((a, b) => b.upvote_count - a.upvote_count)
         break
       case 'least_upvoted':
-        posts.sort((a, b) => a.upvote_count - b.upvote_count)
+        nextPosts.sort((a, b) => a.upvote_count - b.upvote_count)
         break
       default: // newest
-        posts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        nextPosts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         break
     }
   }
+  return nextPosts
+  }, [hasAdv, isDateFiltering, rawPosts, resultSort, searchParams])
 
   // Client-side pagination for bulk results (avoid rendering 1000+ cards)
   const PAGE_SIZE = 100
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  const visiblePosts = isDateFiltering ? posts.slice(0, visibleCount) : posts
+  const visiblePosts = useMemo(
+    () => isDateFiltering ? posts.slice(0, visibleCount) : posts,
+    [isDateFiltering, posts, visibleCount],
+  )
   const hasMoreVisible = isDateFiltering && visibleCount < posts.length
 
   // ── Infinite scroll (normal mode only) ──
@@ -187,18 +199,6 @@ export function Feed() {
     observer.observe(el)
     return () => observer.disconnect()
   }, [loadMore, isDateFiltering])
-
-  // ── Loading states ──
-  if (isLoading && !isDateFiltering) {
-    return (
-      <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pt-3 pb-6 sm:px-8">
-        <div className="w-full max-w-[670px] space-y-4 xl:-ml-[245px]">
-          {!hideCompose && <ComposePost defaultTopic={activeTopic} />}
-          {[...Array(4)].map((_, i) => <PostCardSkeleton key={i} />)}
-        </div>
-      </div>
-    )
-  }
 
   // Waiting for user to click Apply after page refresh
   if (isDateFiltering && !searchTriggered) {
@@ -227,7 +227,7 @@ export function Feed() {
             </div>
             <p className="mt-5 text-sm font-medium text-white/50">Scanning date range...</p>
             <p className="mt-1.5 text-xs text-white/25">
-              {bulk.scanned} scanned · {posts.length} match{posts.length !== 1 ? 'es' : ''} · 15 workers
+              {bulk.scanned} scanned · {posts.length} match{posts.length !== 1 ? 'es' : ''} · 20 workers
             </p>
           </div>
         </div>
@@ -241,7 +241,11 @@ export function Feed() {
         <div data-onboarding="feed-compose">
           {hasAdvancedParams(location.search) ? <AdvancedSearchPanel /> : !hideCompose ? <ComposePost defaultTopic={activeTopic} /> : null}
         </div>
-        {posts.length === 0 ? (
+        {isLoading && !isDateFiltering ? (
+          <div className="space-y-4">
+            {[...Array(4)].map((_, i) => <PostCardSkeleton key={i} />)}
+          </div>
+        ) : posts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/[0.04]">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/20"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>

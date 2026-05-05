@@ -2,11 +2,11 @@ import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { X, Users } from 'lucide-react'
-import { NetworthPill } from '@/components/networth-pill'
-import { UserMetaPill } from '@/components/user-meta-pill'
+import { NetworthPill } from '@/components/networth-pill/NetworthPill'
+import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
 import { useMyAliases } from '@/hooks/useFollow'
 import type { Alias } from '@/hooks/useFollow'
-import { FollowingModalSkeleton } from '@/components/skeleton'
+import { FollowingModalSkeleton } from '@/components/skeleton/Skeleton'
 
 interface Props {
   onClose: () => void

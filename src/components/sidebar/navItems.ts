@@ -1,4 +1,11 @@
-import type { NavItem } from './types'
+export interface NavItem {
+  label: string
+  path: string
+  icon: string
+  iconSelected: string
+  scale: number
+  offset?: string
+}
 
 export const navItems: NavItem[] = [
   {

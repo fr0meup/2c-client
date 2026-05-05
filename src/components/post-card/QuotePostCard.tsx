@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { NetworthPill } from '@/components/networth-pill'
+import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import type { PostCardData } from './types'
 import { timeAgo, renderPostText } from './utils'
 

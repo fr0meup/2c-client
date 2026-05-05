@@ -1,11 +1,10 @@
 import { CornerUpLeft } from 'lucide-react'
-import { NetworthPill } from '@/components/networth-pill'
+import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth'
 import { useMessages } from './MessagesContext'
-import { timeAgo } from './utils'
-import type { ChatMessage } from './types'
+import { timeAgo, type ChatMessage } from './types'
 
 interface Props {
   msg: ChatMessage

@@ -1,17 +1,32 @@
-import { Component, useEffect, type ReactNode } from 'react'
+import { Component, Suspense, lazy, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
-import { AppLayout } from './layouts/AppLayout'
-import { Login } from './pages/Login'
-import { Feed } from './pages/Feed'
-import { Notifications } from './pages/Notifications'
-import { Messages } from './pages/Messages'
-import { Room } from './pages/Room'
-import { Leaderboard } from './pages/Leaderboard'
-import { Bookmarks } from './pages/Bookmarks'
-import { Transactions } from './pages/Transactions'
-import { Profile } from './pages/Profile'
-import { PostDetailPage } from './pages/PostDetailPage'
+import { routeLoaders } from './lib/routePreload'
+
+const AppLayout = lazy(routeLoaders.layout)
+const Login = lazy(routeLoaders.login)
+const Feed = lazy(routeLoaders.feed)
+const Notifications = lazy(routeLoaders.notifications)
+const Messages = lazy(routeLoaders.messages)
+const Room = lazy(routeLoaders.room)
+const Leaderboard = lazy(routeLoaders.leaderboard)
+const Bookmarks = lazy(routeLoaders.bookmarks)
+const Profile = lazy(routeLoaders.profile)
+const PostDetailPage = lazy(routeLoaders.post)
+
+function PageFallback() {
+  return <div className="min-h-[calc(100vh-72px)] bg-[#0a0907]" />
+}
+
+function Transactions() {
+  return (
+    <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pt-3 pb-6 sm:px-8">
+      <div className="flex w-full max-w-[670px] items-center justify-center xl:-ml-[245px]" style={{ minHeight: 'calc(100vh - 72px - 48px)' }}>
+        <p className="text-sm font-medium text-white/40">Coming soon (I'm lying, this is probably never coming.)</p>
+      </div>
+    </div>
+  )
+}
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode }) {
@@ -74,22 +89,24 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <ScrollToTop />
-        <Routes>
-          <Route path="/login" element={<RedirectIfAuth />} />
-          <Route element={<RequireAuth />}>
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<Feed />} />
-              <Route path="/post/:uuid" element={<PostDetailPage />} />
-              <Route path="/notifications" element={<Notifications />} />
-              <Route path="/messages" element={<Messages />} />
-              <Route path="/room/:uuid" element={<Room />} />
-              <Route path="/leaderboard" element={<Leaderboard />} />
-              <Route path="/bookmarks" element={<Bookmarks />} />
-              <Route path="/transactions" element={<Transactions />} />
-              <Route path="/user/:uuid" element={<Profile />} />
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/login" element={<RedirectIfAuth />} />
+            <Route element={<RequireAuth />}>
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<Feed />} />
+                <Route path="/post/:uuid" element={<PostDetailPage />} />
+                <Route path="/notifications" element={<Notifications />} />
+                <Route path="/messages" element={<Messages />} />
+                <Route path="/room/:uuid" element={<Room />} />
+                <Route path="/leaderboard" element={<Leaderboard />} />
+                <Route path="/bookmarks" element={<Bookmarks />} />
+                <Route path="/transactions" element={<Transactions />} />
+                <Route path="/user/:uuid" element={<Profile />} />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </AuthProvider>
     </ErrorBoundary>

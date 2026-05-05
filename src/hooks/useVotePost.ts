@@ -13,8 +13,13 @@ interface VoteResponse {
   message: string
 }
 
+interface PatchablePosts {
+  votes?: Vote[]
+  posts?: { uuid: string; upvote_count: number }[]
+}
+
 /** Patch a votes array + posts array for a given post_uuid / vote_type */
-function patchVotesAndPosts<T extends { votes: Vote[]; posts: { uuid: string; upvote_count: number }[] }>(
+function patchVotesAndPosts<T extends PatchablePosts>(
   section: T,
   postUuid: string,
   voteType: 1 | -1 | 0,
@@ -61,7 +66,7 @@ export function useVotePost() {
         { queryKey: ['feed'] },
         (old) => {
           if (!old?.pages) return old
-          return { ...old, pages: old.pages.map((page) => patchVotesAndPosts(page as any, post_uuid, vote_type)) }
+          return { ...old, pages: old.pages.map((page) => patchVotesAndPosts(page, post_uuid, vote_type)) }
         }
       )
 
@@ -95,9 +100,9 @@ export function useVotePost() {
             ...old,
             pages: old.pages.map((page) => ({
               ...page,
-              recentPosts: patchVotesAndPosts(page.recentPosts as any, post_uuid, vote_type),
-              ...(page.votedPosts ? { votedPosts: patchVotesAndPosts(page.votedPosts as any, post_uuid, vote_type) } : {}),
-              ...(page.pickPostsVotes ? { pickPostsVotes: patchVotesAndPosts(page.pickPostsVotes as any, post_uuid, vote_type) } : {}),
+              recentPosts: patchVotesAndPosts(page.recentPosts, post_uuid, vote_type),
+              ...(page.votedPosts ? { votedPosts: patchVotesAndPosts(page.votedPosts, post_uuid, vote_type) } : {}),
+              ...(page.pickPostsVotes ? { pickPostsVotes: patchVotesAndPosts(page.pickPostsVotes, post_uuid, vote_type) } : {}),
             })),
           }
         }
@@ -108,7 +113,7 @@ export function useVotePost() {
         ['bookmarks'],
         (old) => {
           if (!old) return old
-          return patchVotesAndPosts(old as any, post_uuid, vote_type)
+          return patchVotesAndPosts(old, post_uuid, vote_type)
         }
       )
     },

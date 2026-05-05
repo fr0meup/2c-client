@@ -1,10 +1,14 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useUserRooms, useUserDMs, useExploreRooms, useRoomMessages, useJoinRoom } from '@/hooks/useRooms'
-import { useAuth } from '@/lib/auth'
-import { useSocket } from '@/hooks/useSocket'
+import { OFFLINE_KEY, useAuth } from '@/lib/auth'
 import type { ApiRoom, ApiMessage, ApiReaction, GetMessagesResponse, GetRoomResponse, ListRoomsResponse } from '@/lib/types'
 import type { ChatMessage, Room, RoomMember } from './types'
+
+const WS_BASE = 'wss://ds3y2js2k0.execute-api.us-east-2.amazonaws.com/ws/'
+const RECONNECT_DELAY = 2_000
+const MAX_RECONNECT_DELAY = 30_000
 
 interface MessagesContextValue {
   rooms: Room[]
@@ -27,8 +31,66 @@ interface MessagesContextValue {
 
 const MessagesContext = createContext<MessagesContextValue | null>(null)
 
+function useSocket(onMessage?: (data: unknown) => void, enabled = true) {
+  const { auth } = useAuth()
+  const wsRef = useRef<WebSocket | null>(null)
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const delayRef = useRef(RECONNECT_DELAY)
+  const onMessageRef = useRef(onMessage)
+  onMessageRef.current = onMessage
+
+  const connect = useCallback(() => {
+    if (!enabled) return
+    if (!auth?.token) return
+    if (localStorage.getItem(OFFLINE_KEY) === '1') return
+
+    if (wsRef.current) {
+      wsRef.current.onclose = null
+      wsRef.current.close()
+    }
+
+    const ws = new WebSocket(`${WS_BASE}?token=${auth.token}`)
+    ws.onopen = () => { delayRef.current = RECONNECT_DELAY }
+    ws.onmessage = (event) => {
+      try {
+        onMessageRef.current?.(JSON.parse(event.data))
+      } catch { /* ignore non-JSON frames */ }
+    }
+    ws.onclose = () => {
+      wsRef.current = null
+      reconnectTimer.current = setTimeout(() => {
+        connect()
+        delayRef.current = Math.min(delayRef.current * 1.5, MAX_RECONNECT_DELAY)
+      }, delayRef.current)
+    }
+    ws.onerror = () => ws.close()
+    wsRef.current = ws
+  }, [auth?.token, enabled])
+
+  useEffect(() => {
+    if (!enabled) return
+    connect()
+    return () => {
+      clearTimeout(reconnectTimer.current)
+      if (wsRef.current) {
+        wsRef.current.onclose = null
+        wsRef.current.close()
+        wsRef.current = null
+      }
+    }
+  }, [connect, enabled])
+
+  const send = useCallback((data: Record<string, unknown>) => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return false
+    wsRef.current.send(JSON.stringify(data))
+    return true
+  }, [])
+
+  return { send }
+}
+
 /** Map an API room to the UI Room shape */
-function mapRoom(r: ApiRoom, currentUserUuid?: string): Room {
+export function mapRoom(r: ApiRoom, currentUserUuid?: string): Room {
   const members: RoomMember[] | undefined = r.members?.map((m) => ({
     user_uuid: m.user_uuid,
     username: m.alias ?? (m.user_uuid === currentUserUuid ? 'You' : `$${Number(m.balance).toLocaleString()}`),
@@ -105,6 +167,7 @@ function mapMessages(messages: ApiMessage[], reactions: ApiReaction[], currentUs
 
 export function MessagesProvider({ children }: { children: ReactNode }) {
   const { auth } = useAuth()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const [joinedRooms, setJoinedRooms] = useState<Set<string>>(new Set())
   const [activeRoomUuid, setActiveRoom] = useState<string | null>(null)
@@ -112,7 +175,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
   const { data: roomsData, isLoading: roomsLoading } = useUserRooms()
   const { data: dmsData, isLoading: dmsLoading } = useUserDMs()
-  const { data: exploreData } = useExploreRooms()
+  const { data: exploreData } = useExploreRooms(false)
   const { data: messagesData, isLoading: messagesLoading } = useRoomMessages(activeRoomUuid ?? undefined)
 
   const rooms = useMemo<Room[]>(() => {
@@ -230,7 +293,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     }
   }, [queryClient, activeRoomUuid])
 
-  const { send: socketSend } = useSocket(handleSocketMessage)
+  const socketEnabled = location.pathname === '/messages' || location.pathname.startsWith('/room/')
+  const { send: socketSend } = useSocket(handleSocketMessage, socketEnabled)
 
   // Send joinRoom via WebSocket when active room changes
   useEffect(() => {
@@ -311,7 +375,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     }
   }, [auth, activeRoomUuid, queryClient, socketSend])
 
-  const markRoomRead = useCallback((_uuid: string) => {
+  const markRoomRead = useCallback(() => {
     // The API doesn't have a dedicated "mark room read" endpoint —
     // missed messages are tracked server-side by reading messages.
     // Refetch rooms to get updated missedMessages count.

@@ -1,4 +1,9 @@
-import type { TopicGroup } from './types'
+export interface TopicGroup {
+  category: string
+  items: string[]
+}
+
+export type PostOption = 'poll' | 'likert' | 'image' | null
 
 export const TOPIC_MENU: TopicGroup[] = [
   { category: 'General', items: ['Lounge', 'Situation monitoring', 'Dating'] },

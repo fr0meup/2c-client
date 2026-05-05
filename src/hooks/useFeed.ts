@@ -99,7 +99,8 @@ export function useFeed(topic: string, searchQuery?: string, advanced?: Advanced
     getNextPageParam: (lastPage) =>
       lastPage.pagination.has_more ? (lastPage.pagination.next_cursor ?? undefined) : undefined,
     enabled: enabled && !!auth,
-    staleTime: 30_000, // 30s before refetch
+    staleTime: 0,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: false,
   })
 }

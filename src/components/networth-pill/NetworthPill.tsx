@@ -1,19 +1,128 @@
-import type { MouseEvent } from 'react'
+import type { CSSProperties, MouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePrefetch } from '@/hooks/usePrefetch'
-import type { NetworthPillProps } from './types'
-import {
-  PILL_IMAGES,
-  PILL_COLORS,
-  TEXT_STYLES,
-  SPECIAL_LABELS,
-  SIZE_CONFIG,
-} from './config'
-import {
-  hexToRgba,
-  getTierFromUUID,
-  getTierFromNetworth,
-} from './utils'
+import { preloadRoute } from '@/lib/routePreload'
+import { announceNavigationPending } from '@/lib/navigationPending'
+
+type PillTier =
+  | 'bronze'
+  | 'silver'
+  | 'gold'
+  | 'platinum'
+  | 'ultra'
+  | 'evil'
+  | 'admin'
+  | 'mod'
+  | 'news'
+  | 'penny'
+  | 'unverified'
+
+interface NetworthPillProps {
+  networth?: number
+  tier?: PillTier
+  subscriptionType?: number
+  authorUuid?: string
+  role?: string
+  size?: 'small' | 'default' | 'huge'
+  className?: string
+}
+
+const PILL_IMAGES: Record<PillTier, string> = {
+  admin: 'https://www.twocents.money/pills/andi2.png',
+  mod: 'https://www.twocents.money/pills/mod.png',
+  evil: 'https://www.twocents.money/pills/evil2.png',
+  news: 'https://www.twocents.money/pills/news2.png',
+  bronze: 'https://www.twocents.money/pills/bronze2.png',
+  silver: 'https://www.twocents.money/pills/silver2.png',
+  gold: 'https://www.twocents.money/pills/gold4.png',
+  platinum: 'https://www.twocents.money/pills/infiniteSafe2.png',
+  ultra: 'https://www.twocents.money/pills/ultra.png',
+  penny: 'https://www.twocents.money/pills/penny.png',
+  unverified: '',
+}
+
+const PILL_COLORS: Record<PillTier, string> = {
+  bronze: '#3F1815',
+  gold: '#3D2319',
+  silver: '#1F2225',
+  platinum: '#002A4B',
+  admin: '#07080A',
+  evil: '#FF4E5A',
+  mod: '#FFB34B',
+  news: '#FF525B',
+  unverified: '#ACC4C1',
+  ultra: '#9590c4',
+  penny: '#8B4513',
+}
+
+const gradientText = (from: string, to: string): CSSProperties => ({
+  backgroundImage: `linear-gradient(180deg, ${from} 0%, ${to} 100%)`,
+  backgroundClip: 'text',
+  WebkitBackgroundClip: 'text',
+  color: 'transparent',
+  WebkitTextFillColor: 'transparent',
+})
+
+const TEXT_STYLES: Record<PillTier, CSSProperties> = {
+  bronze: gradientText('#3F1815', '#6E3839'),
+  gold: gradientText('#3D2319', '#6D3629'),
+  silver: gradientText('#1F2225', '#38484D'),
+  platinum: gradientText('#002A4B', '#653676'),
+  admin: gradientText('#07080A', '#22272B'),
+  evil: gradientText('#FF4E5A', '#ED3341'),
+  mod: gradientText('#FFC294', '#FFB34B'),
+  news: gradientText('#FF7075', '#FF525B'),
+  unverified: { color: '#ffffff' },
+  ultra: gradientText('#232323', '#1D1668'),
+  penny: {
+    color: '#3D1A08',
+    textShadow: '0 0.75px 0.5px rgba(255, 255, 255, 0.20)',
+  },
+}
+
+const SPECIAL_LABELS: Partial<Record<PillTier, string>> = {
+  admin: 'ANDI',
+  mod: 'MOD',
+  news: 'NEWS',
+  penny: 'PENNY',
+}
+
+const SIZE_CONFIG = {
+  small: { height: 'h-8', text: 'text-sm', borderWidth: 6, iconSize: 'w-4 h-4', iconText: 'text-xs' },
+  default: { height: 'h-8', text: 'text-sm', borderWidth: 6, iconSize: 'w-5 h-5', iconText: 'text-xs' },
+  huge: { height: 'h-10', text: 'text-base', borderWidth: 20, iconSize: 'w-6 h-6', iconText: 'text-base' },
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  if (!result) return `rgba(0, 0, 0, ${alpha})`
+  return `rgba(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}, ${alpha})`
+}
+
+function getTierFromNetworth(networth: number): PillTier {
+  if (networth >= 10_000_000) return 'ultra'
+  if (networth >= 1_000_000) return 'platinum'
+  if (networth >= 300_000) return 'gold'
+  if (networth >= 50_000) return 'silver'
+  if (networth >= 0) return 'bronze'
+  return 'evil'
+}
+
+const MOD_UUIDS = new Set([
+  '3d940646-0265-4c72-bc93-a98dd9b8d68e',
+  '4814e409-b55a-4a71-86f6-34da365d4119',
+  'd72a2aa3-df71-4ddb-88a4-a8181254e031',
+  'e5dbcd9b-6dc9-4831-ad30-43f50d72487d',
+])
+
+function getTierFromUUID(uuid: string, subscriptionType: number, networth: number, role?: string): PillTier {
+  const lower = uuid.toLowerCase()
+  if (lower === 'admin') return 'admin'
+  if (lower === 'penny') return 'penny'
+  if (role === 'moderator' || MOD_UUIDS.has(lower)) return 'mod'
+  if (subscriptionType === 0) return 'unverified'
+  return getTierFromNetworth(networth)
+}
 
 export function NetworthPill({
   networth = 0,
@@ -31,11 +140,15 @@ export function NetworthPill({
   function handleClick(e: MouseEvent<HTMLDivElement>) {
     if (!canNavigate) return
     e.stopPropagation()
+    announceNavigationPending(`/user/${authorUuid}`)
     navigate(`/user/${authorUuid}`)
   }
 
   function handleHover() {
-    if (canNavigate) prefetchUserProfile(authorUuid!)
+    if (canNavigate) {
+      preloadRoute('profile')
+      prefetchUserProfile(authorUuid!)
+    }
   }
 
   const actualTier =

@@ -3,7 +3,6 @@ import { rpc } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import type {
   ListRoomsResponse,
-  GetRoomResponse,
   GetMembersResponse,
   GetMessagesResponse,
 } from '@/lib/types'
@@ -25,6 +24,7 @@ export function useUserRooms() {
     enabled: !!auth,
     staleTime: 30_000,
     refetchInterval: 30_000,
+    refetchOnMount: 'always',
     placeholderData: keepPreviousData,
   })
 }
@@ -46,12 +46,13 @@ export function useUserDMs() {
     enabled: !!auth,
     staleTime: 30_000,
     refetchInterval: 30_000,
+    refetchOnMount: 'always',
     placeholderData: keepPreviousData,
   })
 }
 
 /** Fetch all public/explore rooms */
-export function useExploreRooms() {
+export function useExploreRooms(enabled = true) {
   const { auth } = useAuth()
 
   return useQuery({
@@ -64,27 +65,8 @@ export function useExploreRooms() {
         auth!.userUuid,
         signal
       ),
-    enabled: !!auth,
+    enabled: enabled && !!auth,
     staleTime: 60_000,
-  })
-}
-
-/** Fetch a single room's details */
-export function useRoom(roomUuid: string | undefined) {
-  const { auth } = useAuth()
-
-  return useQuery({
-    queryKey: ['rooms', 'detail', roomUuid],
-    queryFn: ({ signal }) =>
-      rpc<GetRoomResponse>(
-        '/v1/rooms/getRoom',
-        { roomUuid },
-        auth!.token,
-        auth!.userUuid,
-        signal
-      ),
-    enabled: !!auth && !!roomUuid,
-    staleTime: 30_000,
   })
 }
 
@@ -122,7 +104,8 @@ export function useRoomMessages(roomUuid: string | undefined, limit = 500) {
         signal
       ),
     enabled: !!auth && !!roomUuid,
-    staleTime: 20_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 }
 

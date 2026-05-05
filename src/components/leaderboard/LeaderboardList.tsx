@@ -1,8 +1,8 @@
-import { NetworthPill } from '@/components/networth-pill'
-import { UserMetaPill } from '@/components/user-meta-pill'
+import { NetworthPill } from '@/components/networth-pill/NetworthPill'
+import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
 import { useFollow } from '@/components/profile/FollowContext'
 import { useAuth } from '@/lib/auth'
-import type { LeaderboardEntry, LeaderboardMeta } from './types'
+import type { LeaderboardEntry, LeaderboardMeta } from './config'
 
 function formatStat(value: number, label?: string): string {
   if (!label) return value.toLocaleString('en-US')

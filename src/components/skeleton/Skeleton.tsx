@@ -44,27 +44,6 @@ export function PostCardSkeleton() {
   )
 }
 
-export function ComposePostSkeleton() {
-  return (
-    <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-5 shadow-lg shadow-black/20">
-      <div className="flex items-center justify-between mb-4">
-        <Skeleton className="h-5 w-20" />
-        <Skeleton className="h-3 w-24" />
-      </div>
-      <Skeleton className="h-5 w-2/3 mb-3" />
-      <Skeleton className="h-20 w-full rounded-xl" />
-      <div className="mt-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-8 w-8 rounded-full" />
-          <Skeleton className="h-8 w-8 rounded-full" />
-          <Skeleton className="h-8 w-8 rounded-full" />
-        </div>
-        <Skeleton className="h-8 w-16 rounded-full" />
-      </div>
-    </div>
-  )
-}
-
 export function PostDetailSkeleton() {
   return (
     <div className="flex flex-col">
@@ -237,91 +216,6 @@ export function ProfileSkeleton() {
   )
 }
 
-export function RoomChatSkeleton() {
-  return (
-    <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pb-6 sm:px-8">
-      <div className="flex w-full max-w-[670px] flex-col gap-3 xl:-ml-[245px]">
-        {/* Messages */}
-        {[...Array(8)].map((_, i) => {
-          const isRight = i % 3 === 0
-          return (
-            <div key={i} className={`flex ${isRight ? 'justify-end' : 'justify-start'}`}>
-              <div className={`flex items-end gap-2 ${isRight ? 'flex-row-reverse' : ''}`}>
-                {!isRight && <Skeleton className="h-6 w-16 shrink-0 rounded-full" />}
-                <div className="space-y-1">
-                  <Skeleton className={`h-10 rounded-2xl ${isRight ? 'w-40' : i % 2 === 0 ? 'w-52' : 'w-36'}`} />
-                </div>
-              </div>
-            </div>
-          )
-        })}
-        {/* Input */}
-        <Skeleton className="mt-auto h-12 w-full rounded-2xl" />
-      </div>
-    </div>
-  )
-}
-
-export function LeaderboardSkeleton() {
-  return (
-    <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pt-3 pb-6 sm:px-8">
-      <div className="flex w-full max-w-[670px] flex-col gap-4 xl:-ml-[245px]">
-        {/* Podium skeleton */}
-        <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-b from-[#141410] to-[#0a0907] px-3 pb-0 pt-5">
-          <div className="flex items-end justify-center gap-1.5">
-            {/* #2 */}
-            <div className="flex flex-1 flex-col items-center">
-              <div className="flex flex-col items-center gap-1.5 pb-3">
-                <Skeleton className="h-6 w-6 rounded-full" />
-                <Skeleton className="h-6 w-20 rounded-full" />
-                <Skeleton className="h-5 w-16 rounded-full" />
-                <Skeleton className="h-8 w-32 rounded-full" />
-              </div>
-              <Skeleton className="h-20 w-full rounded-t-xl" />
-            </div>
-            {/* #1 */}
-            <div className="flex flex-1 flex-col items-center">
-              <div className="flex flex-col items-center gap-1.5 pb-3">
-                <Skeleton className="h-6 w-6 rounded-full" />
-                <Skeleton className="h-7 w-24 rounded-full" />
-                <Skeleton className="h-5 w-16 rounded-full" />
-                <Skeleton className="h-8 w-36 rounded-full" />
-                <Skeleton className="h-3 w-28" />
-              </div>
-              <Skeleton className="h-28 w-full rounded-t-xl" />
-            </div>
-            {/* #3 */}
-            <div className="flex flex-1 flex-col items-center">
-              <div className="flex flex-col items-center gap-1.5 pb-3">
-                <Skeleton className="h-6 w-6 rounded-full" />
-                <Skeleton className="h-6 w-20 rounded-full" />
-                <Skeleton className="h-5 w-16 rounded-full" />
-                <Skeleton className="h-8 w-32 rounded-full" />
-              </div>
-              <Skeleton className="h-14 w-full rounded-t-xl" />
-            </div>
-          </div>
-        </div>
-
-        {/* List skeleton */}
-        {[...Array(7)].map((_, i) => (
-          <div key={i} className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-4">
-            <Skeleton className="h-5 w-6 rounded" />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2.5">
-                <Skeleton className="h-7 w-24 rounded-full" />
-                <Skeleton className="h-8 w-40 rounded-full" />
-              </div>
-              <Skeleton className="mt-1.5 h-3 w-3/5" />
-            </div>
-            <Skeleton className="h-8 w-14 shrink-0 rounded-md" />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 export function LeaderboardContentSkeleton() {
   return (
     <>
@@ -401,16 +295,6 @@ export function CommentsSkeleton() {
           </div>
         </div>
       ))}
-    </div>
-  )
-}
-
-export function TransactionsSkeleton() {
-  return (
-    <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pt-3 pb-6 sm:px-8">
-      <div className="flex w-full max-w-[670px] items-center justify-center xl:-ml-[245px]" style={{ minHeight: 'calc(100vh - 72px - 48px)' }}>
-        <Skeleton className="h-5 w-28" />
-      </div>
     </div>
   )
 }

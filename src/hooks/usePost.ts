@@ -28,6 +28,8 @@ export function usePost(postUuid: string | undefined) {
       return res
     },
     enabled: !!auth && !!postUuid,
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
   })
 }

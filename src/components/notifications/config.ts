@@ -1,4 +1,31 @@
-import type { NotificationType, FilterTab } from './types'
+export type NotificationType =
+  | 'post_voted'
+  | 'comment_voted'
+  | 'post_replied'
+  | 'comment_replied'
+  | 'pick_post'
+  | 'pick_resolved'
+  | 'trending_post'
+  | 'poll_voted'
+  | 'followed'
+  | 'generic'
+  | 'balance_updated'
+
+export interface Notification {
+  uuid: string
+  type: NotificationType
+  message: string
+  actor?: string
+  preview?: string
+  created_at: string
+  read_at: string | null
+  post_uuid?: string
+  comment_uuid?: string
+  follower_uuid?: string
+  isDownvote?: boolean
+}
+
+export type FilterTab = 'all' | 'unread' | 'replies'
 
 export const TYPE_LABELS: Record<NotificationType, string> = {
   post_voted: 'upvoted your post',
@@ -24,4 +51,3 @@ export const FILTER_TABS: { value: FilterTab; label: string }[] = [
   { value: 'unread', label: 'Unread' },
   { value: 'replies', label: 'Replies' },
 ]
-

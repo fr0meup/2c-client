@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X, Download, MessageSquare, Triangle, MoreHorizontal, Link2, Trash2, Eye, Quote, UserPlus, UserCheck, Mail, Ban, Bookmark, Loader2, Star } from 'lucide-react'
-import { NetworthPill } from '@/components/networth-pill'
-import { UserMetaPill } from '@/components/user-meta-pill'
+import { NetworthPill } from '@/components/networth-pill/NetworthPill'
+import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
 import type { PostCardData } from './types'
 import { cleanPostText, renderPostText, timeAgo } from './utils'
 import { useVotePost } from '@/hooks/useVotePost'
@@ -15,6 +15,8 @@ import { humanizeError } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePrefetch } from '@/hooks/usePrefetch'
+import { preloadRoute } from '@/lib/routePreload'
+import { announceNavigationPending } from '@/lib/navigationPending'
 import { PollCard } from './PollCard'
 import { LikertScale } from './LikertScale'
 import { PicksCard } from './PicksCard'
@@ -101,7 +103,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
   const queryClient = useQueryClient()
   const blockUser = useBlockUser()
   const unblockUser = useUnblockUser()
-  const { prefetchComments } = usePrefetch()
+  const { prefetchComments, prefetchPost } = usePrefetch()
   const alias = aliasFor(post.author_uuid)
   const imageSrc = post.post_meta?.src
   const isVideoPost = post.post_meta?.media_type === 'video'
@@ -122,17 +124,6 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
   const bookmarkMutation = useToggleBookmark()
   const isOwn = auth?.userUuid === post.author_uuid
 
-  useEffect(() => {
-    if (!menuOpen) return
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [menuOpen])
-
-  if (!post?.author_meta) return null
-
   const pollOptions = post.post_meta?.poll
   const isPoll = post.post_type === 2 && pollOptions && pollOptions.length > 0
   const isLikert = post.post_type === 5
@@ -148,6 +139,17 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
     isLikert ? post.uuid : undefined,
     isLikert
   )
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [menuOpen])
+
+  if (!post?.author_meta) return null
 
   const cleanText = cleanPostText(post.text)
   const gifRegex = /(https?:\/\/\S+\.gif(?:\?\S*)?)/gi
@@ -170,8 +172,8 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
   return (
     <>
       <article
-        onClick={() => navigate(`/post/${post.uuid}`)}
-        onMouseEnter={() => prefetchComments(post.uuid)}
+        onClick={() => { announceNavigationPending(`/post/${post.uuid}`); navigate(`/post/${post.uuid}`) }}
+        onMouseEnter={() => { preloadRoute('post'); prefetchPost(post.uuid); prefetchComments(post.uuid) }}
         className="cursor-pointer rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 transition-colors hover:bg-white/[0.05]"
       >
         <div className="min-w-0">
@@ -578,7 +580,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
             {/* Actions */}
             <div className="ml-auto flex shrink-0 items-center gap-2.5">
               <button
-                onClick={(e) => { e.stopPropagation(); navigate(`/post/${post.uuid}`) }}
+                onClick={(e) => { e.stopPropagation(); announceNavigationPending(`/post/${post.uuid}`); navigate(`/post/${post.uuid}`) }}
                 className="group flex h-[38px] cursor-pointer items-center gap-1.5 rounded-full border border-[#c8a44d]/20 bg-gradient-to-b from-white/[0.07] to-white/[0.03] px-4.5 text-sm text-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_4px_rgba(0,0,0,0.15)] transition-all hover:border-[#c8a44d]/30 hover:text-[#c8a44d] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_0_10px_rgba(218,178,87,0.1)] active:scale-95"
               >
                 <MessageSquare className="h-3.5 w-3.5 fill-current transition-transform group-hover:scale-110" />

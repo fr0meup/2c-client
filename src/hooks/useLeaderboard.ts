@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/lib/auth'
 import { rpc } from '@/lib/api'
 import type { LeaderboardResponse } from '@/lib/types'
-import type { LeaderboardType, LeaderboardEntry } from '@/components/leaderboard/types'
+import type { LeaderboardType, LeaderboardEntry } from '@/components/leaderboard/config'
 
 /** Map UI board type → API param name */
 export const BOARD_API_NAME: Record<LeaderboardType, string> = {
@@ -63,5 +63,6 @@ export function useLeaderboardData(board: LeaderboardType) {
     enabled: !!auth?.token,
     staleTime: 60_000,
     refetchInterval: 120_000,
+    refetchOnMount: 'always',
   })
 }

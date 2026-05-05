@@ -1,16 +1,15 @@
+import { Suspense, lazy } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { FeedFilters } from '@/components/feed-filters'
-import { PostDetailHeader } from '@/components/post-detail'
-import { NotificationsHeader } from '@/components/notifications'
-import { ProfileHeader } from '@/components/profile'
-import { ChatHeader, MessagesListHeader } from '@/components/messages'
-import { LeaderboardHeader } from '@/components/leaderboard'
+import { headerLoaders } from '@/lib/routePreload'
 
-interface HeaderProps {
-  onToggleGuides: () => void
-  guidesEnabled: boolean
-}
+const FeedFilters = lazy(headerLoaders.feed)
+const PostDetailHeader = lazy(headerLoaders.post)
+const NotificationsHeader = lazy(headerLoaders.notifications)
+const ProfileHeader = lazy(headerLoaders.profile)
+const ChatHeader = lazy(headerLoaders.room)
+const MessagesListHeader = lazy(headerLoaders.messages)
+const LeaderboardHeader = lazy(headerLoaders.leaderboard)
 
 function isFeedPath(pathname: string, search: string): boolean {
   return pathname === '/' || new URLSearchParams(search).has('feed')
@@ -70,18 +69,12 @@ function PageHeader({ title }: { title: string }) {
 }
 
 /** Left side — fixed, stays on screen when scrolling */
-export function HeaderLeft({ onToggleGuides, guidesEnabled }: HeaderProps) {
+export function HeaderLeft() {
   return (
     <header
       className="fixed left-0 top-0 z-50 hidden h-[72px] bg-[#0a0907] xl:flex"
       style={{ width: 'calc(50% - 372px)' }}
     >
-      {/* <button
-        onClick={onToggleGuides}
-        className="absolute left-4 top-1/2 -translate-y-1/2 rounded px-3 py-1.5 text-xs font-semibold text-white/[0.6] transition-colors hover:bg-white/[0.06] hover:text-white"
-      >
-        {guidesEnabled ? 'Hide guides' : 'Show guides'}
-      </button> */}
       <div className="fixed top-0 flex h-[72px] w-60 items-start justify-start pl-7 pt-6" style={{ left: 'calc(50% - 600px)' }}>
         <img
           src="https://www.twocents.money/_next/image?url=%2F2centsLogo.png&w=1920&q=75"
@@ -113,15 +106,17 @@ export function HeaderRight() {
       }`}
     >
       <div className="w-full max-w-[670px] xl:-ml-[245px]">
-        {showFilters && <FeedFilters />}
-        {showPostDetail && <PostDetailHeader />}
-        {showNotifications && <NotificationsHeader />}
-        {showProfile && <ProfileHeader />}
-        {showRoom && <ChatHeader />}
-        {showMessagesList && <MessagesListHeader />}
-        {showBookmarks && <PageHeader title="Bookmarks" />}
-        {showTransactions && <PageHeader title="Transactions" />}
-        {showLeaderboard && <LeaderboardHeader />}
+        <Suspense fallback={<div className="h-10" />}>
+          {showFilters && <FeedFilters />}
+          {showPostDetail && <PostDetailHeader />}
+          {showNotifications && <NotificationsHeader />}
+          {showProfile && <ProfileHeader />}
+          {showRoom && <ChatHeader />}
+          {showMessagesList && <MessagesListHeader />}
+          {showBookmarks && <PageHeader title="Bookmarks" />}
+          {showTransactions && <PageHeader title="Transactions" />}
+          {showLeaderboard && <LeaderboardHeader />}
+        </Suspense>
       </div>
     </div>
   )

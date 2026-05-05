@@ -3,10 +3,10 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { Triangle, Users, UserPlus, UserCheck, Loader2, X } from 'lucide-react'
 
 import { useAuth } from '@/lib/auth'
-import { UserMetaPill } from '@/components/user-meta-pill'
-import { PostCard } from '@/components/post-card'
-import type { PostCardData } from '@/components/post-card'
-import { ProfileSkeleton } from '@/components/skeleton'
+import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
+import { PostCard } from '@/components/post-card/PostCard'
+import type { PostCardData } from '@/components/post-card/types'
+import { PostCardSkeleton, ProfileSkeleton, Skeleton } from '@/components/skeleton/Skeleton'
 import { useUserProfile } from '@/hooks/useUserProfile'
 import type { Comment as ApiComment } from '@/lib/types'
 import { BalanceChart } from './BalanceChart'
@@ -14,9 +14,48 @@ import { ProfileCommentCard } from './ProfileCommentCard'
 import { ProfileTabs } from './ProfileTabs'
 import { useFollow } from './FollowContext'
 import { useFollowsMe } from '@/hooks/useFollow'
-import { joinedAgo, formatCompact } from './utils'
-import type { ProfileTab, UserProfileData } from './types'
 import { FollowingModal } from './FollowingModal'
+
+function joinedAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const days = Math.floor(diff / 86_400_000)
+  if (days < 30) return `${days}d`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months}mo`
+  return `${Math.floor(months / 12)}y`
+}
+
+function formatCompact(n: number): string {
+  if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}k`
+  return n.toLocaleString('en-US')
+}
+
+export interface BalancePoint {
+  balance: number
+  date: string
+}
+
+export interface UserProfileData {
+  uuid: string
+  username?: string
+  balance: number
+  delta_balance?: number
+  bio?: string
+  age?: number
+  gender?: 'M' | 'F'
+  arena?: string
+  subscription_type: number
+  elo_rating: number
+  role?: string
+  created_at: string
+  followers?: number
+  following?: number
+  upvotes_received: number
+  balance_history: BalancePoint[]
+}
+
+export type ProfileTab = 'posts' | 'comments' | 'votes' | 'picks'
 
 export function UserProfile() {
   const { uuid } = useParams<{ uuid: string }>()
@@ -28,7 +67,14 @@ export function UserProfile() {
   const followsMe = followsMeData?.hasAlias ?? false
   const [searchParams, setSearchParams] = useSearchParams()
   const tab = (searchParams.get('tab') as ProfileTab) || 'posts'
-  const setTab = (t: ProfileTab) => setSearchParams(t === 'posts' ? {} : { tab: t }, { replace: true })
+  const [pendingTab, setPendingTab] = useState<ProfileTab | null>(null)
+  const activeTab = pendingTab ?? tab
+  const isTabPending = pendingTab !== null
+  const setTab = (t: ProfileTab) => {
+    if (t === activeTab) return
+    setPendingTab(t)
+    setSearchParams(t === 'posts' ? {} : { tab: t }, { replace: true })
+  }
   const [showFollowing, setShowFollowing] = useState(false)
 
   const { data, isLoading, isError, fetchNextPage, isFetchingNextPage } = useUserProfile(targetUuid)
@@ -117,6 +163,10 @@ export function UserProfile() {
   const lastPage = data?.pages[data.pages.length - 1]
   const hasMorePosts = lastPage?.pagination.hasMorePosts ?? false
   const hasMoreComments = lastPage?.pagination.hasMoreComments ?? false
+
+  useEffect(() => {
+    if (pendingTab === tab) setPendingTab(null)
+  }, [pendingTab, tab])
 
   if (isLoading) {
     return <ProfileSkeleton />
@@ -234,12 +284,14 @@ export function UserProfile() {
 
         {/* Tabs */}
         <div className="flex items-center justify-center pt-1">
-          <ProfileTabs active={tab} onChange={setTab} isOwnProfile={isOwnProfile} />
+          <ProfileTabs active={activeTab} onChange={setTab} isOwnProfile={isOwnProfile} />
         </div>
 
         {/* Content */}
         <div className="flex flex-col gap-4">
-          {tab === 'posts' && (
+          {isTabPending ? (
+            <ProfileTabSkeleton tab={activeTab} />
+          ) : activeTab === 'posts' && (
             posts.length === 0 ? (
               <EmptyState message="No posts yet" />
             ) : (
@@ -259,7 +311,7 @@ export function UserProfile() {
               </>
             )
           )}
-          {tab === 'comments' && (
+          {!isTabPending && activeTab === 'comments' && (
             comments.length === 0 ? (
               <EmptyState message="No comments yet" />
             ) : (
@@ -278,7 +330,7 @@ export function UserProfile() {
               </>
             )
           )}
-          {isOwnProfile && tab === 'votes' && (
+          {isOwnProfile && !isTabPending && activeTab === 'votes' && (
             votedPosts.length === 0 ? (
               <EmptyState message="No votes yet" />
             ) : (
@@ -293,7 +345,7 @@ export function UserProfile() {
               </>
             )
           )}
-          {isOwnProfile && tab === 'picks' && (
+          {isOwnProfile && !isTabPending && activeTab === 'picks' && (
             pickPosts.length === 0 ? (
               <EmptyState message="No picks yet" />
             ) : (
@@ -330,6 +382,40 @@ function EmptyState({ message }: { message: string }) {
     <div className="flex items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.02] py-16">
       <p className="text-sm text-white/40">{message}</p>
     </div>
+  )
+}
+
+function ProfileCommentSkeleton() {
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3.5">
+      <div className="flex items-center gap-1.5">
+        <Skeleton className="h-3.5 w-28" />
+        <Skeleton className="h-3.5 w-44" />
+      </div>
+      <Skeleton className="mt-3 h-4 w-full" />
+      <Skeleton className="mt-1.5 h-4 w-5/6" />
+      <div className="mt-3 flex items-center gap-2">
+        <Skeleton className="h-7 w-24 rounded-full" />
+        <Skeleton className="h-3.5 w-12" />
+        <Skeleton className="ml-auto h-[38px] w-24 rounded-full" />
+      </div>
+    </div>
+  )
+}
+
+function ProfileTabSkeleton({ tab }: { tab: ProfileTab }) {
+  if (tab === 'comments') {
+    return (
+      <>
+        {[...Array(4)].map((_, i) => <ProfileCommentSkeleton key={i} />)}
+      </>
+    )
+  }
+
+  return (
+    <>
+      {[...Array(3)].map((_, i) => <PostCardSkeleton key={i} />)}
+    </>
   )
 }
 

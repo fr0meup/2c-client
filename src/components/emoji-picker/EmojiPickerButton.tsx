@@ -2,8 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Smile } from 'lucide-react'
 import { EmojiPicker } from 'frimousse'
 
-import './emoji-picker.css'
-
 // Force frimousse to show all emojis (version 17) including country flags,
 // bypassing its canvas-based native rendering check that hides them on Windows.
 sessionStorage.setItem(

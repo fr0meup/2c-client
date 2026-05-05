@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
-import type { ProfileTab } from './types'
+import type { ProfileTab } from './UserProfile'
 
 const ALL_TABS: { value: ProfileTab; label: string }[] = [
   { value: 'posts', label: 'Posts' },

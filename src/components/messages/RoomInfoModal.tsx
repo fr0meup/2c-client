@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Loader2 } from 'lucide-react'
-import { NetworthPill } from '@/components/networth-pill'
-import { UserMetaPill } from '@/components/user-meta-pill'
+import { NetworthPill } from '@/components/networth-pill/NetworthPill'
+import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
 import { useFollow } from '@/components/profile/FollowContext'
 import { useRoomMembers } from '@/hooks/useRooms'
-import { fmtCount, gradientCss } from './utils'
-import type { Room, RoomMember } from './types'
+import { fmtCount, gradientCss, type Room, type RoomMember } from './types'
 
 const BATCH = 30
 

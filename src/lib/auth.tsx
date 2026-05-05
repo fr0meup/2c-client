@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 
 const STORAGE_KEY = '2c_auth'
+export const OFFLINE_KEY = '2c_appear_offline'
 
 interface AuthState {
   token: string

@@ -168,28 +168,6 @@ function DatePicker({ value, onChange, label, minDate }: { value: string; onChan
   )
 }
 
-export interface AdvancedSearchResult {
-  q?: string
-  min_balance?: number
-  max_balance?: number
-  votes_min?: number
-  votes_max?: number
-  min_age?: number
-  max_age?: number
-  genders?: string[]
-  has_image?: boolean
-  has_poll?: boolean
-  has_likert?: boolean
-  has_video?: boolean
-  author_uuid?: string
-  verified?: string
-  comments_min?: number
-  comments_max?: number
-  country?: string
-  city?: string
-  adv_topic?: string
-}
-
 function NumberInput({
   label,
   value,
@@ -538,6 +516,7 @@ export function AdvancedSearchPanel() {
     const effectiveTo = dateTo || toDateStr(new Date())
     params.set('date_from', effectiveFrom)
     params.set('date_to', effectiveTo)
+    params.set('search_run', String(Date.now()))
     navigate(`/?${params.toString()}`)
   }
 

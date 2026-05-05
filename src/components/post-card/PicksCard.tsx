@@ -6,7 +6,7 @@ import { useVotePick } from '@/hooks/useVotes'
 
 // ── Types ──
 
-export interface PicksCardProps {
+interface PicksCardProps {
   postUuid: string
   priceHistory?: Array<{ price: number; timestamp?: number; date?: string }>
   userVote?: 'yes' | 'no' | null

@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
-import { NetworthPill } from '@/components/networth-pill'
+import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { useUserProfile } from '@/hooks/useUserProfile'
 import { ProfileSettingsMenu, ProfileEditMenu, ProfileActionsMenu } from './ProfileMenus'
 import { useFollow } from './FollowContext'

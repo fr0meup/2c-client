@@ -1,5 +1,17 @@
-import { GenderIcon } from '@/components/gender-icon'
-import type { UserMetaPillProps } from './types'
+import { GenderIcon } from '@/components/gender-icon/GenderIcon'
+import type { ReactNode } from 'react'
+
+export interface UserMetaPillProps {
+  elo?: number
+  alias?: string
+  gender?: string
+  age?: number
+  arena?: string
+  variant?: 'post' | 'comment'
+  size?: 'default' | 'small'
+  children?: ReactNode
+  className?: string
+}
 
 export function UserMetaPill({
   elo,

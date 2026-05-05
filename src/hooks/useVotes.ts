@@ -15,8 +15,13 @@ interface VoteCommentResponse {
   message: string
 }
 
+interface PatchableComments {
+  votes?: Vote[]
+  comments?: { uuid: string; upvote_count: number }[]
+}
+
 /** Patch a comment votes array + comments upvote_count for a given comment_uuid / vote_type */
-function patchCommentVotes<T extends { votes: Vote[]; comments: { uuid: string; upvote_count: number }[] }>(
+function patchCommentVotes<T extends PatchableComments>(
   section: T,
   commentUuid: string,
   voteType: 1 | -1 | 0,
@@ -80,7 +85,7 @@ export function useVoteComment() {
             ...old,
             pages: old.pages.map((page) => ({
               ...page,
-              recentComments: patchCommentVotes(page.recentComments as any, comment_uuid, vote_type),
+              recentComments: patchCommentVotes(page.recentComments, comment_uuid, vote_type),
             })),
           }
         }
