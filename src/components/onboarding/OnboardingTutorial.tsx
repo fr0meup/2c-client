@@ -314,7 +314,7 @@ export function OnboardingTutorial() {
     function handleInteraction() {
       // Fire a synthetic click so onClick handlers (e.g. close-compose) trigger
       // immediately — before the step changes and click blockers shift away
-      el.click()
+      el?.click()
       // Compose needs more time so the click event fires and the modal opens
       const delay = current.selector === 'compose' ? 200 : 50
       setTimeout(() => {
