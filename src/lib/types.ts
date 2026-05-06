@@ -360,6 +360,26 @@ export interface LeaderboardResponse {
   leaderboard: ApiLeaderboardEntry[]
 }
 
+/** Personal leaderboard block returned by `/v2/auth/login` */
+export interface AuthLoginLeaderboard {
+  myPosition: number
+  totalPositions: number
+  nextUpdatedAt: number
+  top100: ApiLeaderboardEntry[]
+}
+
+export interface AuthLoginResponse {
+  leaderboard?: AuthLoginLeaderboard
+  [key: string]: unknown
+}
+
+/** Cached personal-rank shape (no top100, that's seeded into the leaderboard cache) */
+export interface MyLeaderboardPosition {
+  myPosition: number
+  totalPositions: number
+  nextUpdatedAt: number
+}
+
 /* ── User Profile ─────────────────────────────────────────── */
 
 export interface ApiUserProfile {

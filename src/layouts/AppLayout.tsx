@@ -10,9 +10,12 @@ import { Sidebar, BottomNav } from '@/components/sidebar/Sidebar'
 import { HeaderLeft, HeaderRight } from './Header'
 import type { PostCardData } from '@/components/post-card/types'
 import { ONBOARDING_KEY } from '@/components/onboarding/constants'
-import { OFFLINE_KEY, useAuth } from '@/lib/auth'
+import { useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '@/lib/auth'
 import { rpc } from '@/lib/api'
 import { NAVIGATION_PENDING_EVENT } from '@/lib/navigationPending'
+import { seedAuthLoginCache } from '@/hooks/useMyRank'
+import type { AuthLoginResponse } from '@/lib/types'
 import {
   LeaderboardContentSkeleton,
   MessagesListSkeleton,
@@ -99,23 +102,25 @@ function PageSkeletonFallback({ pathname: pathnameProp }: { pathname?: string })
 
 function useAuthLogin() {
   const { auth, logout } = useAuth()
+  const qc = useQueryClient()
   const called = useRef(false)
 
   useEffect(() => {
     if (!auth || called.current) return
     called.current = true
-    if (localStorage.getItem(OFFLINE_KEY) === '1') return
 
-    rpc(
+    rpc<AuthLoginResponse>(
       '/v2/auth/login',
       { version: 'web-v0.1.3', secret_key: auth.secretKey },
       auth.token,
       auth.userUuid,
-    ).catch((err) => {
-      console.warn('[useAuthLogin] /v2/auth/login failed, logging out:', err)
-      logout()
-    })
-  }, [auth, logout])
+    )
+      .then((res) => seedAuthLoginCache(qc, res))
+      .catch((err) => {
+        console.warn('[useAuthLogin] /v2/auth/login failed, logging out:', err)
+        logout()
+      })
+  }, [auth, logout, qc])
 }
 
 export function AppLayout() {

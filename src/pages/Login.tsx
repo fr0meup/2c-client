@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Copy, Check, ChevronRight, ShieldCheck, Terminal, ClipboardPaste, Loader2 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { rpc } from '@/lib/api'
+import { seedAuthLoginCache } from '@/hooks/useMyRank'
+import type { AuthLoginResponse } from '@/lib/types'
 
 const EXTRACT_SCRIPT = `(function() {
   const token = document.cookie.split('; ').find(r => r.startsWith('twocentsToken='))?.split('=')[1];
@@ -29,6 +32,7 @@ const STEPS = [
 export function Login() {
   const navigate = useNavigate()
   const { login } = useAuth()
+  const qc = useQueryClient()
   const [copied, setCopied] = useState(false)
   const [pasteValue, setPasteValue] = useState('')
   const [error, setError] = useState('')
@@ -73,10 +77,11 @@ export function Login() {
     setLoading(true)
     try {
       // Validate token + secret_key: /v1/users/blocked requires a valid secret_key
-      await Promise.all([
-        rpc('/v2/auth/login', { version: 'web-v0.1.3', secret_key: secretKey }, token, uuid),
+      const [loginRes] = await Promise.all([
+        rpc<AuthLoginResponse>('/v2/auth/login', { version: 'web-v0.1.3', secret_key: secretKey }, token, uuid),
         rpc('/v1/users/blocked', { secret_key: secretKey }, token, uuid),
       ])
+      seedAuthLoginCache(qc, loginRes)
       login(token, uuid, secretKey, persist)
       navigate('/', { replace: true })
     } catch {

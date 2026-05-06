@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Podium } from './Podium'
 import { LeaderboardList } from './LeaderboardList'
+import { MyRankCard } from './MyRankCard'
 import { LEADERBOARD_META, useLeaderboard } from './config'
 import { useLeaderboardData } from '@/hooks/useLeaderboard'
 import { LeaderboardContentSkeleton } from '@/components/skeleton/Skeleton'
@@ -90,6 +91,7 @@ export function LeaderboardPage() {
           <p className="py-20 text-center text-sm text-white/40">No entries yet</p>
         ) : (
           <>
+            {board === 'top_100' && <MyRankCard />}
             <Podium entries={top3} meta={meta} />
             <LeaderboardList entries={rest} meta={meta} />
           </>
