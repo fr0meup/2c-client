@@ -205,7 +205,7 @@ export function AppLayout() {
       <ComposeContext.Provider value={{ openCompose, openQuote }}>
       <div className="xl:ml-60">
         <HeaderRight />
-        <main className="bg-[#0a0907] min-h-screen">
+        <main className="min-h-[calc(100vh-72px)] bg-[#0a0907]">
           {pendingPath ? (
             <PageSkeletonFallback pathname={pendingPath} />
           ) : (

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ComposePost } from '@/components/compose-post/ComposePost'
 import { AdvancedSearchPanel, hasAdvancedParams } from '@/components/feed-filters/AdvancedSearchModal'
 import { PostCard } from '@/components/post-card/PostCard'
@@ -12,8 +12,24 @@ import { useCompose } from '@/layouts/AppLayout'
 import { NAVIGATION_PENDING_EVENT } from '@/lib/navigationPending'
 import { cn } from '@/lib/utils'
 
+const RESULT_SORT_LABELS = {
+  newest: 'Newest',
+  oldest: 'Oldest',
+  most_upvoted: 'Most Upvoted',
+  least_upvoted: 'Least Upvoted',
+  most_commented: 'Most Commented',
+  least_commented: 'Least Commented',
+} as const
+
+type ResultSort = keyof typeof RESULT_SORT_LABELS
+
+function isResultSort(value: string | null): value is ResultSort {
+  return value != null && value in RESULT_SORT_LABELS
+}
+
 export function Feed() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { openQuote } = useCompose()
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search])
   const feedParam = searchParams.get('feed')
@@ -26,7 +42,8 @@ export function Feed() {
   const hasAdv = searchParams.has('adv')
   const isDateFiltering = !!(dateFrom || dateTo)
   const scanKey = `${dateFrom ?? ''}|${dateTo ?? ''}|${searchParams.get('adv_topic') ?? ''}`
-  const [resultSort, setResultSort] = useState<'newest' | 'oldest' | 'most_upvoted' | 'least_upvoted' | 'most_commented' | 'least_commented'>('newest')
+  const sortParam = searchParams.get('sort')
+  const resultSort: ResultSort = isResultSort(sortParam) ? sortParam : 'newest'
   const [sortOpen, setSortOpen] = useState(false)
   const sortRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -37,6 +54,15 @@ export function Feed() {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [sortOpen])
+
+  function selectResultSort(sort: ResultSort) {
+    const params = new URLSearchParams(location.search)
+    if (sort === 'newest') params.delete('sort')
+    else params.set('sort', sort)
+    const nextSearch = params.toString()
+    navigate(nextSearch ? `/?${nextSearch}` : '/', { replace: true })
+    setSortOpen(false)
+  }
 
   // Only run bulk fetch when user clicks Apply (URL change), not on page refresh
   const hideCompose = ['Hot', 'Picks', 'Following', 'Announcements'].includes(activeTopic)
@@ -317,15 +343,15 @@ export function Feed() {
                           : 'border-white/[0.08] bg-white/[0.03] text-white/40 hover:border-white/[0.12] hover:text-white/60'
                       )}
                     >
-                      {({ newest: 'Newest', oldest: 'Oldest', most_upvoted: 'Most Upvoted', least_upvoted: 'Least Upvoted', most_commented: 'Most Commented', least_commented: 'Least Commented' } as const)[resultSort]}
+                      {RESULT_SORT_LABELS[resultSort]}
                       <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={cn('transition-transform', sortOpen && 'rotate-180')}><path d="m6 9 6 6 6-6"/></svg>
                     </button>
                     {sortOpen && (
                       <div className="absolute right-0 top-full z-50 mt-1 min-w-[9rem] rounded-lg border border-white/[0.06] bg-[#141410] py-1 shadow-lg">
-                        {([['newest', 'Newest'], ['oldest', 'Oldest'], ['most_upvoted', 'Most Upvoted'], ['least_upvoted', 'Least Upvoted'], ['most_commented', 'Most Commented'], ['least_commented', 'Least Commented']] as const).map(([val, label]) => (
+                        {Object.entries(RESULT_SORT_LABELS).map(([val, label]) => (
                           <button
                             key={val}
-                            onClick={() => { setResultSort(val); setSortOpen(false) }}
+                            onClick={() => selectResultSort(val as ResultSort)}
                             className={cn(
                               'flex w-full cursor-pointer items-center px-3 py-1.5 text-xs transition-colors',
                               resultSort === val

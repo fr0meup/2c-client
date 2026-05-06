@@ -424,7 +424,7 @@ export function AdvancedSearchPanel() {
   const [advTopic, setAdvTopic] = useState(sp.get('adv_topic') || '')
   const [dateFrom, setDateFrom] = useState(sp.get('date_from') || '')
   const [dateTo, setDateTo] = useState(sp.get('date_to') || '')
-  const [showDateRange, setShowDateRange] = useState(!!(sp.get('date_from') || sp.get('date_to')))
+  const [showDateRange, setShowDateRange] = useState(sp.get('date_range') === '1')
   const [expanded, setExpanded] = useState(true)
 
   const cityOptions = country && citiesData ? (citiesData.cities[country] || []).sort() : []
@@ -456,8 +456,8 @@ export function AdvancedSearchPanel() {
     country,
     city,
     advTopic,
-    dateFrom,
-    dateTo,
+    showDateRange && dateFrom,
+    showDateRange && dateTo,
   ].filter(Boolean).length
 
   const handleClose = () => navigate('/')
@@ -514,6 +514,7 @@ export function AdvancedSearchPanel() {
     // Always use workers — default date range to full platform history
     const effectiveFrom = dateFrom || '2024-12-06'
     const effectiveTo = dateTo || toDateStr(new Date())
+    if (showDateRange) params.set('date_range', '1')
     params.set('date_from', effectiveFrom)
     params.set('date_to', effectiveTo)
     params.set('search_run', String(Date.now()))

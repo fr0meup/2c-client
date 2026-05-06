@@ -41,6 +41,8 @@ interface CachedBulkResult {
   scanned: number
 }
 
+const sessionBulkCache = new Map<string, CachedBulkResult>()
+
 export function useBulkDateFetch({
   dateFrom,
   dateTo,
@@ -56,20 +58,43 @@ export function useBulkDateFetch({
   // Stable key for serverParams to avoid effect re-triggers
   const paramsKey = JSON.stringify(serverParams ?? {})
   const cacheKey = ['bulkDateFetch', dateFrom, dateTo, topic, paramsKey]
+  const cacheId = JSON.stringify(cacheKey)
   const now = new Date()
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const isCurrentDayRange = !dateTo || dateTo === todayStr
 
   // Find a covering in-memory (React Query) cache entry
   function findMemoryCache(): CachedBulkResult | undefined {
+    const sessionExact = sessionBulkCache.get(cacheId)
+    if (sessionExact) return sessionExact
+
     const exact = queryClient.getQueryData<CachedBulkResult>(cacheKey)
-    if (exact && exact.posts.length > 0) return exact
+    if (exact) return exact
     if (!dateFrom) return undefined
     const reqFrom = new Date(dateFrom).getTime()
     const reqTo = dateTo ? new Date(dateTo + 'T23:59:59.999Z').getTime() : Date.now()
+    for (const [key, data] of sessionBulkCache) {
+      const parsedKey = JSON.parse(key) as [string, string, string, string | undefined, string]
+      const [, cFrom, cTo, cTopic, cParams] = parsedKey
+      if (cParams !== paramsKey) continue
+      if (cTopic && cTopic !== topic) continue
+      const cachedFromTs = new Date(cFrom).getTime()
+      const cachedToTs = cTo ? new Date(cTo + 'T23:59:59.999Z').getTime() : Date.now()
+      if (cachedFromTs <= reqFrom && cachedToTs >= reqTo) {
+        const needTopicFilter = !cTopic && !!topic
+        const filtered = data.posts.filter((p) => {
+          const ts = new Date(p.created_at).getTime()
+          if (ts < reqFrom || ts > reqTo) return false
+          if (needTopicFilter && p.topic !== topic) return false
+          return true
+        })
+        return { posts: filtered, votes: data.votes, polls: data.polls, pickVotes: data.pickVotes, scanned: data.scanned }
+      }
+    }
+
     const allCached = queryClient.getQueriesData<CachedBulkResult>({ queryKey: ['bulkDateFetch'] })
     for (const [key, data] of allCached) {
-      if (!data || data.posts.length === 0) continue
+      if (!data) continue
       const [, cFrom, cTo, cTopic, cParams] = key as unknown as [string, string, string, string | undefined, string]
       if (cParams !== paramsKey) continue
       if (cTopic && cTopic !== topic) continue
@@ -91,7 +116,7 @@ export function useBulkDateFetch({
 
   // Synchronous in-memory cache restore on mount — avoids flash on back-navigation
   const initialCache = enabled ? findMemoryCache() : undefined
-  const hasCacheRef = useRef(!!initialCache && initialCache.posts.length > 0 && !isCurrentDayRange)
+  const hasCacheRef = useRef(!!initialCache)
 
   const [posts, setPosts] = useState<Post[]>(initialCache?.posts ?? [])
   const [votes, setVotes] = useState<Vote[]>(initialCache?.votes ?? [])
@@ -118,7 +143,7 @@ export function useBulkDateFetch({
     }
 
     // Check in-memory cache on re-renders (e.g. topic/date change)
-    const memCached = isCurrentDayRange ? undefined : findMemoryCache()
+    const memCached = findMemoryCache()
     if (memCached) {
       setPosts(memCached.posts)
       setVotes(memCached.votes)
@@ -310,13 +335,15 @@ export function useBulkDateFetch({
       setIsLoading(false)
 
       // Also cache in React Query for instant back-navigation
-      queryClient.setQueryData<CachedBulkResult>(cacheKey, {
+      const cacheValue = {
         posts: finalPosts,
         votes: finalVotes,
         polls: finalPolls,
         pickVotes: finalPicks,
         scanned: totalScanned,
-      })
+      }
+      sessionBulkCache.set(cacheId, cacheValue)
+      queryClient.setQueryData<CachedBulkResult>(cacheKey, cacheValue)
     }
 
     run().catch(() => {

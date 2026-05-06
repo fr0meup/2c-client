@@ -26,11 +26,11 @@ html, body, #root {
   background-color: #0a0907;
   min-height: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 html {
-  overflow-y: scroll;
+  overflow-y: hidden;
   overscroll-behavior: none;
   scrollbar-width: thin;
   scrollbar-color: #333330 #0a0907;
@@ -66,9 +66,15 @@ html::before {
 body {
   margin: 0;
   background-color: #0a0907;
+  height: 100vh;
+  overflow-y: auto;
   font-family: 'DM Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
 }
 
 @media (max-width: 680px) {

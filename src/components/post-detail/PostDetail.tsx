@@ -156,6 +156,15 @@ export function PostDetail() {
   const commentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    if (!lightboxOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [lightboxOpen])
+
+  useEffect(() => {
     function checkCommentSel() {
       const sel = window.getSelection()
       const has = sel != null && !sel.isCollapsed && sel.toString().length > 0
@@ -413,7 +422,7 @@ export function PostDetail() {
         {/* Lightbox */}
         {lightboxOpen && imageSrc && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/80 backdrop-blur-sm"
             onClick={() => setLightboxOpen(false)}
           >
             <div className="absolute right-4 top-4 flex items-center gap-2">
