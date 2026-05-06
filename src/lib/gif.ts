@@ -81,6 +81,36 @@ export function saveGif(url: string): string[] {
   return gifs
 }
 
+/** Bulk-save multiple GIF URLs. Returns the count of newly added (non-duplicate) URLs. */
+export function saveManyGifs(urls: string[]): { added: number; skipped: number } {
+  const existing = getSavedGifs()
+  const seen = new Set(existing)
+  let added = 0
+  let skipped = 0
+  const next = [...existing]
+  for (const raw of urls) {
+    const url = raw.trim()
+    if (!url) continue
+    if (seen.has(url)) { skipped++; continue }
+    seen.add(url)
+    next.unshift(url)
+    added++
+  }
+  if (added > 0) {
+    writeList(SAVED_KEY, next)
+    notify()
+  }
+  return { added, skipped }
+}
+
+/** Parse a blob of text into individual URL candidates (split on whitespace, commas, semicolons). */
+export function parseGifUrlList(input: string): string[] {
+  return input
+    .split(/[\s,;]+/)
+    .map((s) => s.trim())
+    .filter((s) => /^https?:\/\//i.test(s))
+}
+
 export function removeGif(url: string): string[] {
   const gifs = getSavedGifs().filter((g) => g !== url)
   writeList(SAVED_KEY, gifs)

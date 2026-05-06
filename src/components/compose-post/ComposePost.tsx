@@ -889,10 +889,10 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
             data-onboarding="save-draft"
             onClick={handleSaveDraft}
             disabled={!canPost}
-            className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border transition-all disabled:cursor-not-allowed disabled:opacity-30 ${
+            className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-30 ${
               savedFeedback
-                ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400'
-                : 'border-white/[0.08] bg-white/[0.04] text-white/40 hover:border-[#c8a44d]/20 hover:text-white/60'
+                ? 'text-emerald-400'
+                : 'text-white/40 hover:text-white/60'
             }`}
             title="Save draft"
           >
@@ -902,7 +902,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
           <div className="relative" ref={topicRef}>
             <button
               onClick={() => setTopicMenuOpen((prev) => !prev)}
-              className="flex h-8 max-w-[8rem] cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border border-white/[0.08] bg-white/[0.04] px-3 text-xs font-medium text-white/40 transition-all hover:border-[#c8a44d]/20 hover:text-white/60 sm:max-w-none"
+              className="flex h-8 max-w-[7rem] cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border border-white/[0.08] bg-white/[0.04] px-3 text-xs font-medium text-white/40 transition-all hover:border-[#c8a44d]/20 hover:text-white/60 sm:max-w-[9rem]"
             >
               <span className="truncate">{selectedTopic}</span>
               <ChevronDown

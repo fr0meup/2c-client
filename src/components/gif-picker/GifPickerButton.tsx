@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Trash2, Star, Plus } from 'lucide-react'
-import { getSavedGifs, removeGif, getFaveGifs, addFave, removeFave, isFave, saveGif } from '@/lib/gif'
+import { X, Trash2, Star, Plus, List } from 'lucide-react'
+import { getSavedGifs, removeGif, getFaveGifs, addFave, removeFave, isFave, saveGif, saveManyGifs, parseGifUrlList } from '@/lib/gif'
 
 interface GifPickerButtonProps {
   onSelect: (url: string) => void
@@ -11,8 +11,12 @@ export function GifPickerButton({ onSelect }: GifPickerButtonProps) {
   const [gifs, setGifs] = useState<string[]>([])
   const [faves, setFaves] = useState<string[]>([])
   const [pasteUrl, setPasteUrl] = useState('')
+  const [bulkMode, setBulkMode] = useState(false)
+  const [bulkText, setBulkText] = useState('')
+  const [bulkFeedback, setBulkFeedback] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const bulkRef = useRef<HTMLTextAreaElement>(null)
 
   function reload() {
     setGifs(getSavedGifs())
@@ -49,12 +53,40 @@ export function GifPickerButton({ onSelect }: GifPickerButtonProps) {
   }
 
   function handlePasteAdd() {
-    const url = pasteUrl.trim()
-    if (!url) return
-    saveGif(url)
+    const trimmed = pasteUrl.trim()
+    if (!trimmed) return
+    // If the user pasted multiple URLs (whitespace/comma separated), bulk-save them.
+    const list = parseGifUrlList(trimmed)
+    if (list.length > 1) {
+      const { added, skipped } = saveManyGifs(list)
+      setBulkFeedback(`Added ${added}${skipped ? ` · ${skipped} duplicate${skipped === 1 ? '' : 's'}` : ''}`)
+      window.setTimeout(() => setBulkFeedback(null), 2200)
+    } else {
+      saveGif(list[0] ?? trimmed)
+    }
     setPasteUrl('')
     reload()
+    inputRef.current?.focus()
   }
+
+  function handleBulkSave() {
+    const list = parseGifUrlList(bulkText)
+    if (list.length === 0) {
+      setBulkFeedback('No valid URLs found')
+      window.setTimeout(() => setBulkFeedback(null), 2200)
+      return
+    }
+    const { added, skipped } = saveManyGifs(list)
+    setBulkFeedback(`Added ${added}${skipped ? ` · ${skipped} duplicate${skipped === 1 ? '' : 's'}` : ''}`)
+    window.setTimeout(() => setBulkFeedback(null), 2400)
+    if (added > 0) setBulkText('')
+    reload()
+    bulkRef.current?.focus()
+  }
+
+  useEffect(() => {
+    if (bulkMode) setTimeout(() => bulkRef.current?.focus(), 50)
+  }, [bulkMode])
 
   const nonFaveGifs = gifs.filter((g) => !faves.includes(g))
 
@@ -85,24 +117,78 @@ export function GifPickerButton({ onSelect }: GifPickerButtonProps) {
             </button>
           </div>
 
-          {/* Paste URL input */}
-          <div className="mx-2 mb-2 flex gap-1.5">
-            <input
-              ref={inputRef}
-              value={pasteUrl}
-              onChange={(e) => setPasteUrl(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handlePasteAdd() }}
-              placeholder="Paste a GIF URL to save..."
-              className="flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-xs text-white placeholder:text-white/25 focus:border-[#c8a44d]/30 focus:outline-none"
-            />
-            <button
-              onClick={handlePasteAdd}
-              disabled={!pasteUrl.trim()}
-              className="flex h-[30px] w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04] text-white/40 transition-colors hover:border-[#c8a44d]/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-          </div>
+          {/* Paste URL input (or bulk paste textarea) */}
+          {bulkMode ? (
+            <div className="mx-2 mb-2 flex flex-col gap-1.5">
+              <textarea
+                ref={bulkRef}
+                value={bulkText}
+                onChange={(e) => setBulkText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault()
+                    handleBulkSave()
+                  }
+                }}
+                rows={5}
+                placeholder={'Paste many GIF URLs (one per line, or comma/space separated)...'}
+                className="w-full resize-none rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-xs text-white placeholder:text-white/25 focus:border-[#c8a44d]/30 focus:outline-none"
+                style={{ scrollbarWidth: 'thin', scrollbarColor: '#333330 transparent' }}
+              />
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  onClick={() => { setBulkMode(false); setBulkText('') }}
+                  className="cursor-pointer text-[10px] uppercase tracking-wider text-white/40 transition-colors hover:text-white/70"
+                >
+                  Cancel
+                </button>
+                <div className="flex items-center gap-1.5">
+                  {bulkFeedback && (
+                    <span className="text-[10px] text-[#c8a44d]/80">{bulkFeedback}</span>
+                  )}
+                  <button
+                    onClick={handleBulkSave}
+                    disabled={parseGifUrlList(bulkText).length === 0}
+                    className="flex h-[26px] cursor-pointer items-center gap-1 rounded-lg bg-[#c8a44d]/15 px-2.5 text-[11px] font-semibold text-[#c8a44d] transition-colors hover:bg-[#c8a44d]/25 disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Add {parseGifUrlList(bulkText).length || ''}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mx-2 mb-2 flex flex-col gap-1">
+              <div className="flex gap-1.5">
+                <input
+                  ref={inputRef}
+                  value={pasteUrl}
+                  onChange={(e) => setPasteUrl(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handlePasteAdd() }}
+                  placeholder="Paste a GIF URL to save..."
+                  className="flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-xs text-white placeholder:text-white/25 focus:border-[#c8a44d]/30 focus:outline-none"
+                />
+                <button
+                  onClick={handlePasteAdd}
+                  disabled={!pasteUrl.trim()}
+                  className="flex h-[30px] w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04] text-white/40 transition-colors hover:border-[#c8a44d]/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                  title="Add"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setBulkMode(true)}
+                  className="flex h-[30px] w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04] text-white/40 transition-colors hover:border-[#c8a44d]/30 hover:text-white"
+                  title="Bulk add multiple URLs"
+                >
+                  <List className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {bulkFeedback && (
+                <span className="px-1 text-[10px] text-[#c8a44d]/80">{bulkFeedback}</span>
+              )}
+            </div>
+          )}
 
           {/* Content */}
           <div
