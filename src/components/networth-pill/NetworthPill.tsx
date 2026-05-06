@@ -88,9 +88,9 @@ const SPECIAL_LABELS: Partial<Record<PillTier, string>> = {
 }
 
 const SIZE_CONFIG = {
-  small: { height: 'h-8', text: 'text-sm', borderWidth: 6, iconSize: 'w-4 h-4', iconText: 'text-xs' },
-  default: { height: 'h-8', text: 'text-sm', borderWidth: 6, iconSize: 'w-5 h-5', iconText: 'text-xs' },
-  huge: { height: 'h-10', text: 'text-base', borderWidth: 20, iconSize: 'w-6 h-6', iconText: 'text-base' },
+  small: { height: 'h-6 sm:h-8', text: 'text-[11px] sm:text-sm', borderWidth: 6, iconSize: 'w-3.5 h-3.5 sm:w-4 sm:h-4', iconText: 'text-[9px] sm:text-xs', minWidth: 'min-w-[42px] sm:min-w-[50px]' },
+  default: { height: 'h-8', text: 'text-sm', borderWidth: 6, iconSize: 'w-5 h-5', iconText: 'text-xs', minWidth: 'min-w-[50px]' },
+  huge: { height: 'h-10', text: 'text-base', borderWidth: 20, iconSize: 'w-6 h-6', iconText: 'text-base', minWidth: 'min-w-[50px]' },
 }
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -177,12 +177,12 @@ export function NetworthPill({
       <div
         onClick={canNavigate ? handleClick : undefined}
         onMouseEnter={canNavigate ? handleHover : undefined}
-        className={`relative inline-flex items-center justify-center gap-1.5 ${config.height} ${config.text} min-w-[60px] rounded-full border-2 border-gray-600 bg-transparent px-2 ${className}${canNavigate ? ' cursor-pointer' : ''}`}
+        className={`relative inline-flex max-w-full items-center justify-center gap-1 ${config.height} ${config.text} ${config.minWidth} rounded-full border-2 border-gray-600 bg-transparent px-1.5 ${className}${canNavigate ? ' cursor-pointer' : ''}`}
       >
         <span className="font-bold" style={textStyle}>
           fag
         </span>
-        <span className="text-[11px] font-medium text-white/30">
+        <span className="truncate text-[10px] font-medium text-white/30">
           {formattedNetworth}
         </span>
       </div>
@@ -193,7 +193,7 @@ export function NetworthPill({
     <div
       onClick={canNavigate ? handleClick : undefined}
       onMouseEnter={canNavigate ? handleHover : undefined}
-      className={`relative inline-flex items-center ${hasSpecialLabel ? 'justify-center px-3' : 'gap-2 pl-1 pr-2'} ${config.height} ${config.text} min-w-[50px] ${className}${canNavigate ? ' cursor-pointer' : ''}`}
+      className={`relative inline-flex max-w-full items-center ${hasSpecialLabel ? 'justify-center px-2' : 'gap-1 pl-0.5 pr-1.5'} ${config.height} ${config.text} ${config.minWidth} ${className}${canNavigate ? ' cursor-pointer' : ''}`}
       style={{
         borderStyle: 'solid',
         borderWidth: `${config.borderWidth}px`,
@@ -206,7 +206,7 @@ export function NetworthPill({
     >
       {!hasSpecialLabel && (
         <span
-          className={`flex flex-shrink-0 items-center justify-center ${config.iconSize} rounded-full border-[2px]`}
+          className={`flex flex-shrink-0 items-center justify-center ${config.iconSize} rounded-full border`}
           style={{
             borderColor: hexToRgba(pillColor, 0.5),
             outline: `2px solid ${hexToRgba(pillColor, 0.5)}`,
@@ -228,7 +228,7 @@ export function NetworthPill({
       )}
 
       <span
-        className={`${config.text} leading-none`}
+        className={`${config.text} min-w-0 truncate leading-none`}
         style={{
           ...textStyle,
           fontWeight: 500,

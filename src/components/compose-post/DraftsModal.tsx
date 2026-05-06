@@ -64,7 +64,7 @@ export function DraftsModal({ onClose, onLoad, onDelete }: Props) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative flex w-full max-w-md mx-4 max-h-[70vh] flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141410] shadow-2xl shadow-black/60"
+        className="relative mx-3 flex max-h-[calc(100svh-1.5rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141410] shadow-2xl shadow-black/60 sm:mx-4"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">

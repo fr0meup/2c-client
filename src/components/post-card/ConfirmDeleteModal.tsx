@@ -19,12 +19,12 @@ export function ConfirmDeleteModal({ onConfirm, onClose, isPending }: Props) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-3 backdrop-blur-md"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-sm mx-4 overflow-hidden rounded-3xl border border-white/[0.08] bg-[#141410] shadow-2xl shadow-black/60"
+        className="relative max-h-[calc(100svh-1.5rem)] w-full max-w-sm overflow-hidden rounded-3xl border border-white/[0.08] bg-[#141410] shadow-2xl shadow-black/60"
       >
         {/* Header */}
         <div className="flex flex-col items-center border-b border-white/[0.06] px-5 py-5">

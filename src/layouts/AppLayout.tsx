@@ -129,6 +129,7 @@ export function AppLayout() {
   const openCompose = useCallback(() => { setQuotedPost(null); setComposeOpen(true) }, [])
   const openQuote = useCallback((post: PostCardData) => { setQuotedPost(post); setComposeOpen(true) }, [])
   const closeCompose = useCallback(() => { setComposeOpen(false); setQuotedPost(null) }, [])
+  const showBottomNav = !location.pathname.startsWith('/room/') && !location.pathname.startsWith('/post/')
 
   useEffect(() => {
     if (!composeOpen) return
@@ -197,10 +198,10 @@ export function AppLayout() {
     <MessagesProvider>
     <FollowProvider>
     <LeaderboardProvider>
-    <div className="min-h-screen bg-[#0a0907] pb-[88px] xl:pb-0">
+    <div className={`min-h-screen bg-[#0a0907] ${showBottomNav ? 'pb-[88px] xl:pb-0' : 'pb-0'}`}>
       <HeaderLeft />
       <Sidebar onNewPostClick={openCompose} />
-      <BottomNav onNewPostClick={openCompose} />
+      {showBottomNav && <BottomNav onNewPostClick={openCompose} />}
       <ComposeContext.Provider value={{ openCompose, openQuote }}>
       <div className="xl:ml-60">
         <HeaderRight />
@@ -230,7 +231,7 @@ export function AppLayout() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
             onClick={closeCompose}
           />
-          <div className="relative z-10 w-full max-w-[600px] mx-4 max-h-[90vh]">
+          <div className="relative z-10 mx-3 w-full max-w-[600px] max-h-[92svh] sm:mx-4">
             <div className="rounded-xl bg-[#141410]">
               <Suspense fallback={<div className="h-[360px] rounded-xl bg-[#141410]" />}>
                 <ComposePost onClose={closeCompose} scrollHeight={360} quotedPost={quotedPost} />

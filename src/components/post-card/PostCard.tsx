@@ -174,12 +174,12 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
       <article
         onClick={() => { announceNavigationPending(`/post/${post.uuid}`); navigate(`/post/${post.uuid}`) }}
         onMouseEnter={() => { preloadRoute('post'); prefetchPost(post.uuid); prefetchComments(post.uuid) }}
-        className="cursor-pointer rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 transition-colors hover:bg-white/[0.05]"
+        className="cursor-pointer rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 transition-colors hover:bg-white/[0.05] sm:p-4"
       >
         <div className="min-w-0">
           {/* Header row */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex items-start justify-between gap-2 sm:items-center">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 sm:flex-nowrap sm:gap-2">
               <NetworthPill
                 networth={post.author_meta.balance}
                 subscriptionType={post.author_meta.subscription_type}
@@ -187,7 +187,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
                 role={post.author_meta.role}
                 size="small"
               />
-              <span className="whitespace-nowrap text-sm text-white/40">
+              <span className="whitespace-nowrap text-xs text-white/40 sm:text-sm">
                 {timeAgo(post.created_at)}
               </span>
               <span className="text-sm text-white/40">·</span>
@@ -195,12 +195,12 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
               {post.topic && (
                 <>
                   <span className="text-sm text-white/40">·</span>
-                  <span className="text-sm font-semibold text-[#c8a44d]">$/{post.topic.toLowerCase()}</span>
+                  <span className="max-w-[9rem] truncate text-xs font-semibold text-[#c8a44d] sm:max-w-none sm:text-sm">$/{post.topic.toLowerCase()}</span>
                 </>
               )}
               <span className="text-sm text-white/40">·</span>
-              <span className="flex items-center gap-1 text-sm text-white/40">
-                <Eye className="h-3.5 w-3.5" />
+              <span className="flex items-center gap-0.5 text-xs text-white/40 sm:gap-1 sm:text-sm">
+                <Eye className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 {post.view_count}
               </span>
             </div>
@@ -214,7 +214,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl border border-white/[0.08] bg-[#141410] p-1 shadow-xl shadow-black/40">
+                <div className="absolute right-0 top-full z-20 mt-1 w-48 max-w-[calc(100vw-2rem)] rounded-xl border border-white/[0.08] bg-[#141410] p-1 shadow-xl shadow-black/40">
                   <button
                     onClick={(e) => {
                       e.stopPropagation()

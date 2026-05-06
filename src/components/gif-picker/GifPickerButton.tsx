@@ -73,7 +73,7 @@ export function GifPickerButton({ onSelect }: GifPickerButtonProps) {
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 z-50 mt-2 w-[340px] rounded-xl border border-white/[0.08] bg-[#141410] shadow-xl shadow-black/40">
+        <div className="gif-picker-popover absolute top-full right-0 z-50 mt-2 w-[340px] max-w-[calc(100vw-2rem)] rounded-xl border border-white/[0.08] bg-[#141410] shadow-xl shadow-black/40">
           {/* Header */}
           <div className="flex items-center justify-between px-3 pt-3 pb-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-white/40">GIFs</span>

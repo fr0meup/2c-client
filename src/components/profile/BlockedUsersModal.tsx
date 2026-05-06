@@ -54,12 +54,12 @@ export function BlockedUsersModal({ onClose }: Props) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-md sm:items-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-2 backdrop-blur-md"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-3xl border border-white/[0.08] bg-[#141410] shadow-2xl shadow-black/60 sm:max-h-[85vh] sm:max-w-md sm:rounded-3xl"
+        className="relative flex max-h-[calc(100svh-1rem)] w-full flex-col overflow-hidden rounded-3xl border border-white/[0.08] bg-[#141410] shadow-2xl shadow-black/60 sm:max-h-[85svh] sm:max-w-md"
       >
         {/* Header */}
         <div className="relative flex items-center gap-3 border-b border-white/[0.06] px-5 py-4">

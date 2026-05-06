@@ -27,6 +27,7 @@ export function FeedFilters() {
   const activeTopic = pendingTopic ?? urlTopic
 
   const topicMenuItems = TOPIC_MENU.flatMap((g) => g.items)
+  const menuGroups = [{ category: 'Feeds', items: ['Picks'] }, ...TOPIC_MENU] as const
   const mainTabLabels = ['New', 'Hot', 'Following', 'Picks'] as const
   const isInTopicsMenu = !mainTabLabels.includes(activeTopic as unknown as typeof mainTabLabels[number]) && topicMenuItems.some((item) => item === activeTopic)
 
@@ -109,11 +110,11 @@ export function FeedFilters() {
   }, [topicsOpen])
 
   return (
-    <div className="relative flex h-10 items-center">
+    <div className={cn('feed-filters relative flex h-10 w-full min-w-0 max-w-full items-center', searchOpen && 'feed-filters--search-open')}>
       {/* Search expanding bar */}
       <div
         className="group absolute left-0 top-0 h-10 cursor-pointer overflow-hidden rounded-full border border-white/[0.08] bg-white/[0.06] hover:bg-gradient-to-b hover:from-white/[0.09] hover:to-white/[0.04] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
-        style={{ width: searchOpen ? '18rem' : '2.5rem', transition: 'width 300ms ease-out' }}
+        style={{ width: searchOpen ? 'min(18rem, calc(100vw - 2rem))' : '2.5rem', transition: 'width 300ms ease-out' }}
         onMouseDown={(e) => {
           if (searchOpen && e.target === e.currentTarget) {
             e.preventDefault()
@@ -208,8 +209,8 @@ export function FeedFilters() {
       {/* Topic pills */}
       <div
         ref={containerRef}
-        className="relative flex items-center gap-1.5"
-        style={{ marginLeft: searchOpen ? '18.75rem' : '3rem', transition: 'margin-left 300ms ease-out', maxWidth: searchOpen ? 'calc(100% - 19rem)' : 'calc(100% - 3.5rem)' }}
+        className="feed-filter-topics relative flex min-w-0 max-w-full items-center gap-1.5"
+        style={{ marginLeft: searchOpen ? '18.75rem' : '3rem', transition: 'margin-left 300ms ease-out', width: searchOpen ? 'max(0px, calc(100% - 19rem))' : 'calc(100% - 3.5rem)' }}
       >
         {/* Sliding gold indicator */}
         <div
@@ -235,6 +236,8 @@ export function FeedFilters() {
               onClick={() => navigateTopic(topic)}
               className={cn(
                 'relative z-10 inline-flex h-8 cursor-pointer items-center justify-center rounded-full px-3.5 text-sm font-medium transition-all duration-200',
+                topic === 'Following' && 'max-[560px]:hidden',
+                topic === 'Picks' && 'max-[430px]:hidden',
                 isActive
                   ? 'text-[#c8a44d]'
                   : 'text-white/60 hover:bg-gradient-to-b hover:from-white/[0.06] hover:to-white/[0.02] hover:text-white/80 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
@@ -290,9 +293,10 @@ export function FeedFilters() {
           {topicsOpen && (
             <div
               data-topics-dropdown
-              className="absolute left-0 top-full z-50 mt-1.5 w-64 rounded-lg border border-white/[0.06] bg-[#141410] py-1 shadow-lg"
+              className="feed-topics-dropdown absolute right-0 top-full z-50 mt-1.5 max-h-[min(70vh,28rem)] w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-white/[0.06] bg-[#141410] py-1 shadow-lg"
+              style={{ scrollbarWidth: 'thin', scrollbarColor: '#333330 transparent' }}
             >
-            {TOPIC_MENU.map((group) => (
+            {menuGroups.map((group) => (
               <div key={group.category}>
                 <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white/30">
                   {group.category}

@@ -228,7 +228,7 @@ export function UserProfile() {
             <p className="mt-4 px-2 text-center text-[14px] leading-snug text-white/80">{profile.bio}</p>
           )}
 
-          <div className="mt-4 flex items-center justify-center gap-5 text-sm">
+          <div className="mt-4 grid w-full grid-cols-3 items-stretch gap-2 text-sm sm:flex sm:items-center sm:justify-center sm:gap-5">
             {profile.followers != null && (
               <>
                 <Stat
@@ -236,7 +236,7 @@ export function UserProfile() {
                   label="Followers"
                   display={formatCompact(profile.followers)}
                 />
-                <span className="h-4 w-px bg-white/10" />
+                <span className="hidden h-4 w-px bg-white/10 sm:block" />
               </>
             )}
             {profile.following != null && (
@@ -244,7 +244,7 @@ export function UserProfile() {
                 {isOwnProfile ? (
                   <button
                     onClick={() => setShowFollowing(true)}
-                    className="cursor-pointer transition-opacity hover:opacity-80"
+                    className="min-w-0 cursor-pointer transition-opacity hover:opacity-80"
                   >
                     <Stat
                       icon={<UserPlus className="h-3.5 w-3.5" strokeWidth={2.2} />}
@@ -259,7 +259,7 @@ export function UserProfile() {
                     display={formatCompact(profile.following)}
                   />
                 )}
-                <span className="h-4 w-px bg-white/10" />
+                <span className="hidden h-4 w-px bg-white/10 sm:block" />
               </>
             )}
             <Stat
@@ -385,10 +385,10 @@ export function UserProfile() {
 
 function Stat({ icon, label, display }: { icon: React.ReactNode; label: string; display: string }) {
   return (
-    <span className="flex items-baseline gap-1.5">
-      <span className="translate-y-[1px] text-[#c8a44d]/70">{icon}</span>
-      <span className="font-bold text-white tabular-nums">{display}</span>
-      <span className="text-xs text-white/40">{label}</span>
+    <span className="flex min-w-0 flex-col items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.025] px-1.5 py-2 text-center sm:flex-row sm:items-baseline sm:gap-1.5 sm:border-0 sm:bg-transparent sm:p-0">
+      <span className="text-[#c8a44d]/70 sm:translate-y-[1px]">{icon}</span>
+      <span className="max-w-full truncate font-bold text-white tabular-nums">{display}</span>
+      <span className="max-w-full truncate text-[10px] leading-tight text-white/40 sm:text-xs">{label}</span>
     </span>
   )
 }

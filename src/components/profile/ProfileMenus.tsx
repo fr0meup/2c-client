@@ -46,7 +46,7 @@ const TRIGGER_BTN =
   'group flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.06] text-white/70 transition-colors hover:bg-gradient-to-b hover:from-white/[0.09] hover:to-white/[0.04] hover:text-white hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
 
 const MENU_PANEL =
-  'absolute right-0 top-full z-50 mt-1.5 min-w-[220px] rounded-xl border border-white/[0.08] bg-[#141410] p-1 shadow-xl shadow-black/40'
+  'absolute right-0 top-full z-50 mt-1.5 min-w-[220px] max-w-[calc(100vw-1rem)] rounded-xl border border-white/[0.08] bg-[#141410] p-1 shadow-xl shadow-black/40'
 
 const MENU_ITEM =
   'flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-white/75 transition-colors hover:bg-white/[0.05] hover:text-white'

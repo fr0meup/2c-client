@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { ImagePlus, X, ChevronDown, BarChart3, List, Bold, Plus, Minus, Loader2, FileText, Save, Check } from 'lucide-react'
+import { ImagePlus, X, ChevronDown, BarChart3, List, Bold, Plus, Minus, Loader2, FileText, Save, Check, MoreHorizontal } from 'lucide-react'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
 import { insertGifImage } from '@/lib/gif'
@@ -94,6 +94,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
   const [draftsOpen, setDraftsOpen] = useState(false)
   const [draftCount, setDraftCount] = useState(0)
   const [savedFeedback, setSavedFeedback] = useState(false)
+  const [toolsMenuOpen, setToolsMenuOpen] = useState(false)
 
   useEffect(() => {
     getDraftCount().then(setDraftCount)
@@ -238,6 +239,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
   }
 
   const topicRef = useRef<HTMLDivElement>(null)
+  const toolsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -248,6 +250,16 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
     if (topicMenuOpen) document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [topicMenuOpen])
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (toolsRef.current && !toolsRef.current.contains(e.target as Node)) {
+        setToolsMenuOpen(false)
+      }
+    }
+    if (toolsMenuOpen) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [toolsMenuOpen])
 
   const toggleOption = useCallback((opt: 'poll' | 'likert') => {
     setActiveOption((prev) => {
@@ -634,8 +646,8 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-5 pb-5 pt-3">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
+        <div className="flex min-w-0 items-center gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -656,9 +668,110 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
             <ImagePlus className="h-4 w-4" />
           </button>
 
+          <div className="relative min-[521px]:hidden" ref={toolsRef}>
+            <button
+              type="button"
+              onClick={() => setToolsMenuOpen((prev) => !prev)}
+              className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors ${
+                toolsMenuOpen || activeOption === 'poll' || activeOption === 'likert' || isBoldActive || isListActive
+                  ? 'bg-[#c8a44d]/10 text-[#c8a44d]'
+                  : 'text-white/40 hover:bg-white/[0.06] hover:text-white'
+              }`}
+              title="More tools"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+            {toolsMenuOpen && (
+              <div className="absolute bottom-full left-0 z-50 mb-2 grid w-[166px] grid-cols-4 gap-1.5 rounded-xl border border-white/[0.08] bg-[#141410] p-2 shadow-xl shadow-black/40">
+                <button
+                  onClick={() => { toggleOption('poll'); setToolsMenuOpen(false) }}
+                  className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors ${activeOption === 'poll' ? 'bg-[#c8a44d]/10 text-[#c8a44d]' : 'text-white/50 hover:bg-white/[0.06] hover:text-white'}`}
+                  title="Poll"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => { toggleOption('likert'); setToolsMenuOpen(false) }}
+                  className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors ${activeOption === 'likert' ? 'bg-[#c8a44d]/10 text-[#c8a44d]' : 'text-white/50 hover:bg-white/[0.06] hover:text-white'}`}
+                  title="Likert"
+                >
+                  <span className="text-xs font-bold">L</span>
+                </button>
+                <button
+                  onClick={() => {
+                    editorRef.current?.focus()
+                    document.execCommand('bold')
+                    setIsBoldActive(document.queryCommandState('bold'))
+                    handleEditorInput()
+                    setToolsMenuOpen(false)
+                  }}
+                  className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors ${isBoldActive ? 'bg-[#c8a44d]/10 text-[#c8a44d]' : 'text-white/50 hover:bg-white/[0.06] hover:text-white'}`}
+                  title="Bold"
+                >
+                  <Bold className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => {
+                    editorRef.current?.focus()
+                    document.execCommand('insertUnorderedList')
+                    setIsListActive(document.queryCommandState('insertUnorderedList'))
+                    handleEditorInput()
+                    setToolsMenuOpen(false)
+                  }}
+                  className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors ${isListActive ? 'bg-[#c8a44d]/10 text-[#c8a44d]' : 'text-white/50 hover:bg-white/[0.06] hover:text-white'}`}
+                  title="Bullets"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+                <button
+                  data-onboarding="zwj"
+                  onClick={() => { handleObfuscate(); setToolsMenuOpen(false) }}
+                  disabled={!hasEditorSelection}
+                  className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-[9px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${hasEditorSelection ? 'text-white/50 hover:bg-white/[0.06] hover:text-white' : 'text-white/40'}`}
+                  title="Obfuscate selected text"
+                >
+                  ZWJ
+                </button>
+                <EmojiPickerButton
+                  size="md"
+                  position="below"
+                  onSelect={(emoji) => {
+                    const el = editorRef.current
+                    if (!el) return
+                    el.focus()
+                    document.execCommand('insertText', false, emoji)
+                    handleEditorInput()
+                  }}
+                />
+                <GifPickerButton
+                  onSelect={(url) => {
+                    const el = editorRef.current
+                    if (!el) return
+                    insertGifImage(el, url)
+                    setGifUrl(url)
+                    handleEditorInput()
+                  }}
+                />
+                <button
+                  data-onboarding="drafts"
+                  onClick={() => { setDraftsOpen(true); setToolsMenuOpen(false) }}
+                  className="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/[0.06] hover:text-white"
+                  title="Drafts"
+                >
+                  <FileText className="h-4 w-4" />
+                  {draftCount > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c8a44d] px-1 text-[10px] font-bold text-[#0f0e0a]">
+                      {draftCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => toggleOption('poll')}
-            className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors ${
+            className={`hidden h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors min-[521px]:flex ${
               activeOption === 'poll'
                 ? 'bg-[#c8a44d]/10 text-[#c8a44d]'
                 : 'text-white/40 hover:bg-white/[0.06] hover:text-white'
@@ -670,7 +783,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
 
           <button
             onClick={() => toggleOption('likert')}
-            className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors ${
+            className={`hidden h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors min-[521px]:flex ${
               activeOption === 'likert'
                 ? 'bg-[#c8a44d]/10 text-[#c8a44d]'
                 : 'text-white/40 hover:bg-white/[0.06] hover:text-white'
@@ -687,7 +800,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
               setIsBoldActive(document.queryCommandState('bold'))
               handleEditorInput()
             }}
-            className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors ${
+            className={`hidden h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors min-[521px]:flex ${
               isBoldActive
                 ? 'bg-[#c8a44d]/10 text-[#c8a44d]'
                 : 'text-white/40 hover:bg-white/[0.06] hover:text-white'
@@ -704,7 +817,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
               setIsListActive(document.queryCommandState('insertUnorderedList'))
               handleEditorInput()
             }}
-            className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors ${
+            className={`hidden h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors min-[521px]:flex ${
               isListActive
                 ? 'bg-[#c8a44d]/10 text-[#c8a44d]'
                 : 'text-white/40 hover:bg-white/[0.06] hover:text-white'
@@ -718,7 +831,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
             data-onboarding="zwj"
             onClick={handleObfuscate}
             disabled={!hasEditorSelection}
-            className={`flex h-8 cursor-pointer items-center justify-center rounded-full px-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
+            className={`hidden h-8 cursor-pointer items-center justify-center rounded-full px-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-30 min-[521px]:flex ${
               hasEditorSelection
                 ? 'text-white/40 hover:bg-white/[0.06] hover:text-white'
                 : 'text-white/40'
@@ -728,34 +841,38 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
             ZWJ
           </button>
 
-          <EmojiPickerButton
-            size="md"
-            position="below"
-            onSelect={(emoji) => {
-              const el = editorRef.current
-              if (!el) return
-              el.focus()
-              document.execCommand('insertText', false, emoji)
-              handleEditorInput()
-            }}
-          />
+          <div className="hidden min-[521px]:block">
+            <EmojiPickerButton
+              size="md"
+              position="below"
+              onSelect={(emoji) => {
+                const el = editorRef.current
+                if (!el) return
+                el.focus()
+                document.execCommand('insertText', false, emoji)
+                handleEditorInput()
+              }}
+            />
+          </div>
 
-          <GifPickerButton
-            onSelect={(url) => {
-              const el = editorRef.current
-              if (!el) return
-              insertGifImage(el, url)
-              setGifUrl(url)
-              handleEditorInput()
-            }}
-          />
+          <div className="hidden min-[521px]:block">
+            <GifPickerButton
+              onSelect={(url) => {
+                const el = editorRef.current
+                if (!el) return
+                insertGifImage(el, url)
+                setGifUrl(url)
+                handleEditorInput()
+              }}
+            />
+          </div>
 
-          <div className="mx-0.5 h-4 w-px bg-white/[0.08]" />
+          <div className="mx-0.5 hidden h-4 w-px bg-white/[0.08] min-[521px]:block" />
 
           <button
             data-onboarding="drafts"
             onClick={() => setDraftsOpen(true)}
-            className="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white"
+            className="relative hidden h-8 w-8 cursor-pointer items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white min-[521px]:flex"
             title="Drafts"
           >
             <FileText className="h-4 w-4" />
@@ -767,7 +884,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <button
             data-onboarding="save-draft"
             onClick={handleSaveDraft}
@@ -785,16 +902,16 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
           <div className="relative" ref={topicRef}>
             <button
               onClick={() => setTopicMenuOpen((prev) => !prev)}
-              className="flex h-8 cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border border-white/[0.08] bg-white/[0.04] px-3 text-xs font-medium text-white/40 transition-all hover:border-[#c8a44d]/20 hover:text-white/60"
+              className="flex h-8 max-w-[8rem] cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border border-white/[0.08] bg-white/[0.04] px-3 text-xs font-medium text-white/40 transition-all hover:border-[#c8a44d]/20 hover:text-white/60 sm:max-w-none"
             >
-              <span>{selectedTopic}</span>
+              <span className="truncate">{selectedTopic}</span>
               <ChevronDown
                 className={`h-3 w-3 transition-transform duration-200 ${topicMenuOpen ? 'rotate-180' : ''}`}
               />
             </button>
             {topicMenuOpen && (
               <div
-                className="absolute right-0 bottom-full z-50 mb-2 w-72 max-h-72 overflow-y-auto rounded-xl border border-white/[0.08] bg-[#141410] p-2 shadow-xl shadow-black/40"
+                className="absolute right-0 bottom-full z-50 mb-2 w-72 max-w-[calc(100vw-2rem)] max-h-72 overflow-y-auto rounded-xl border border-white/[0.08] bg-[#141410] p-2 shadow-xl shadow-black/40"
                 style={{
                   scrollbarWidth: 'thin',
                   scrollbarColor: '#333330 transparent',
@@ -832,7 +949,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
           <button
             onClick={handleSubmit}
             disabled={!canPost || isSubmitting}
-            className="flex cursor-pointer items-center gap-1.5 rounded-full bg-[#c8a44d] px-4 py-1.5 text-sm font-semibold text-[#0f0e0a] transition-all duration-200 hover:bg-[#c8a44d]/85 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-[#c8a44d] px-3 text-sm font-semibold text-[#0f0e0a] transition-all duration-200 hover:bg-[#c8a44d]/85 disabled:cursor-not-allowed disabled:opacity-40 sm:px-4"
           >
             {isSubmitting ? (
               <>

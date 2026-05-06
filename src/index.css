@@ -25,6 +25,8 @@
 html, body, #root {
   background-color: #0a0907;
   min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 html {
@@ -67,6 +69,60 @@ body {
   font-family: 'DM Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+@media (max-width: 680px) {
+  .feed-filters--search-open .feed-filter-topics {
+    display: none;
+  }
+}
+
+@media (max-width: 430px) {
+  em-emoji-picker,
+  .twocents-emoji-scroll {
+    width: min(350px, calc(100vw - 2rem)) !important;
+  }
+
+  .emoji-picker-popover,
+  .gif-picker-popover {
+    position: fixed !important;
+    left: 1rem !important;
+    right: 1rem !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+
+  .emoji-picker-popover {
+    top: 5rem !important;
+    bottom: auto !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+
+  .gif-picker-popover {
+    top: 5rem !important;
+    bottom: auto !important;
+    margin-top: 0 !important;
+  }
+}
+
+.user-meta-pill::-webkit-scrollbar {
+  display: none;
+}
+
+.feed-filter-topics::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  .feed-topics-dropdown {
+    position: fixed;
+    left: 1rem;
+    right: 1rem;
+    top: 68px;
+    width: auto;
+    max-width: none;
+  }
 }
 
 .msg-flash > div {

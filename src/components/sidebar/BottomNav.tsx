@@ -25,7 +25,9 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
   const { prefetchFeed, prefetchLeaderboard, prefetchMyProfile, prefetchNotifications, prefetchRooms, prefetchBookmarks } = usePrefetch()
   const userUuid = auth?.userUuid
   const [moreOpen, setMoreOpen] = useState(false)
+  const [isVisible, setIsVisible] = useState(!location.pathname.startsWith('/post/'))
   const moreRef = useRef<HTMLDivElement>(null)
+  const lastScrollYRef = useRef(0)
 
   const items = useMemo(
     () => navItems.map((item) =>
@@ -40,6 +42,7 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
 
   useEffect(() => {
     if (!moreOpen) return
+    setIsVisible(true)
     function onClick(e: MouseEvent) {
       if (!(e.target instanceof Element)) return
       if (moreRef.current?.contains(e.target)) return
@@ -48,6 +51,33 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
     document.addEventListener('click', onClick)
     return () => document.removeEventListener('click', onClick)
   }, [moreOpen])
+
+  useEffect(() => {
+    const y = Math.max(0, window.scrollY)
+    lastScrollYRef.current = y
+    setMoreOpen(false)
+    setIsVisible(!location.pathname.startsWith('/post/'))
+  }, [location.pathname])
+
+  useEffect(() => {
+    function onScroll() {
+      const y = Math.max(0, window.scrollY)
+      const delta = y - lastScrollYRef.current
+      if (Math.abs(delta) < 8) return
+
+      if (delta > 0 && y > 24) {
+        setMoreOpen(false)
+        setIsVisible(false)
+      } else if (delta < 0 || y <= 8) {
+        setIsVisible(true)
+      }
+
+      lastScrollYRef.current = y
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   function isItemActive(item: NavItem): boolean {
     if (item.label === 'Feed') return isFeedPath(location.pathname, location.search)
@@ -68,8 +98,8 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-3 left-0 right-0 z-50 flex justify-center px-3 xl:hidden">
-      <nav className="pointer-events-auto inline-flex h-[68px] items-center gap-1.5 rounded-full border border-[#c8a44d]/20 bg-gradient-to-r from-[#c8a44d]/[0.06] via-white/[0.04] to-[#c8a44d]/[0.06] px-8 shadow-[0_0_12px_rgba(218,178,87,0.05),inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-md">
+    <div className={`pointer-events-none fixed bottom-3 left-0 right-0 z-50 flex max-w-[100vw] justify-center px-2 transition-all duration-300 ease-out sm:px-3 xl:hidden ${isVisible || moreOpen ? 'translate-y-0 opacity-100' : 'translate-y-[calc(100%+1rem)] opacity-0'}`}>
+      <nav className={`flex h-[58px] w-full max-w-[calc(100vw-1rem)] items-center justify-around gap-0.5 rounded-full border border-[#c8a44d]/20 bg-gradient-to-r from-[#c8a44d]/[0.06] via-white/[0.04] to-[#c8a44d]/[0.06] px-1.5 shadow-[0_0_12px_rgba(218,178,87,0.05),inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-md min-[380px]:max-w-[360px] sm:inline-flex sm:h-[68px] sm:w-auto sm:max-w-[calc(100vw-1.5rem)] sm:justify-center sm:gap-1.5 sm:px-6 ${isVisible || moreOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
         {/* Primary items: always visible */}
         {primary.map((item) => (
           <BottomNavItem key={item.path} item={item} isActive={isItemActive(item)} onClick={() => {
@@ -94,9 +124,10 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
               e.stopPropagation()
               setMoreOpen((v) => !v)
             }}
-            className="group flex h-14 w-14 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/60 transition-all duration-200 hover:bg-white/[0.06] hover:text-white"
+            aria-label="More"
+            className="group flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/60 transition-all duration-200 hover:bg-white/[0.06] hover:text-white sm:h-14 sm:w-14"
           >
-            <MoreHorizontal className="h-7 w-7" />
+            <MoreHorizontal className="h-5 w-5 sm:h-7 sm:w-7" />
           </button>
           {moreOpen && (
             <div className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 rounded-2xl border border-white/[0.06] bg-[#141410] p-1 shadow-lg">
@@ -123,9 +154,9 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
         <button
           onClick={onNewPostClick}
           aria-label="New Post"
-          className="ml-1 flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#c8a44d] text-[#0f0e0a] transition-all duration-200 hover:bg-[#c8a44d]/85 hover:shadow-lg hover:shadow-[#c8a44d]/20 active:scale-[0.98]"
+          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#c8a44d] text-[#0f0e0a] transition-all duration-200 hover:bg-[#c8a44d]/85 hover:shadow-lg hover:shadow-[#c8a44d]/20 active:scale-[0.98] sm:ml-1 sm:h-10 sm:w-10"
         >
-          <PenSquare className="h-[18px] w-[18px]" />
+          <PenSquare className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
         </button>
       </nav>
     </div>
@@ -146,7 +177,8 @@ function BottomNavItem({ item, isActive, onClick, onPreload }: { item: NavItem; 
       onMouseEnter={handlePreload}
       onFocus={handlePreload}
       onTouchStart={handlePreload}
-      className="group flex h-14 w-14 shrink-0 items-center justify-center rounded-full transition-all duration-200 hover:bg-white/[0.06]"
+      aria-label={item.label}
+      className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all duration-200 hover:bg-white/[0.06] sm:h-14 sm:w-14"
       {...(item.label === 'Me' ? { 'data-onboarding': 'me-nav' } : {})}
     >
       <NavIconImg item={item} isActive={isActive} size={32} />
@@ -170,9 +202,10 @@ function NavIconImg({ item, isActive, size }: { item: NavItem; isActive: boolean
       >
         <img
           src={src}
-          alt={item.label}
+          alt=""
+          decoding="async"
           className="h-full w-full object-contain"
-          style={{ transform, opacity: isActive ? 1 : 0.65 }}
+          style={{ transform, opacity: isActive ? 1 : 0.68 }}
         />
       </div>
       {showBadge && (

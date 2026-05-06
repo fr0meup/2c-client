@@ -18,23 +18,23 @@ export const navItems: NavItem[] = [
   {
     label: 'Notifications',
     path: '/notifications',
-    icon: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fnotifications_unselected.8aa44693.png&w=1080&q=75',
-    iconSelected: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fnotifications_selected.04f8df21.png&w=1080&q=75',
+    icon: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fnotifications_unselected.19d14a80.webp&w=1080&q=75',
+    iconSelected: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fnotifications_selected.474ec42b.webp&w=1080&q=75',
     scale: 1.15,
     offset: '-2px',
   },
   {
     label: 'Messages',
     path: '/messages',
-    icon: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Frooms_unselected.73dcc432.png&w=1080&q=75',
-    iconSelected: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Frooms_selected.dd05075f.png&w=1080&q=75',
+    icon: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Frooms-unselected.e6b03b15.webp&w=1080&q=75',
+    iconSelected: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Frooms-selected.80aa6aba.webp&w=1080&q=75',
     scale: 1.1,
   },
   {
     label: 'Leaderboard',
     path: '/leaderboard',
-    icon: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Frankings_unselected.d5e8e0c3.png&w=1080&q=75',
-    iconSelected: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Frankings_selected.a99a7ba0.png&w=1080&q=75',
+    icon: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Franking.f2b26d2a.png&w=1080&q=75',
+    iconSelected: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Franking_selected.8d67736b.png&w=1080&q=75',
     scale: 1.15,
   },
   {
@@ -54,8 +54,8 @@ export const navItems: NavItem[] = [
   {
     label: 'Me',
     path: '/user/me',
-    icon: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fprofile_unselected.2a7afa47.png&w=1080&q=75',
-    iconSelected: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fprofile_selected.b513207d.png&w=1080&q=75',
+    icon: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fprofile.e10844f4.png&w=1080&q=75',
+    iconSelected: 'https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fprofile_selected.99c4e5cf.png&w=1080&q=75',
     scale: 1.1,
   },
 ]

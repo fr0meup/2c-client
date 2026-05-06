@@ -27,11 +27,11 @@ export function ExploreModal({ onClose }: Props) {
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-end justify-center px-2 sm:items-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative flex max-h-[80vh] w-full flex-col overflow-hidden rounded-t-3xl border border-white/[0.08] bg-[#141410] shadow-2xl shadow-black/60 sm:max-w-md sm:rounded-3xl"
+        className="relative flex max-h-[calc(100svh-1rem)] w-full flex-col overflow-hidden rounded-t-3xl border border-white/[0.08] bg-[#141410] shadow-2xl shadow-black/60 sm:max-h-[80svh] sm:max-w-md sm:rounded-3xl"
       >
         <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
           <div className="flex items-center gap-2">

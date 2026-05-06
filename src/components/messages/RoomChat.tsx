@@ -88,6 +88,7 @@ export function RoomChat() {
   const { getRoom, getMessages, sendMessage, markRoomRead, setActiveRoom, isMessagesLoading, isLoading, activeRoomUuid } = useMessages()
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
   const [visibleCount, setVisibleCount] = useState(BATCH)
+  const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height ?? window.innerHeight)
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const messagesRef = useRef<HTMLDivElement>(null)
 
@@ -129,6 +130,27 @@ export function RoomChat() {
     body.style.overflow = 'hidden'
     body.style.height = '100vh'
     return () => { html.style.overflowY = prevHO; html.style.height = prevHH; body.style.overflow = prevBO; body.style.height = prevBH }
+  }, [])
+
+  useEffect(() => {
+    const viewport = window.visualViewport
+    function updateViewportHeight() {
+      setViewportHeight(viewport?.height ?? window.innerHeight)
+      requestAnimationFrame(() => {
+        const el = messagesRef.current
+        if (el) el.scrollTop = el.scrollHeight
+      })
+    }
+
+    updateViewportHeight()
+    viewport?.addEventListener('resize', updateViewportHeight)
+    viewport?.addEventListener('scroll', updateViewportHeight)
+    window.addEventListener('resize', updateViewportHeight)
+    return () => {
+      viewport?.removeEventListener('resize', updateViewportHeight)
+      viewport?.removeEventListener('scroll', updateViewportHeight)
+      window.removeEventListener('resize', updateViewportHeight)
+    }
   }, [])
 
   // Set active room so context fetches messages for this room
@@ -175,7 +197,7 @@ export function RoomChat() {
   }
 
   return (
-    <div className="flex justify-center px-4 sm:px-8" style={{ height: 'calc(100vh - 72px)' }}>
+    <div className="flex justify-center px-3 sm:px-8" style={{ height: `${Math.max(320, viewportHeight - 72)}px` }}>
       <div className="flex h-full w-full max-w-[670px] flex-col xl:-ml-[245px]">
         {/* Messages */}
         <div ref={messagesRef} onScroll={onScroll} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-4">

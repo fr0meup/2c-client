@@ -306,7 +306,7 @@ export function PostDetail() {
     <div className="flex flex-col">
       <div className="pb-4 pt-1.5">
         {/* Author info row */}
-        <div className="mt-1.5 flex items-center gap-2">
+        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 sm:flex-nowrap sm:gap-2">
           <NetworthPill
             networth={post.author_meta.balance}
             subscriptionType={post.author_meta.subscription_type}
@@ -314,22 +314,22 @@ export function PostDetail() {
             role={post.author_meta.role}
             size="small"
           />
-          <span className="text-sm text-white/40">{timeAgo(post.created_at)}</span>
+          <span className="text-xs text-white/40 sm:text-sm">{timeAgo(post.created_at)}</span>
           {post.topic && (
             <>
               <span className="text-sm text-white/40">·</span>
-              <span className="text-sm font-semibold text-[#c8a44d]">$/{post.topic.toLowerCase()}</span>
+              <span className="max-w-[9rem] truncate text-xs font-semibold text-[#c8a44d] sm:max-w-none sm:text-sm">$/{post.topic.toLowerCase()}</span>
               {isPicks && post.post_meta?.resolution_deadline && (
                 <>
                   <span className="text-sm text-white/40">·</span>
-                  <span className="text-[12px] font-medium text-white/40">
+                  <span className="text-[11px] font-medium text-white/40 sm:text-[12px]">
                     Resolves {new Date(post.post_meta.resolution_deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
                 </>
               )}
               <span className="text-sm text-white/40">·</span>
-              <span className="flex items-center gap-1 text-sm text-white/40">
-                <Eye className="h-3.5 w-3.5" />
+              <span className="flex items-center gap-0.5 text-xs text-white/40 sm:gap-1 sm:text-sm">
+                <Eye className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 {post.view_count}
               </span>
             </>

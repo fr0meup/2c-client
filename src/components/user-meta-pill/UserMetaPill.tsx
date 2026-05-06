@@ -68,7 +68,8 @@ export function UserMetaPill({
 
   return (
     <div
-      className={`flex ${sm ? 'h-[30px] text-[12px]' : 'h-[38px] text-sm'} min-w-0 items-center overflow-hidden whitespace-nowrap rounded-full border text-white/70 ${variant === 'comment' ? 'border-white/[0.08] bg-white/[0.04]' : 'border-[#c8a44d]/20 bg-gradient-to-r from-[#c8a44d]/[0.06] via-white/[0.04] to-[#c8a44d]/[0.06] shadow-[0_0_12px_rgba(218,178,87,0.05),inset_0_1px_0_rgba(255,255,255,0.1)]'} ${className}`}
+      className={`user-meta-pill flex ${sm ? 'h-[30px] text-[12px]' : 'h-[38px] text-sm'} min-w-0 items-center overflow-x-auto overflow-y-hidden whitespace-nowrap rounded-full border text-white/70 ${variant === 'comment' ? 'border-white/[0.08] bg-white/[0.04]' : 'border-[#c8a44d]/20 bg-gradient-to-r from-[#c8a44d]/[0.06] via-white/[0.04] to-[#c8a44d]/[0.06] shadow-[0_0_12px_rgba(218,178,87,0.05),inset_0_1px_0_rgba(255,255,255,0.1)]'} ${className}`}
+      style={{ scrollbarWidth: 'none' }}
     >
       {tierColors && (
         <>
@@ -92,7 +93,7 @@ export function UserMetaPill({
 
       {hasAlias && (
         <>
-          <span className={`min-w-0 shrink truncate bg-gradient-to-r from-[#c8a44d] to-[#c8a44d]/80 bg-clip-text ${sm ? 'px-2 py-1' : 'px-3 py-2'} font-medium text-transparent`}>
+          <span className={`shrink-0 bg-gradient-to-r from-[#c8a44d] to-[#c8a44d]/80 bg-clip-text ${sm ? 'px-2 py-1' : 'px-3 py-2'} font-medium text-transparent`}>
             {alias}
           </span>
           <Separator />
@@ -120,13 +121,13 @@ export function UserMetaPill({
 
       {hasArena && (
         <>
-          <span className={`flex min-w-0 shrink items-center gap-1 ${sm ? 'px-2 py-1' : 'px-3 py-2'}`}>
+          <span className={`flex shrink-0 items-center gap-1 ${sm ? 'px-2 py-1' : 'px-3 py-2'}`}>
             <img
               src="https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Flocation-icon.bbe094a7.png&w=48&q=75&dpl=dpl_57sq3a4okDe2tVXZVSYu9FCcDV21"
               alt=""
               className={`${sm ? 'h-3 w-3' : 'h-4 w-4'} shrink-0 opacity-60`}
             />
-            <span className="truncate">{arena}</span>
+            <span>{arena}</span>
           </span>
           <Separator />
         </>

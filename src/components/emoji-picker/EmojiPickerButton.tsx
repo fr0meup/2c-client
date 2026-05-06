@@ -82,7 +82,7 @@ export function EmojiPickerButton({
       </button>
 
       <div
-        className={`absolute right-0 z-50 ${
+        className={`emoji-picker-popover absolute right-0 z-50 ${
           open ? '' : 'invisible pointer-events-none'
         }`}
         style={
