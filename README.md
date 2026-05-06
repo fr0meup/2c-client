@@ -19,6 +19,7 @@ On top of that, a couple extras:
 - **Video Support** — inline video player with custom controls (play/pause, mute, progress bar, fullscreen).
 - **Custom GIFs** — save, favorite, and paste your own GIF URLs. They persist in localStorage and can be inserted into comments and messages.
 - **Block List** — actually see who you've blocked and unblock them from a proper list. The official app doesn't have this.
+- **Custom Location** — not stuck with the preset city list. Hit the `+` in the city picker (Profile → Edit City) and type any location you want.
 - **Appear Offline** — toggle an offline key in localStorage so the login ping doesn't fire. Ghost mode.
 - **Export / Import Data** — one-click backup of all your local data (drafts, saved GIFs, favorites, settings) to a JSON file. Import it on another device or after a wipe and you're right back where you were.
 - **Fresh Design** — completely rebuilt UI. Looks better. That's it.

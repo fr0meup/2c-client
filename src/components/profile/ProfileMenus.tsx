@@ -577,6 +577,7 @@ export function ProfileEditMenu({ user }: ProfileEditMenuProps) {
   return (
     <PopoverMenu
       triggerTitle="Edit profile"
+      onboardingId="edit-profile"
       trigger={<Pencil className="h-4 w-4" strokeWidth={2.2} />}
     >
       {() => <EditMenuContent user={user} />}
@@ -664,7 +665,7 @@ function EditMenuContent({ user }: { user?: ApiUserProfile }) {
         <span className="flex-1 text-left">Bio</span>
         <span className="max-w-[100px] truncate text-xs text-white/30">{currentBio || '—'}</span>
       </button>
-      <button onClick={() => setEditing('city')} className={MENU_ITEM}>
+      <button onClick={() => setEditing('city')} className={MENU_ITEM} data-onboarding="edit-city">
         <MapPin className="h-4 w-4 text-white/50" strokeWidth={2.2} />
         <span className="flex-1 text-left">City</span>
         <span className="text-xs text-white/30">{currentArena || '—'}</span>
@@ -843,6 +844,7 @@ function CityEditor({ initial, saving, onBack, onSave }: { initial: string; savi
             <button
               onClick={() => setCustomMode(true)}
               title="Custom location"
+              data-onboarding="custom-location"
               className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md text-[#c8a44d]/60 transition-colors hover:bg-[#c8a44d]/10 hover:text-[#c8a44d]"
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />

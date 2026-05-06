@@ -20,6 +20,14 @@ interface Step {
   clickThrough?: boolean
   waitFor?: string
   interimSelector?: string
+  // If true, do NOT dispatch a body mousedown when leaving this step.
+  // Used for chained steps inside the same popover (e.g. edit-profile → edit-city → custom-location)
+  // so the popover stays open across the chain.
+  keepOpen?: boolean
+  // If true, listen to the natural 'click' event instead of 'mousedown' and do NOT synthesize
+  // a click. Use this for toggle buttons (e.g. popover triggers) where a synthesized click + the
+  // user's real click would double-toggle the state.
+  naturalClick?: boolean
 }
 
 const STEPS: Step[] = [
@@ -135,6 +143,37 @@ const STEPS: Step[] = [
     position: 'top',
     accent: '#c8a44d',
     action: true,
+  },
+  // ── Custom Location flow ──
+  {
+    selector: 'edit-profile',
+    title: 'Edit Profile',
+    description: 'Click the pencil icon to open the edit profile menu \u2014 we\u2019ll show off the custom location feature.',
+    position: 'bottom',
+    accent: '#c8a44d',
+    waitFor: 'edit-profile',
+    action: true,
+    keepOpen: true,
+    naturalClick: true,
+  },
+  {
+    selector: 'edit-city',
+    title: 'City',
+    description: 'Click the City row to open the location picker.',
+    position: 'right',
+    accent: '#c8a44d',
+    waitFor: 'edit-city',
+    action: true,
+    keepOpen: true,
+    naturalClick: true,
+  },
+  {
+    selector: 'custom-location',
+    title: 'Custom Location',
+    description: 'Not stuck with the preset city list. Hit the \u201C+\u201D inside the search box to type any location you want (e.g. \u201CTokyo, Japan\u201D or \u201CMars\u201D).',
+    position: 'right',
+    accent: '#c8a44d',
+    waitFor: 'custom-location',
   },
   {
     selector: 'settings',
@@ -310,18 +349,22 @@ export function OnboardingTutorial() {
     if (!current?.action) return
     const el = getTargetEl(current.selector)
     if (!el) return
+    const useNatural = !!current.naturalClick
+    const eventName = useNatural ? 'click' : 'mousedown'
     function handleInteraction() {
-      // Fire a synthetic click so onClick handlers (e.g. close-compose) trigger
-      // immediately — before the step changes and click blockers shift away
-      el?.click()
+      if (!useNatural) {
+        // Fire a synthetic click so onClick handlers (e.g. close-compose) trigger
+        // immediately — before the step changes and click blockers shift away
+        el?.click()
+      }
       // Compose needs more time so the click event fires and the modal opens
       const delay = current.selector === 'compose' ? 200 : 50
       setTimeout(() => {
         goToStep(Math.min(step + 1, STEPS.length - 1))
       }, delay)
     }
-    el.addEventListener('mousedown', handleInteraction, { once: true })
-    return () => el.removeEventListener('mousedown', handleInteraction)
+    el.addEventListener(eventName, handleInteraction, { once: true })
+    return () => el.removeEventListener(eventName, handleInteraction)
   }, [visible, step, waiting, goToStep])
 
   // ── Dismiss open popovers (e.g. settings menu) when leaving an action step ──
@@ -331,7 +374,7 @@ export function OnboardingTutorial() {
     prevStepRef.current = step
     if (!visible || prev === step) return
     const prevDef = STEPS[prev]
-    if (prevDef?.action || prevDef?.clickThrough) {
+    if ((prevDef?.action || prevDef?.clickThrough) && !prevDef?.keepOpen) {
       // Dispatch a mousedown on body so PopoverMenu's outside-click handler closes it
       document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
     }
@@ -467,20 +510,20 @@ export function OnboardingTutorial() {
         style={{ zIndex: 230 }}
       >
         {waiting ? (
-          <div className="pointer-events-auto fixed inset-0" onMouseDown={(e) => e.preventDefault()} />
+          <div className="pointer-events-auto fixed inset-0" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }} onClick={(e) => { e.preventDefault(); e.stopPropagation() }} />
         ) : allowClick && spotlight ? (
           <>
             {/* Top */}
-            <div className="pointer-events-auto fixed left-0 right-0 top-0" style={{ height: Math.max(0, spotlight.top - PAD) }} onMouseDown={(e) => e.preventDefault()} />
+            <div className="pointer-events-auto fixed left-0 right-0 top-0" style={{ height: Math.max(0, spotlight.top - PAD) }} onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }} onClick={(e) => { e.preventDefault(); e.stopPropagation() }} />
             {/* Bottom */}
-            <div className="pointer-events-auto fixed bottom-0 left-0 right-0" style={{ top: spotlight.top + spotlight.height + PAD }} onMouseDown={(e) => e.preventDefault()} />
+            <div className="pointer-events-auto fixed bottom-0 left-0 right-0" style={{ top: spotlight.top + spotlight.height + PAD }} onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }} onClick={(e) => { e.preventDefault(); e.stopPropagation() }} />
             {/* Left */}
-            <div className="pointer-events-auto fixed left-0" style={{ top: spotlight.top - PAD, height: spotlight.height + PAD * 2, width: Math.max(0, spotlight.left - PAD) }} onMouseDown={(e) => e.preventDefault()} />
+            <div className="pointer-events-auto fixed left-0" style={{ top: spotlight.top - PAD, height: spotlight.height + PAD * 2, width: Math.max(0, spotlight.left - PAD) }} onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }} onClick={(e) => { e.preventDefault(); e.stopPropagation() }} />
             {/* Right */}
-            <div className="pointer-events-auto fixed right-0" style={{ top: spotlight.top - PAD, height: spotlight.height + PAD * 2, left: spotlight.left + spotlight.width + PAD }} onMouseDown={(e) => e.preventDefault()} />
+            <div className="pointer-events-auto fixed right-0" style={{ top: spotlight.top - PAD, height: spotlight.height + PAD * 2, left: spotlight.left + spotlight.width + PAD }} onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }} onClick={(e) => { e.preventDefault(); e.stopPropagation() }} />
           </>
         ) : (
-          <div className="pointer-events-auto fixed inset-0" onMouseDown={(e) => e.preventDefault()} />
+          <div className="pointer-events-auto fixed inset-0" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }} onClick={(e) => { e.preventDefault(); e.stopPropagation() }} />
         )}
       </div>
 
@@ -488,7 +531,8 @@ export function OnboardingTutorial() {
       <div
         ref={tooltipRef}
         className={cn(
-          'w-[340px] max-w-[calc(100vw-32px)]',
+          current.selector === '__export_reminder__' ? 'w-[440px]' : 'w-[340px]',
+          'max-w-[calc(100vw-32px)]',
           (waiting || !tooltipVisible || exiting) ? 'pointer-events-none' : 'pointer-events-auto',
         )}
         style={{ zIndex: 240, ...tooltipStyle, opacity: (tooltipVisible && !exiting) ? 1 : 0 }}
