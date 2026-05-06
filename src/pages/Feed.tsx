@@ -25,7 +25,8 @@ export function Feed() {
   const dateTo = searchParams.get('date_to')
   const hasAdv = searchParams.has('adv')
   const isDateFiltering = !!(dateFrom || dateTo)
-  const [resultSort, setResultSort] = useState<'newest' | 'oldest' | 'most_upvoted' | 'least_upvoted'>('newest')
+  const scanKey = `${dateFrom ?? ''}|${dateTo ?? ''}|${searchParams.get('adv_topic') ?? ''}`
+  const [resultSort, setResultSort] = useState<'newest' | 'oldest' | 'most_upvoted' | 'least_upvoted' | 'most_commented' | 'least_commented'>('newest')
   const [sortOpen, setSortOpen] = useState(false)
   const sortRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -43,13 +44,17 @@ export function Feed() {
   const [bulkRefreshKey, setBulkRefreshKey] = useState(location.search)
   const [pendingFeedNav, setPendingFeedNav] = useState<{ search: string; run: number } | null>(null)
   const prevSearch = useRef(location.search)
+  const prevScanKey = useRef(scanKey)
   useEffect(() => {
     if (prevSearch.current !== location.search) {
       setSearchTriggered(true)
-      setBulkRefreshKey(location.search)
+      if (prevScanKey.current !== scanKey) {
+        setBulkRefreshKey(scanKey)
+        prevScanKey.current = scanKey
+      }
       prevSearch.current = location.search
     }
-  }, [location.search])
+  }, [location.search, scanKey])
 
   // Server-side: only topic + search query. Everything else is client-side filtered.
   const advTopic = searchParams.get('adv_topic') || undefined
@@ -193,6 +198,12 @@ export function Feed() {
       case 'least_upvoted':
         nextPosts.sort((a, b) => a.upvote_count - b.upvote_count)
         break
+      case 'most_commented':
+        nextPosts.sort((a, b) => b.comment_count - a.comment_count)
+        break
+      case 'least_commented':
+        nextPosts.sort((a, b) => a.comment_count - b.comment_count)
+        break
       default: // newest
         nextPosts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         break
@@ -306,12 +317,12 @@ export function Feed() {
                           : 'border-white/[0.08] bg-white/[0.03] text-white/40 hover:border-white/[0.12] hover:text-white/60'
                       )}
                     >
-                      {({ newest: 'Newest', oldest: 'Oldest', most_upvoted: 'Most Upvoted', least_upvoted: 'Least Upvoted' } as const)[resultSort]}
+                      {({ newest: 'Newest', oldest: 'Oldest', most_upvoted: 'Most Upvoted', least_upvoted: 'Least Upvoted', most_commented: 'Most Commented', least_commented: 'Least Commented' } as const)[resultSort]}
                       <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={cn('transition-transform', sortOpen && 'rotate-180')}><path d="m6 9 6 6 6-6"/></svg>
                     </button>
                     {sortOpen && (
                       <div className="absolute right-0 top-full z-50 mt-1 min-w-[9rem] rounded-lg border border-white/[0.06] bg-[#141410] py-1 shadow-lg">
-                        {([['newest', 'Newest'], ['oldest', 'Oldest'], ['most_upvoted', 'Most Upvoted'], ['least_upvoted', 'Least Upvoted']] as const).map(([val, label]) => (
+                        {([['newest', 'Newest'], ['oldest', 'Oldest'], ['most_upvoted', 'Most Upvoted'], ['least_upvoted', 'Least Upvoted'], ['most_commented', 'Most Commented'], ['least_commented', 'Least Commented']] as const).map(([val, label]) => (
                           <button
                             key={val}
                             onClick={() => { setResultSort(val); setSortOpen(false) }}
