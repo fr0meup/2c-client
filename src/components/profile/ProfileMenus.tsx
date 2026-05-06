@@ -29,6 +29,7 @@ import {
   UserPlus,
   Calendar,
   Link2,
+  Plus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCities } from '@/hooks/useCities'
@@ -730,9 +731,13 @@ function CityEditor({ initial, saving, onBack, onSave }: { initial: string; savi
     return parts.length === 2 ? parts[1] : null
   })
   const [search, setSearch] = useState('')
+  const [customMode, setCustomMode] = useState(false)
+  const [customValue, setCustomValue] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
+  const customRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { searchRef.current?.focus() }, [selectedRegion])
+  useEffect(() => { if (customMode) customRef.current?.focus() }, [customMode])
 
   const cities = data?.cities ?? {}
   const regions = Object.keys(cities).sort()
@@ -743,6 +748,36 @@ function CityEditor({ initial, saving, onBack, onSave }: { initial: string; savi
         return cities[r].some((c) => c.toLowerCase().includes(search.toLowerCase()))
       })
     : regions
+
+  if (customMode) {
+    return (
+      <div className="flex w-[240px] flex-col gap-2 p-2">
+        <button onClick={() => setCustomMode(false)} className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white">
+          <ChevronLeft className="h-3.5 w-3.5" strokeWidth={2.2} />
+          <span>Custom Location</span>
+        </button>
+        <input
+          ref={customRef}
+          value={customValue}
+          onChange={(e) => setCustomValue(e.target.value)}
+          maxLength={100}
+          placeholder="e.g. Tokyo, Japan"
+          className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white/90 placeholder-white/30 outline-none focus:border-[#c8a44d]/40"
+        />
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-white/25">{customValue.length}/100</span>
+          <button
+            onClick={() => { if (customValue.trim()) onSave(customValue.trim()) }}
+            disabled={saving || !customValue.trim()}
+            className="flex items-center gap-1.5 rounded-lg bg-[#c8a44d]/20 px-3 py-1.5 text-xs font-semibold text-[#c8a44d] transition-colors hover:bg-[#c8a44d]/30 disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" strokeWidth={2.5} />}
+            Save
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (selectedRegion && cities[selectedRegion]) {
     const regionCities = cities[selectedRegion]
@@ -763,7 +798,7 @@ function CityEditor({ initial, saving, onBack, onSave }: { initial: string; savi
           placeholder="Search cities…"
           className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs text-white/90 placeholder-white/30 outline-none focus:border-[#c8a44d]/40"
         />
-        <div className="max-h-[200px] overflow-y-auto">
+        <div className="max-h-[200px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#333330 transparent' }}>
           {filteredCities.map((city) => {
             const arena = `${city}, ${selectedRegion}`
             const isActive = arena === initial
@@ -797,14 +832,23 @@ function CityEditor({ initial, saving, onBack, onSave }: { initial: string; savi
         </div>
       ) : (
         <>
-          <input
-            ref={searchRef}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search regions…"
-            className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs text-white/90 placeholder-white/30 outline-none focus:border-[#c8a44d]/40"
-          />
-          <div className="max-h-[250px] overflow-y-auto">
+          <div className="relative">
+            <input
+              ref={searchRef}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search regions…"
+              className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 pr-8 text-xs text-white/90 placeholder-white/30 outline-none focus:border-[#c8a44d]/40"
+            />
+            <button
+              onClick={() => setCustomMode(true)}
+              title="Custom location"
+              className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md text-[#c8a44d]/60 transition-colors hover:bg-[#c8a44d]/10 hover:text-[#c8a44d]"
+            >
+              <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+            </button>
+          </div>
+          <div className="max-h-[250px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#333330 transparent' }}>
             {filteredRegions.map((region) => (
               <button
                 key={region}
