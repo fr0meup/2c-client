@@ -65,16 +65,20 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
-const SCROLL_CACHE_KEY = '__feed_scroll_y'
+const SCROLL_CACHE_KEY = '__scroll_y'
+const SCROLL_PATH_KEY = '__scroll_path'
 
 export function saveScrollPosition() {
   sessionStorage.setItem(SCROLL_CACHE_KEY, String(document.body.scrollTop))
+  sessionStorage.setItem(SCROLL_PATH_KEY, window.location.pathname)
 }
 
-function consumeScrollPosition(): number | null {
+function consumeScrollPosition(targetPath: string): number | null {
+  const savedPath = sessionStorage.getItem(SCROLL_PATH_KEY)
   const raw = sessionStorage.getItem(SCROLL_CACHE_KEY)
-  if (raw == null) return null
   sessionStorage.removeItem(SCROLL_CACHE_KEY)
+  sessionStorage.removeItem(SCROLL_PATH_KEY)
+  if (raw == null || savedPath !== targetPath) return null
   return Number(raw)
 }
 
@@ -88,9 +92,9 @@ function ScrollToTop() {
     const prev = prevPath.current
     prevPath.current = pathname
 
-    // Navigating back FROM post detail → restore cached position
+    // Navigating back FROM post detail → restore cached position only if returning to the original page
     if (prev.startsWith('/post/') && !pathname.startsWith('/post/')) {
-      const saved = consumeScrollPosition()
+      const saved = consumeScrollPosition(pathname)
       if (saved != null) {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
