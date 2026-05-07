@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, useEffect, type ReactNode } from 'react'
+import { Component, Suspense, lazy, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import { routeLoaders } from './lib/routePreload'
@@ -65,9 +65,45 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
+const SCROLL_CACHE_KEY = '__feed_scroll_y'
+
+export function saveScrollPosition() {
+  sessionStorage.setItem(SCROLL_CACHE_KEY, String(document.body.scrollTop))
+}
+
+function consumeScrollPosition(): number | null {
+  const raw = sessionStorage.getItem(SCROLL_CACHE_KEY)
+  if (raw == null) return null
+  sessionStorage.removeItem(SCROLL_CACHE_KEY)
+  return Number(raw)
+}
+
 function ScrollToTop() {
   const { pathname } = useLocation()
-  useEffect(() => { window.scrollTo(0, 0) }, [pathname])
+  const prevPath = useRef(pathname)
+
+  useEffect(() => { window.history.scrollRestoration = 'manual' }, [])
+
+  useLayoutEffect(() => {
+    const prev = prevPath.current
+    prevPath.current = pathname
+
+    // Navigating back FROM post detail → restore cached position
+    if (prev.startsWith('/post/') && !pathname.startsWith('/post/')) {
+      const saved = consumeScrollPosition()
+      if (saved != null) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            document.body.scrollTop = saved
+          })
+        })
+        return
+      }
+    }
+
+    document.body.scrollTop = 0
+  }, [pathname])
+
   return null
 }
 

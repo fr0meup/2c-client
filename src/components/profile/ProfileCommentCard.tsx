@@ -7,6 +7,8 @@ import { useFollow } from './FollowContext'
 import { useVoteComment } from '@/hooks/useVotes'
 import type { Comment } from '@/lib/types'
 import { saveGif, removeGif, isGifSaved } from '@/lib/gif'
+import { saveScrollPosition } from '@/App'
+import { announceNavigationPending } from '@/lib/navigationPending'
 
 function GifWithStar({ url }: { url: string }) {
   const [saved, setSaved] = useState(() => isGifSaved(url))
@@ -76,7 +78,7 @@ export function ProfileCommentCard({ comment, postTitle, initialVote = 0 }: Prop
 
   return (
     <div
-      onClick={() => navigate(`/post/${comment.post_uuid}`)}
+      onClick={() => { saveScrollPosition(); announceNavigationPending(`/post/${comment.post_uuid}`); navigate(`/post/${comment.post_uuid}#comment-${comment.uuid}`) }}
       className="flex w-full cursor-pointer flex-col gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3.5 text-left transition-colors hover:bg-white/[0.04]"
     >
       {/* Post context */}

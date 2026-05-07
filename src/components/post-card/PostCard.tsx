@@ -17,6 +17,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { usePrefetch } from '@/hooks/usePrefetch'
 import { preloadRoute } from '@/lib/routePreload'
 import { announceNavigationPending } from '@/lib/navigationPending'
+import { saveScrollPosition } from '@/App'
 import { PollCard } from './PollCard'
 import { LikertScale } from './LikertScale'
 import { PicksCard } from './PicksCard'
@@ -172,7 +173,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
   return (
     <>
       <article
-        onClick={() => { announceNavigationPending(`/post/${post.uuid}`); navigate(`/post/${post.uuid}`) }}
+        onClick={() => { saveScrollPosition(); announceNavigationPending(`/post/${post.uuid}`); navigate(`/post/${post.uuid}`) }}
         onMouseEnter={() => { preloadRoute('post'); prefetchPost(post.uuid); prefetchComments(post.uuid) }}
         className="cursor-pointer rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 transition-colors hover:bg-white/[0.05] sm:p-4"
       >
