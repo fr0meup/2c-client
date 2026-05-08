@@ -69,45 +69,76 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 const SCROLL_CACHE_KEY = '__scroll_y'
 const SCROLL_PATH_KEY = '__scroll_path'
 
+function currentScrollPath() {
+  return `${window.location.pathname}${window.location.search}`
+}
+
+function getPageScrollTop() {
+  return Math.max(
+    window.scrollY,
+    document.documentElement.scrollTop,
+    document.body.scrollTop,
+  )
+}
+
+function setPageScrollTop(y: number) {
+  document.documentElement.scrollTop = y
+  document.body.scrollTop = y
+  window.scrollTo(0, y)
+}
+
 export function saveScrollPosition() {
-  sessionStorage.setItem(SCROLL_CACHE_KEY, String(document.body.scrollTop))
-  sessionStorage.setItem(SCROLL_PATH_KEY, window.location.pathname)
+  sessionStorage.setItem(SCROLL_CACHE_KEY, String(getPageScrollTop()))
+  sessionStorage.setItem(SCROLL_PATH_KEY, currentScrollPath())
 }
 
 function consumeScrollPosition(targetPath: string): number | null {
   const savedPath = sessionStorage.getItem(SCROLL_PATH_KEY)
   const raw = sessionStorage.getItem(SCROLL_CACHE_KEY)
+  if (raw == null || savedPath !== targetPath) return null
   sessionStorage.removeItem(SCROLL_CACHE_KEY)
   sessionStorage.removeItem(SCROLL_PATH_KEY)
-  if (raw == null || savedPath !== targetPath) return null
   return Number(raw)
 }
 
+function restoreScrollPosition(y: number) {
+  let attempts = 0
+  let frame = 0
+
+  const restore = () => {
+    attempts += 1
+    setPageScrollTop(y)
+    const maxScroll = Math.max(0, document.body.scrollHeight - window.innerHeight)
+    if (getPageScrollTop() < y && maxScroll < y && attempts < 20) {
+      frame = requestAnimationFrame(restore)
+    }
+  }
+
+  frame = requestAnimationFrame(restore)
+  return () => cancelAnimationFrame(frame)
+}
+
 function ScrollToTop() {
-  const { pathname } = useLocation()
-  const prevPath = useRef(pathname)
+  const { pathname, search } = useLocation()
+  const currentPath = `${pathname}${search}`
+  const prevPath = useRef(currentPath)
 
   useEffect(() => { window.history.scrollRestoration = 'manual' }, [])
 
   useLayoutEffect(() => {
     const prev = prevPath.current
-    prevPath.current = pathname
+    prevPath.current = currentPath
 
     // Navigating back FROM post detail → restore cached position only if returning to the original page
     if (prev.startsWith('/post/') && !pathname.startsWith('/post/')) {
-      const saved = consumeScrollPosition(pathname)
+      const saved = consumeScrollPosition(currentPath)
       if (saved != null) {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            document.body.scrollTop = saved
-          })
-        })
-        return
+        return restoreScrollPosition(saved)
       }
     }
 
-    document.body.scrollTop = 0
-  }, [pathname])
+    setPageScrollTop(0)
+  }, [currentPath, pathname])
 
   return null
 }
