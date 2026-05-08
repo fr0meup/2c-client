@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">2C Client</string>
-    <string name="title_activity_main">2C Client</string>
-    <string name="package_name">money.twocents.client</string>
-    <string name="custom_url_scheme">money.twocents.client</string>
-</resources>

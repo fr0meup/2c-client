@@ -1,9 +1,0 @@
-node_modules/
-dist/
-android-sdk/
-cmdline-tools-tmp/
-commandlinetools-win-latest.zip
-
-android/.gradle/
-android/local.properties
-android/**/build/
