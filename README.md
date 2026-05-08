@@ -22,6 +22,7 @@ On top of that, a couple extras:
 - **Custom Location** — not stuck with the preset city list. Hit the `+` in the city picker (Profile → Edit City) and type any location you want.
 - **Appear Offline** — toggle an offline key in localStorage so the login ping doesn't fire. Ghost mode.
 - **Export / Import Data** — one-click backup of all your local data (drafts, saved GIFs, favorites, settings) to a JSON file. Import it on another device or after a wipe and you're right back where you were.
+- **Group Chats** — create group chats (fake-DM workaround since the real API doesn't expose room creation). Click the `+` button on the messages page to create one. Invite others via the link icon in the room header — copy either the invite link (works in this client) or a console script they can paste on twocents.money to auto-join.
 - **Fresh Design** — completely rebuilt UI. Looks better. That's it.
 
 ## ⚠️ EXPORT YOUR DATA

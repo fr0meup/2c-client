@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Compass, MessageSquare } from 'lucide-react'
+import { Compass, MessageSquare, Plus, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Hash, Lock, Users } from 'lucide-react'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
@@ -22,16 +22,45 @@ export function Messages() {
 
 export function MessagesListHeader() {
   const [exploreOpen, setExploreOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const { createGroupChat } = useMessages()
+  const navigate = useNavigate()
+
+  const handleCreateGroup = async () => {
+    if (creating) return
+    setCreating(true)
+    try {
+      const roomUuid = await createGroupChat()
+      announceNavigationPending(`/room/${roomUuid}`)
+      navigate(`/room/${roomUuid}`)
+    } catch (e) {
+      console.error('Failed to create group chat:', e)
+    } finally {
+      setCreating(false)
+    }
+  }
 
   return (
     <>
-      <div className="flex h-10 items-center justify-center">
+      <div className="flex h-10 items-center justify-center gap-2">
         <button
           onClick={() => setExploreOpen(true)}
           className="group flex h-10 cursor-pointer items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.06] px-4 text-sm font-medium text-white/75 transition-all hover:border-[#c8a44d]/30 hover:bg-gradient-to-b hover:from-[#c8a44d]/[0.1] hover:to-[#c8a44d]/[0.04] hover:text-[#c8a44d] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
         >
           <Compass className="h-3.5 w-3.5 transition-transform duration-300 group-hover:rotate-[20deg]" strokeWidth={2.4} />
           <span>Explore rooms</span>
+        </button>
+        <button
+          onClick={handleCreateGroup}
+          disabled={creating}
+          className="group flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.06] text-white/75 transition-all hover:border-[#c8a44d]/30 hover:bg-gradient-to-b hover:from-[#c8a44d]/[0.1] hover:to-[#c8a44d]/[0.04] hover:text-[#c8a44d] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] disabled:opacity-50"
+          title="Create group chat"
+        >
+          {creating ? (
+            <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.4} />
+          ) : (
+            <Plus className="h-4 w-4 transition-transform duration-200 group-hover:rotate-90" strokeWidth={2.4} />
+          )}
         </button>
       </div>
 

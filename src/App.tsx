@@ -9,6 +9,7 @@ const Feed = lazy(routeLoaders.feed)
 const Notifications = lazy(routeLoaders.notifications)
 const Messages = lazy(routeLoaders.messages)
 const Room = lazy(routeLoaders.room)
+const JoinRoom = lazy(routeLoaders.joinRoom)
 const Leaderboard = lazy(routeLoaders.leaderboard)
 const Bookmarks = lazy(routeLoaders.bookmarks)
 const Profile = lazy(routeLoaders.profile)
@@ -139,6 +140,7 @@ function App() {
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/messages" element={<Messages />} />
                 <Route path="/room/:uuid" element={<Room />} />
+                <Route path="/join/:roomUuid/:roomCode" element={<JoinRoom />} />
                 <Route path="/leaderboard" element={<Leaderboard />} />
                 <Route path="/bookmarks" element={<Bookmarks />} />
                 <Route path="/transactions" element={<Transactions />} />

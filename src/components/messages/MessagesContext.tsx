@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useUserRooms, useUserDMs, useExploreRooms, useRoomMessages, useJoinRoom } from '@/hooks/useRooms'
+import { rpc } from '@/lib/api'
 import { OFFLINE_KEY, useAuth } from '@/lib/auth'
 import type { ApiRoom, ApiMessage, ApiReaction, GetMessagesResponse, GetRoomResponse, ListRoomsResponse } from '@/lib/types'
 import type { ChatMessage, Room, RoomMember } from './types'
@@ -23,6 +24,8 @@ interface MessagesContextValue {
   markRoomRead: (uuid: string) => void
   joinRoom: (uuid: string) => void
   joinedRooms: Set<string>
+  /** Create a fake-DM-based group chat, send "start" msg, return roomUuid */
+  createGroupChat: () => Promise<string>
   /** Set active room to trigger message fetching */
   activeRoomUuid: string | null
   setActiveRoom: (uuid: string | null) => void
@@ -119,6 +122,7 @@ export function mapRoom(r: ApiRoom, currentUserUuid?: string): Room {
     },
     unread_count: r.missedMessages,
     muted: r.mute,
+    room_code: r.room_code ?? undefined,
     requirements: r.requirements.map((req) => ({
       uuid: req.uuid,
       label: req.humanReadableRequirement,
@@ -375,6 +379,67 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     }
   }, [auth, activeRoomUuid, queryClient, socketSend])
 
+  const createGroupChat = useCallback(async () => {
+    if (!auth) throw new Error('Not authenticated')
+
+    const fakeUuid = crypto.randomUUID()
+    const suffix = fakeUuid.slice(0, 8)
+    const roomCode = `gc-${suffix}`
+
+    // 1. Create room shell via startDM with fake UUID
+    const created = await rpc<{ room?: { uuid: string }; roomUuid?: string; uuid?: string }>(
+      '/v1/rooms/startDM',
+      { recipientUuid: fakeUuid },
+      auth.token,
+      auth.userUuid,
+    )
+    const roomUuid = created?.room?.uuid ?? created?.roomUuid ?? created?.uuid
+    if (!roomUuid) throw new Error('No room UUID returned from startDM')
+
+    // 2. Add name, description, and room code
+    await rpc(
+      '/v1/rooms/updateRoom',
+      {
+        roomUuid,
+        name: `Group ${suffix}`,
+        description: `Group chat ${suffix}`,
+        roomCode,
+        room_code: roomCode,
+      },
+      auth.token,
+      auth.userUuid,
+    )
+
+    // 3. Send "start" message via WebSocket to register the DM row
+    socketSend({ action: 'joinRoom', roomUuid })
+    // Small delay to let the WS joinRoom propagate
+    await new Promise((r) => setTimeout(r, 300))
+    socketSend({ action: 'sendMessage', roomUuid, text: 'start' })
+
+    // 4. Fetch the fully-updated room and seed caches
+    const [roomData, messagesData] = await Promise.all([
+      rpc<GetRoomResponse>('/v1/rooms/getRoom', { roomUuid }, auth.token, auth.userUuid),
+      rpc<GetMessagesResponse>('/v1/rooms/getMessages', { roomUuid, offset: 0, limit: 500 }, auth.token, auth.userUuid),
+    ])
+
+    queryClient.setQueryData<ListRoomsResponse>(['rooms', 'dms'], (prev) => {
+      const apiRoom = roomData.room
+      if (!prev) return { rooms: [apiRoom] }
+      if (prev.rooms.some((r) => r.uuid === apiRoom.uuid)) return prev
+      return { rooms: [apiRoom, ...prev.rooms] }
+    })
+    queryClient.setQueryData(['rooms', 'detail', roomUuid], roomData)
+    queryClient.setQueryData(['rooms', 'messages', roomUuid], messagesData)
+
+    // Refresh lists in background
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ['rooms', 'dms'] })
+      queryClient.invalidateQueries({ queryKey: ['rooms', 'user'] })
+    }, 2000)
+
+    return roomUuid
+  }, [auth, queryClient, socketSend])
+
   const markRoomRead = useCallback(() => {
     // The API doesn't have a dedicated "mark room read" endpoint —
     // missed messages are tracked server-side by reading messages.
@@ -419,12 +484,13 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       toggleReaction,
       markRoomRead,
       joinRoom,
+      createGroupChat,
       joinedRooms: allJoinedRooms,
       activeRoomUuid,
       setActiveRoom,
       isMessagesLoading: messagesLoading,
     }
-  }, [rooms, dms, publicRooms, isLoading, getRoom, getMessages, sendMessage, toggleReaction, markRoomRead, joinRoom, allJoinedRooms, activeRoomUuid, messagesLoading])
+  }, [rooms, dms, publicRooms, isLoading, getRoom, getMessages, sendMessage, toggleReaction, markRoomRead, joinRoom, createGroupChat, allJoinedRooms, activeRoomUuid, messagesLoading])
 
   return <MessagesContext.Provider value={value}>{children}</MessagesContext.Provider>
 }

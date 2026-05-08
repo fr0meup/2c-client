@@ -37,6 +37,7 @@ export interface Room {
   unread_count: number
   muted: boolean
   requirements?: RoomRequirement[]
+  room_code?: string
 }
 
 export interface MessageAuthorMeta {

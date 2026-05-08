@@ -5,6 +5,7 @@ export const routeLoaders = {
   notifications: () => import('@/components/notifications/NotificationsFeed').then((m) => ({ default: m.Notifications })),
   messages: () => import('@/components/messages/MessagesList').then((m) => ({ default: m.Messages })),
   room: () => import('@/components/messages/RoomChat').then((m) => ({ default: m.Room })),
+  joinRoom: () => import('@/components/messages/JoinRoom').then((m) => ({ default: m.JoinRoom })),
   leaderboard: () => import('@/components/leaderboard/LeaderboardPage').then((m) => ({ default: m.Leaderboard })),
   bookmarks: () => import('@/pages/Bookmarks').then((m) => ({ default: m.Bookmarks })),
   profile: () => import('@/components/profile/UserProfile').then((m) => ({ default: m.UserProfile })),
@@ -37,6 +38,7 @@ export function routeForPath(path: string) {
   if (path === '/notifications') return 'notifications'
   if (path === '/messages') return 'messages'
   if (path.startsWith('/room/')) return 'room'
+  if (path.startsWith('/join/')) return 'joinRoom'
   if (path === '/leaderboard') return 'leaderboard'
   if (path === '/bookmarks') return 'bookmarks'
   if (path.startsWith('/user/')) return 'profile'
