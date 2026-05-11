@@ -10,6 +10,7 @@ import type { ChatMessage, Room, RoomMember } from './types'
 const WS_BASE = 'wss://ds3y2js2k0.execute-api.us-east-2.amazonaws.com/ws/'
 const RECONNECT_DELAY = 2_000
 const MAX_RECONNECT_DELAY = 30_000
+const GIF_REGEX = /(https?:\/\/\S+\.gif(?:\?\S*)?)/gi
 
 interface MessagesContextValue {
   rooms: Room[]
@@ -150,6 +151,10 @@ function mapMessages(messages: ApiMessage[], reactions: ApiReaction[], currentUs
       room_uuid: m.room_uuid,
       author_uuid: m.author_uuid,
       text: m.text,
+      message_meta: {
+        giphy_id: typeof m.message_meta?.giphy_id === 'string' ? m.message_meta.giphy_id : undefined,
+        giphy_url: typeof m.message_meta?.giphy_url === 'string' ? m.message_meta.giphy_url : undefined,
+      },
       created_at: m.created_at,
       reply_to_uuid: m.reply_to_message_uuid ?? undefined,
       reply_preview: m.replyMessageText ?? undefined,
@@ -310,18 +315,20 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   const sendMessage = useCallback((roomUuid: string, text: string, replyToUuid?: string) => {
     const trimmed = text.trim()
     if (!trimmed || !auth) return false
+    const gifUrl = trimmed.match(GIF_REGEX)?.[0]
+    const messageText = trimmed
+    const messageMeta = gifUrl ? { giphy_url: gifUrl, giphy_id: gifUrl } : {}
 
-    // Optimistic update: add message to cache
     const newMsg: ApiMessage = {
       uuid: `local-${Date.now()}`,
       room_uuid: roomUuid,
       author_uuid: auth.userUuid,
-      text: trimmed,
+      text: messageText,
       created_at: new Date().toISOString(),
       role: 'user',
       reply_to_message_uuid: replyToUuid ?? null,
       author_meta: { age: 0, gender: '', balance: 0, arena: '', subscription_type: 0 },
-      message_meta: {},
+      message_meta: messageMeta,
       deleted_at: null,
       replyMessageText: null,
       isBookmarked: false,
@@ -332,13 +339,18 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       (prev) => prev ? { ...prev, messages: [newMsg, ...prev.messages] } : undefined
     )
 
-    // Send via WebSocket
     const payload: Record<string, unknown> = {
       action: 'sendMessage',
       roomUuid,
-      text: trimmed,
+      text: messageText,
     }
     if (replyToUuid) payload.replyToMessageUuid = replyToUuid
+    if (gifUrl) {
+      payload.giphy_url = gifUrl
+      payload.giphy_id = gifUrl
+      payload.message_meta = messageMeta
+      payload.messageMeta = messageMeta
+    }
 
     const sent = socketSend(payload)
     if (!sent) {

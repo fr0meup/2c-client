@@ -55,6 +55,10 @@ export interface ChatMessage {
   room_uuid: string
   author_uuid: string
   text: string
+  message_meta?: {
+    giphy_id?: string
+    giphy_url?: string
+  } | null
   created_at: string
   reply_to_uuid?: string
   reply_preview?: string

@@ -4,9 +4,10 @@ import { getSavedGifs, removeGif, getFaveGifs, addFave, removeFave, isFave, save
 
 interface GifPickerButtonProps {
   onSelect: (url: string) => void
+  position?: 'above' | 'below'
 }
 
-export function GifPickerButton({ onSelect }: GifPickerButtonProps) {
+export function GifPickerButton({ onSelect, position = 'below' }: GifPickerButtonProps) {
   const [open, setOpen] = useState(false)
   const [gifs, setGifs] = useState<string[]>([])
   const [faves, setFaves] = useState<string[]>([])
@@ -104,8 +105,17 @@ export function GifPickerButton({ onSelect }: GifPickerButtonProps) {
         <span className="text-[10px] font-black leading-none tracking-tight">GIF</span>
       </button>
 
-      {open && (
-        <div className="gif-picker-popover absolute top-full right-0 z-50 mt-2 w-[340px] max-w-[calc(100vw-2rem)] rounded-xl border border-white/[0.08] bg-[#141410] shadow-xl shadow-black/40">
+      <div
+        className={`gif-picker-popover absolute right-0 z-50 ${
+          open ? '' : 'invisible pointer-events-none'
+        }`}
+        style={
+          position === 'above'
+            ? { bottom: '100%', marginBottom: 8 }
+            : { top: '100%', marginTop: 8 }
+        }
+      >
+        <div className="w-[340px] max-w-[calc(100vw-2rem)] rounded-xl border border-white/[0.08] bg-[#141410] shadow-xl shadow-black/40">
           {/* Header */}
           <div className="flex items-center justify-between px-3 pt-3 pb-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-white/40">GIFs</span>
@@ -249,7 +259,7 @@ export function GifPickerButton({ onSelect }: GifPickerButtonProps) {
             )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -1,12 +1,55 @@
-import { CornerUpLeft } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { CornerUpLeft, Star } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth'
+import { saveGif, removeGif, isGifSaved } from '@/lib/gif'
 import { useMessages } from './MessagesContext'
 import { timeAgo, type ChatMessage } from './types'
+
+const GIF_REGEX = /(https?:\/\/\S+\.gif(?:\?\S*)?)/gi
+
+function GifWithStar({ url }: { url: string }) {
+  const [saved, setSaved] = useState(() => isGifSaved(url))
+
+  useEffect(() => {
+    function onSync() { setSaved(isGifSaved(url)) }
+    window.addEventListener('gif-storage-change', onSync)
+    return () => window.removeEventListener('gif-storage-change', onSync)
+  }, [url])
+
+  return (
+    <div className="group/gif relative mt-1.5 w-fit">
+      <img
+        src={url}
+        alt="GIF"
+        className="max-w-[240px] rounded-lg"
+        loading="lazy"
+      />
+      <button
+        onClick={() => {
+          if (saved) {
+            removeGif(url)
+            setSaved(false)
+          } else {
+            saveGif(url)
+            setSaved(true)
+          }
+        }}
+        className={`absolute right-1.5 top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full opacity-0 transition-all group-hover/gif:opacity-100 ${
+          saved
+            ? 'bg-[#c8a44d]/90 text-[#0f0e0a]'
+            : 'bg-black/60 text-white/60 hover:bg-black/80 hover:text-white'
+        }`}
+        title={saved ? 'Remove from saved GIFs' : 'Save GIF'}
+      >
+        <Star className={`h-3 w-3 ${saved ? 'fill-current' : ''}`} />
+      </button>
+    </div>
+  )
+}
 
 function renderMessageText(text: string, navigate: ReturnType<typeof useNavigate>, isMine: boolean) {
   const re = /(\[([^\]]+)\]\(((?:\/post|\/user)\/[0-9a-f-]{36})\))|(https?:\/\/[^\s]+)|(\/post\/[0-9a-f-]{36})/gi
@@ -55,6 +98,10 @@ export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: 
   const isMine = msg.author_uuid === auth?.userUuid
   const author = msg.author_meta
 
+  // Extract GIF URLs from message text (same logic as comments)
+  const gifUrls: string[] = msg.text.match(GIF_REGEX) ?? []
+  const strippedText = msg.text.replace(GIF_REGEX, '').trim()
+
   if (msg.deleted_at) {
     return (
       <div className={cn('flex px-1', isMine ? 'justify-end' : 'justify-start')}>
@@ -96,6 +143,7 @@ export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: 
         )}
 
         {/* Bubble */}
+        {strippedText && (
         <div
           className={cn(
             'relative rounded-2xl px-3.5 py-2 text-[13.5px] leading-relaxed shadow-sm [overflow-wrap:anywhere]',
@@ -104,7 +152,7 @@ export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: 
               : 'rounded-bl-md border border-white/[0.06] bg-white/[0.06] text-white/90 shadow-black/20',
           )}
         >
-          {renderMessageText(msg.text, navigate, isMine)}
+          {renderMessageText(strippedText, navigate, isMine)}
 
           {/* Action buttons on hover */}
           <div
@@ -130,6 +178,41 @@ export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: 
             />
           </div>
         </div>
+        )}
+
+        {/* GIFs */}
+        {gifUrls.length > 0 && (
+          <div className={cn('relative', isMine ? 'self-end' : 'self-start')}>
+            {gifUrls.map((url, i) => (
+              <GifWithStar key={i} url={url} />
+            ))}
+            {/* Action buttons on hover for GIF-only messages */}
+            {!strippedText && (
+              <div
+                className={cn(
+                  'absolute top-1/2 flex -translate-y-1/2 items-center gap-1 opacity-0 transition-all group-hover:opacity-100',
+                  isMine ? 'right-full mr-1.5' : 'left-full ml-1.5',
+                )}
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onReply(msg)
+                  }}
+                  title="Reply"
+                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-white/[0.08] bg-[#141410] text-white/60 shadow-md shadow-black/30 transition-all hover:bg-white/[0.06] hover:text-white"
+                >
+                  <CornerUpLeft className="h-3.5 w-3.5" strokeWidth={2.2} />
+                </button>
+                <EmojiPickerButton
+                  onSelect={(emoji) => toggleReaction(msg.uuid, emoji)}
+                  size="sm"
+                  position="above"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Reactions */}
         {msg.reactions && msg.reactions.length > 0 && (

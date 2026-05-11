@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CornerUpLeft, Send, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
+import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
 import type { ChatMessage } from './types'
 import { obfuscateText } from '@/lib/utils'
 import { useToast } from '@/components/toast/ToastContext'
@@ -14,6 +15,7 @@ interface Props {
 
 export function MessageComposer({ onSend, replyTo, onCancelReply }: Props) {
   const [text, setText] = useState('')
+  const [gifUrl, setGifUrl] = useState<string | null>(null)
   const [hasMsgSelection, setHasMsgSelection] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
   const { toast } = useToast()
@@ -43,9 +45,10 @@ export function MessageComposer({ onSend, replyTo, onCancelReply }: Props) {
 
   function submit() {
     const trimmed = text.trim()
-    if (!trimmed) return
-    onSend(trimmed, replyTo?.uuid)
+    if (!trimmed && !gifUrl) return
+    onSend(gifUrl ? `${trimmed}${trimmed ? '\n' : ''}${gifUrl}` : trimmed, replyTo?.uuid)
     setText('')
+    setGifUrl(null)
     if (ref.current) ref.current.style.height = 'auto'
   }
 
@@ -58,6 +61,19 @@ export function MessageComposer({ onSend, replyTo, onCancelReply }: Props) {
           <button
             onClick={onCancelReply}
             className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white"
+          >
+            <X className="h-3 w-3" strokeWidth={2.4} />
+          </button>
+        </div>
+      )}
+
+      {gifUrl && (
+        <div className="mb-2 flex items-start gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] p-2">
+          <img src={gifUrl} alt="GIF" className="max-h-[120px] max-w-[180px] rounded-lg object-contain" loading="lazy" />
+          <button
+            onClick={() => setGifUrl(null)}
+            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white"
+            title="Remove GIF"
           >
             <X className="h-3 w-3" strokeWidth={2.4} />
           </button>
@@ -84,7 +100,7 @@ export function MessageComposer({ onSend, replyTo, onCancelReply }: Props) {
             }}
             rows={1}
             placeholder="Message…"
-            className="block min-h-[40px] w-full resize-none overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] py-2.5 pl-4 pr-14 text-[13.5px] text-white placeholder:text-white/30 transition-colors focus:border-[#c8a44d]/30 focus:bg-white/[0.06] focus:outline-none"
+            className="block min-h-[40px] w-full resize-none overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] py-2.5 pl-4 pr-[6.5rem] text-[13.5px] text-white placeholder:text-white/30 transition-colors focus:border-[#c8a44d]/30 focus:bg-white/[0.06] focus:outline-none"
             style={{ maxHeight: '140px' }}
           />
           <div className="absolute inset-y-0 right-1.5 flex items-center gap-0.5">
@@ -124,14 +140,21 @@ export function MessageComposer({ onSend, replyTo, onCancelReply }: Props) {
               size="sm"
               position="above"
             />
+            <GifPickerButton
+              position="above"
+              onSelect={(url) => {
+                setGifUrl(url)
+                ref.current?.focus()
+              }}
+            />
           </div>
         </div>
         <button
           onClick={submit}
-          disabled={!text.trim()}
+          disabled={!text.trim() && !gifUrl}
           className={cn(
             'flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all duration-200 active:scale-95',
-            text.trim()
+            text.trim() || gifUrl
               ? 'cursor-pointer bg-[#c8a44d] text-[#0f0e0a] hover:bg-[#c8a44d]/90 hover:shadow-lg hover:shadow-[#c8a44d]/20'
               : 'cursor-default bg-white/[0.06] text-white/30',
           )}
