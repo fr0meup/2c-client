@@ -89,7 +89,7 @@ export async function notifyMentions({ auth, mentionedUuids, postUuid, contentTy
 
   const results = await Promise.allSettled(recipients.map(async (recipientUuid) => {
     const recipientNw = await getUserNetworth(auth, recipientUuid)
-    const text = `${senderNw} mentioned ${recipientNw} in a ${contentType}.\ncheck it out here: ${postUrl(postUuid)}`
+    const text = `${senderNw} mentioned ${recipientNw} in a ${contentType}.\ncheck it out here: ${postUrl(postUuid)}\ncustom client: http://localhost:5173/post/${postUuid}`
     const dm = await rpc<{ room: { uuid: string } }>(
       '/v1/rooms/startDM',
       { recipientUuid },
