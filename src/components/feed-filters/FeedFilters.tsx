@@ -7,6 +7,7 @@ import { TOPICS, TOPIC_MENU, FEED_PARAM_TO_TOPIC, getFeedUrl } from './config'
 import { usePrefetch } from '@/hooks/usePrefetch'
 import { preloadRoute } from '@/lib/routePreload'
 import { announceNavigationPending } from '@/lib/navigationPending'
+import { addSearchHistory, clearSearchHistory, getSearchHistory } from '@/lib/searchHistory'
 
 export function FeedFilters() {
   const navigate = useNavigate()
@@ -17,6 +18,8 @@ export function FeedFilters() {
   const [searchValue, setSearchValue] = useState(currentQuery)
   const [advLoading, setAdvLoading] = useState(false)
   const [topicsOpen, setTopicsOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => getSearchHistory())
   const [pendingTopic, setPendingTopic] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -45,6 +48,19 @@ export function FeedFilters() {
     prefetchTopic(topic)
     navigate(url)
     setTopicsOpen(false)
+  }
+
+  function submitSearch(value: string) {
+    const query = value.trim()
+    if (!query) return
+    const params = new URLSearchParams(location.search)
+    params.set('q', query)
+    const url = `/?${params.toString()}`
+    setSearchHistory(addSearchHistory(query))
+    setHistoryOpen(false)
+    announceNavigationPending(url)
+    navigate(url)
+    inputRef.current?.blur()
   }
 
   useEffect(() => {
@@ -113,7 +129,12 @@ export function FeedFilters() {
     <div className={cn('feed-filters relative flex h-10 w-full min-w-0 max-w-full items-center', searchOpen && 'feed-filters--search-open')}>
       {/* Search expanding bar */}
       <div
-        className="group absolute left-0 top-0 h-10 cursor-pointer overflow-hidden rounded-full border border-white/[0.08] bg-white/[0.06] hover:bg-gradient-to-b hover:from-white/[0.09] hover:to-white/[0.04] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+        className={cn(
+          'group absolute left-0 top-0 h-10 cursor-pointer overflow-hidden border border-white/[0.08] bg-white/[0.06] hover:bg-gradient-to-b hover:from-white/[0.09] hover:to-white/[0.04] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]',
+          searchOpen && historyOpen && searchHistory.length > 0
+            ? 'rounded-t-[20px] rounded-b-none border-b-transparent'
+            : 'rounded-full'
+        )}
         style={{ width: searchOpen ? 'min(18rem, calc(100vw - 2rem))' : '2.5rem', transition: 'width 300ms ease-out' }}
         onMouseDown={(e) => {
           if (searchOpen && e.target === e.currentTarget) {
@@ -139,16 +160,14 @@ export function FeedFilters() {
           tabIndex={searchOpen ? 0 : -1}
           onBlur={(e) => {
             if (e.relatedTarget?.closest('[data-adv-search]')) return
+            if (e.relatedTarget?.closest('[data-search-history]')) return
+            setHistoryOpen(false)
             if (!searchValue.trim()) setSearchOpen(false)
           }}
+          onFocus={() => { setSearchHistory(getSearchHistory()); setHistoryOpen(true) }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && searchValue.trim()) {
-              const params = new URLSearchParams(location.search)
-              params.set('q', searchValue.trim())
-              const url = `/?${params.toString()}`
-              announceNavigationPending(url)
-              navigate(url)
-              inputRef.current?.blur()
+              submitSearch(searchValue)
             }
             if (e.key === 'Escape') {
               if (searchValue) {
@@ -189,6 +208,45 @@ export function FeedFilters() {
           </button>
         ))}
       </div>
+
+      {/* Search history dropdown — connected to search bar */}
+      {searchOpen && historyOpen && searchHistory.length > 0 && (
+        <div
+          data-search-history
+          tabIndex={-1}
+          className="absolute left-0 top-10 z-50 overflow-hidden rounded-b-[20px] border border-t-0 border-white/[0.08] bg-white/[0.06] pb-1.5 backdrop-blur-sm"
+          style={{ width: 'min(18rem, calc(100vw - 2rem))' }}
+        >
+          <div className="mx-3 mb-1 border-t border-white/[0.06]" />
+          <div className="flex items-center justify-between px-3 py-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-white/25">Recent</span>
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                setSearchHistory(clearSearchHistory())
+              }}
+              className="cursor-pointer text-[10px] font-medium text-white/25 transition-colors hover:text-white/60"
+            >
+              Clear
+            </button>
+          </div>
+          {searchHistory.map((item) => (
+            <button
+              key={item}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                setSearchValue(item)
+                submitSearch(item)
+              }}
+              className="flex w-full cursor-pointer items-center px-3 py-1.5 text-left text-xs text-white/50 transition-colors hover:bg-white/[0.06] hover:text-white/80"
+            >
+              <span className="truncate">{item}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Search icon */}
       <div

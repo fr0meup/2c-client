@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { useCities } from '@/hooks/useCities'
 import { TOPIC_MENU } from '@/components/feed-filters/config'
 import { TOPIC_TO_API } from '@/hooks/useFeed'
+import { addSearchHistory, clearSearchHistory, getSearchHistory } from '@/lib/searchHistory'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const DAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
@@ -426,6 +427,8 @@ export function AdvancedSearchPanel() {
   const [dateTo, setDateTo] = useState(sp.get('date_to') || '')
   const [showDateRange, setShowDateRange] = useState(sp.get('date_range') === '1')
   const [expanded, setExpanded] = useState(true)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => getSearchHistory())
 
   const cityOptions = country && citiesData ? (citiesData.cities[country] || []).sort() : []
 
@@ -491,7 +494,12 @@ export function AdvancedSearchPanel() {
   const handleApply = () => {
     const params = new URLSearchParams()
     params.set('adv', '1')
-    if (searchText.trim()) params.set('q', searchText.trim())
+    const query = searchText.trim()
+    if (query) {
+      params.set('q', query)
+      setSearchHistory(addSearchHistory(query))
+      setHistoryOpen(false)
+    }
     if (minBalance) params.set('min_balance', minBalance)
     if (maxBalance) params.set('max_balance', maxBalance)
     if (votesMin) params.set('votes_min', votesMin)
@@ -563,14 +571,55 @@ export function AdvancedSearchPanel() {
           <div className="space-y-3.5 px-4 pb-3">
             {/* Search + Date toggle */}
             <div className="flex gap-1.5">
-              <input
-                type="text"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                placeholder="Search..."
-                onKeyDown={(e) => e.key === 'Enter' && handleApply()}
-                className="h-8 min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-xs text-white placeholder:text-white/20 focus:border-[#c8a44d]/30 focus:outline-none"
-              />
+              <div className="relative min-w-0 flex-1">
+                <input
+                  type="text"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  placeholder="Search..."
+                  onFocus={() => { setSearchHistory(getSearchHistory()); setHistoryOpen(true) }}
+                  onBlur={(e) => {
+                    if (e.relatedTarget?.closest('[data-search-history]')) return
+                    setHistoryOpen(false)
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleApply()}
+                  className="h-8 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-xs text-white placeholder:text-white/20 focus:border-[#c8a44d]/30 focus:outline-none"
+                />
+                {historyOpen && searchHistory.length > 0 && (
+                  <div
+                    data-search-history
+                    className="absolute left-0 top-full z-50 mt-1.5 w-full overflow-hidden rounded-lg border border-white/[0.06] bg-[#141410] py-1 shadow-lg"
+                  >
+                    <div className="flex items-center justify-between px-3 py-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-white/25">Recent searches</span>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          setSearchHistory(clearSearchHistory())
+                        }}
+                        className="cursor-pointer text-[10px] font-medium text-white/25 transition-colors hover:text-white/60"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    {searchHistory.map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          setSearchText(item)
+                          setHistoryOpen(false)
+                        }}
+                        className="flex w-full cursor-pointer items-center px-3 py-1.5 text-left text-xs text-white/60 transition-colors hover:bg-white/[0.03] hover:text-white/80"
+                      >
+                        <span className="truncate">{item}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button
                 type="button"
                 title={showDateRange ? 'Remove date range' : 'Add date range'}
