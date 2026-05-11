@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { ArrowLeft, Hash, Lock, Users, Link2, Check, Terminal } from 'lucide-react'
+import { ArrowLeft, Hash, Lock, Users, Link2, Check, Terminal, LogOut } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
+import { useLeaveRoom } from '@/hooks/useRooms'
+import { useToast } from '@/components/toast/ToastContext'
 import { useMessages } from './MessagesContext'
 import { MessageBubble } from './MessageBubble'
 import { MessageComposer } from './MessageComposer'
@@ -15,7 +17,7 @@ export function Room() {
 }
 
 function buildJoinScript(roomUuid: string, roomCode: string) {
-  return `(async()=>{const t=document.cookie.split('; ').find(r=>r.startsWith('twocentsToken='))?.split('=')[1];if(!t){alert('Not logged in to twocents');return}const u=JSON.parse(atob(t.split('.')[1])).sub;const API='https://api.twocents.money/prod';const h={Authorization:'Bearer '+t,'Content-Type':'application/json'};const res=await fetch(API,{method:'POST',headers:h,body:JSON.stringify({jsonrpc:'2.0',id:u,method:'/v1/rooms/joinRoomWithCode',params:{roomUuid:'${roomUuid}',roomCode:'${roomCode}'}})});const j=await res.json();if(j.error){alert('Failed: '+j.error.message)}else{const ws=new WebSocket('wss://ds3y2js2k0.execute-api.us-east-2.amazonaws.com/ws/?token='+t);ws.onopen=()=>{ws.send(JSON.stringify({action:'joinRoom',roomUuid:'${roomUuid}'}));setTimeout(()=>{ws.send(JSON.stringify({action:'sendMessage',roomUuid:'${roomUuid}',text:'joined'}));ws.close();window.location.href='/room/${roomUuid}'},1000)};ws.onerror=()=>{window.location.href='/room/${roomUuid}'}}})();`
+  return `(async()=>{const t=document.cookie.split('; ').find(r=>r.startsWith('twocentsToken='))?.split('=')[1];if(!t){alert('Not logged in to twocents');return}const u=JSON.parse(atob(t.split('.')[1])).sub;const API='https://api.twocents.money/prod';const h={Authorization:'Bearer '+t,'Content-Type':'application/json'};const res=await fetch(API,{method:'POST',headers:h,body:JSON.stringify({jsonrpc:'2.0',id:u,method:'/v1/rooms/joinRoomWithCode',params:{roomUuid:'${roomUuid}',roomCode:'${roomCode}'}})});const j=await res.json();if(j.error){alert('Failed: '+j.error.message)}else{const ws=new WebSocket('wss://ds3y2js2k0.execute-api.us-east-2.amazonaws.com/ws/?token='+t);ws.onopen=()=>{ws.send(JSON.stringify({action:'joinRoom',roomUuid:'${roomUuid}'}));setTimeout(()=>{ws.send(JSON.stringify({action:'sendMessage',roomUuid:'${roomUuid}',text:'joined'}));ws.close();window.location.href='/rooms/${roomUuid}'},1000)};ws.onerror=()=>{window.location.href='/rooms/${roomUuid}'}}})();`
 }
 
 export function ChatHeader() {
@@ -27,19 +29,24 @@ export function ChatHeader() {
   const [copiedLink, setCopiedLink] = useState(false)
   const [copiedScript, setCopiedScript] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const leaveRoom = useLeaveRoom()
+  const { toast } = useToast()
   const room = uuid ? getRoom(uuid) : undefined
+  const explicitRoomCode = room?.room_code || room?.name.match(/gc-[a-z0-9]+/i)?.[0] || room?.description?.match(/gc-[a-z0-9]+/i)?.[0]
+  const groupChatCode = room?.name.match(/^group chat\s+([a-z0-9]+)$/i)?.[1] || room?.description?.match(/^group chat\s+([a-z0-9]+)$/i)?.[1]
+  const roomCode = explicitRoomCode || (groupChatCode ? `gc-${groupChatCode.toLowerCase()}` : undefined)
 
   const handleCopyLink = () => {
-    if (!room) return
-    const link = `${window.location.origin}/join/${room.uuid}/${room.room_code}`
+    if (!room || !roomCode) return
+    const link = `${window.location.origin}/join/${room.uuid}/${roomCode}`
     navigator.clipboard.writeText(link)
     setCopiedLink(true)
     setTimeout(() => setCopiedLink(false), 2000)
   }
 
   const handleCopyScript = () => {
-    if (!room?.room_code) return
-    const script = buildJoinScript(room.uuid, room.room_code)
+    if (!room || !roomCode) return
+    const script = buildJoinScript(room.uuid, roomCode)
     navigator.clipboard.writeText(script)
     setCopiedScript(true)
     setTimeout(() => setCopiedScript(false), 2000)
@@ -58,7 +65,7 @@ export function ChatHeader() {
   const other = isDm ? room.members?.find((m) => m.user_uuid !== auth?.userUuid) : undefined
   const displayName = other?.username ?? room.name
   const onlineCount = room.stats.online_count ?? 0
-  const hasInvite = !!room.room_code
+  const isGroup = !!roomCode
 
   return (
     <>
@@ -86,7 +93,8 @@ export function ChatHeader() {
           )}
         </button>
 
-        {hasInvite ? (
+        <div className="flex items-center gap-2">
+          {isGroup && (
           <div className="relative">
             <button
               onClick={() => setInviteOpen((v) => !v)}
@@ -129,9 +137,27 @@ export function ChatHeader() {
               </>
             )}
           </div>
-        ) : (
-          <span className="h-10 w-10 shrink-0" aria-hidden />
-        )}
+          )}
+          <button
+              onClick={() => {
+                if (!uuid) return
+                leaveRoom.mutate(uuid, {
+                  onSuccess: () => {
+                    toast('success', isDm ? 'Left conversation' : 'Left room')
+                    navigate('/messages')
+                  },
+                  onError: () => {
+                    toast('error', isDm ? 'Failed to leave conversation' : 'Failed to leave room')
+                  },
+                })
+              }}
+              disabled={leaveRoom.isPending}
+              title={isDm ? 'Leave conversation' : 'Leave room'}
+              className="group flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.06] text-white/70 transition-all hover:border-red-500/30 hover:bg-gradient-to-b hover:from-red-500/[0.1] hover:to-red-500/[0.04] hover:text-red-400 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+            >
+              <LogOut className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" strokeWidth={2.4} />
+            </button>
+        </div>
       </div>
 
       {infoOpen && <RoomInfoModal room={room} onClose={() => setInfoOpen(false)} />}
@@ -169,11 +195,12 @@ export function RoomChat() {
     if (!state?.sendJoined || !uuid || sentJoinedRef.current) return
     sentJoinedRef.current = true
     window.history.replaceState({}, '')
-    // Small delay to let WS connect and join the room
-    const timer = setTimeout(() => {
-      sendMessage(uuid, 'joined')
-    }, 1500)
-    return () => clearTimeout(timer)
+    let attempts = 0
+    const timer = setInterval(() => {
+      attempts += 1
+      if (sendMessage(uuid, 'joined') || attempts >= 10) clearInterval(timer)
+    }, 750)
+    return () => clearInterval(timer)
   }, [location.state, uuid, sendMessage])
 
   const room = uuid ? getRoom(uuid) : undefined

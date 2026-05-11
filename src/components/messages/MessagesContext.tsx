@@ -19,7 +19,7 @@ interface MessagesContextValue {
   isLoading: boolean
   getRoom: (uuid: string) => Room | undefined
   getMessages: (uuid: string) => ChatMessage[]
-  sendMessage: (roomUuid: string, text: string, replyToUuid?: string) => void
+  sendMessage: (roomUuid: string, text: string, replyToUuid?: string) => boolean
   toggleReaction: (messageUuid: string, emoji: string) => void
   markRoomRead: (uuid: string) => void
   joinRoom: (uuid: string) => void
@@ -309,7 +309,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
   const sendMessage = useCallback((roomUuid: string, text: string, replyToUuid?: string) => {
     const trimmed = text.trim()
-    if (!trimmed || !auth) return
+    if (!trimmed || !auth) return false
 
     // Optimistic update: add message to cache
     const newMsg: ApiMessage = {
@@ -345,6 +345,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       // Socket not ready — refetch to sync
       queryClient.invalidateQueries({ queryKey: ['rooms', 'messages', roomUuid] })
     }
+    return sent
   }, [auth, queryClient, socketSend])
 
   const toggleReaction = useCallback((messageUuid: string, emoji: string) => {

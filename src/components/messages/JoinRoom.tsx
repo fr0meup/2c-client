@@ -4,6 +4,8 @@ import { Loader2 } from 'lucide-react'
 import { rpc } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 
+const WS_URL = 'wss://ds3y2js2k0.execute-api.us-east-2.amazonaws.com/ws/'
+
 export function JoinRoom() {
   const { roomUuid, roomCode } = useParams<{ roomUuid: string; roomCode: string }>()
   const { auth } = useAuth()
@@ -25,8 +27,25 @@ export function JoinRoom() {
           auth.userUuid,
         )
 
-        // Navigate to the room with state flag so it sends "joined" after 5s
-        navigate(`/room/${roomUuid}`, { replace: true, state: { sendJoined: true } })
+        await new Promise<void>((resolve) => {
+          const ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(auth.token)}`)
+          const timeout = window.setTimeout(resolve, 5000)
+          ws.onopen = () => {
+            ws.send(JSON.stringify({ action: 'joinRoom', roomUuid }))
+            window.setTimeout(() => {
+              ws.send(JSON.stringify({ action: 'sendMessage', roomUuid, text: 'joined' }))
+              ws.close()
+              window.clearTimeout(timeout)
+              resolve()
+            }, 1000)
+          }
+          ws.onerror = () => {
+            window.clearTimeout(timeout)
+            resolve()
+          }
+        })
+
+        navigate(`/room/${roomUuid}`, { replace: true })
       } catch (e) {
         console.error('Failed to join room:', e)
         setError(e instanceof Error ? e.message : 'Failed to join room')

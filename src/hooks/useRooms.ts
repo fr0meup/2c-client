@@ -128,3 +128,24 @@ export function useJoinRoom() {
     },
   })
 }
+
+/** Leave a room */
+export function useLeaveRoom() {
+  const { auth } = useAuth()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (roomUuid: string) =>
+      rpc<{ message: string }>(
+        '/v1/rooms/leaveRoom',
+        { roomUuid },
+        auth!.token,
+        auth!.userUuid,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rooms', 'user'] })
+      queryClient.invalidateQueries({ queryKey: ['rooms', 'dms'] })
+      queryClient.invalidateQueries({ queryKey: ['rooms', 'explore'] })
+    },
+  })
+}
