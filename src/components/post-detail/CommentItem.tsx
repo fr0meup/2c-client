@@ -3,7 +3,7 @@ import { MessageSquare, MoreHorizontal, Link2, Trash2, Triangle, Star } from 'lu
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
-import { timeAgo, cleanPostText } from '@/components/post-card/utils'
+import { timeAgo, cleanPostText, renderPostText } from '@/components/post-card/utils'
 import { useCreateComment, useDeleteComment } from '@/hooks/useComments'
 import { useVoteComment } from '@/hooks/useVotes'
 import { useAuth } from '@/lib/auth'
@@ -14,6 +14,8 @@ import type { Comment } from './CommentThread'
 import { obfuscateText } from '@/lib/utils'
 import { saveGif, removeGif, isGifSaved, getTextWithGifs, insertGifImage } from '@/lib/gif'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
+import { MentionPicker } from '@/components/mention-picker/MentionPicker'
+import { extractMentionUuids, notifyMentions } from '@/lib/mentionNotifications'
 
 function GifWithStar({ url }: { url: string }) {
   const [saved, setSaved] = useState(() => isGifSaved(url))
@@ -124,6 +126,8 @@ export function CommentItem({
   function handleSubmitReply() {
     if (!replyRef.current) return
 
+    const mentionedUuids = extractMentionUuids(replyRef.current, auth?.userUuid)
+
     // Extract GIF URL directly from the DOM before converting to text
     const gifImg = replyRef.current.querySelector('img[data-gif-url]') as HTMLImageElement | null
     const gifMeta = gifImg
@@ -143,13 +147,23 @@ export function CommentItem({
         ...gifMeta,
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           if (replyRef.current) {
             replyRef.current.innerHTML = ''
             setReplyHasText(false)
           }
           setReplyOpen(false)
           toast('success', 'Reply posted')
+          if (auth && mentionedUuids.length > 0) {
+            const result = await notifyMentions({
+              auth,
+              mentionedUuids,
+              postUuid: comment.post_uuid,
+              contentType: 'comment',
+            })
+            if (result.sent > 0) toast('success', `Mention notification sent to ${result.sent}`)
+            if (result.failed > 0) toast('error', `Failed to notify ${result.failed} mention${result.failed === 1 ? '' : 's'}`)
+          }
         },
         onError: (err) => {
           toast('error', `Failed to reply: ${humanizeError(err)}`)
@@ -246,7 +260,7 @@ export function CommentItem({
           <>
             {strippedText && (
               <p className="mt-1.5 whitespace-pre-wrap text-[14px] leading-relaxed text-white/90">
-                {strippedText}
+                {renderPostText(strippedText)}
               </p>
             )}
             {allGifs.map((url, i) => (
@@ -356,6 +370,7 @@ export function CommentItem({
             }}
             className="w-full min-h-[36px] px-4 py-2 pr-[12.5rem] text-sm text-white empty:before:content-[attr(data-placeholder)] empty:before:text-white/25 focus:outline-none"
           />
+          <MentionPicker editorRef={replyRef} onMentionInserted={() => setReplyHasText(true)} />
           <div className="absolute right-1.5 bottom-1 flex items-center gap-1">
             <button
               disabled={!hasReplySelection}

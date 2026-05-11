@@ -9,8 +9,12 @@ export function getTextWithGifs(el: HTMLElement): string {
     if (node.nodeType === Node.TEXT_NODE) {
       text += node.textContent ?? ''
     } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const tag = (node as HTMLElement).tagName
-      if (tag === 'IMG') {
+      const elem = node as HTMLElement
+      const tag = elem.tagName
+      if (elem.hasAttribute('data-mention-uuid')) {
+        const uuid = elem.getAttribute('data-mention-uuid')
+        text += uuid ? `[${elem.textContent || ''}](/user/${uuid})` : elem.textContent || ''
+      } else if (tag === 'IMG') {
         const src = (node as HTMLImageElement).getAttribute('data-gif-url') || (node as HTMLImageElement).src
         text += (text.length > 0 && !text.endsWith('\n') ? '\n' : '') + src
       } else if (tag === 'BR') {

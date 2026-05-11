@@ -18,6 +18,8 @@ import { DraftsModal } from './DraftsModal'
 import { TOPIC_MENU, TOPIC_SLUG, type PostOption } from './config'
 import type { PostCardData } from '@/components/post-card/types'
 import { obfuscateText } from '@/lib/utils'
+import { MentionPicker } from '@/components/mention-picker/MentionPicker'
+import { extractMentionUuids, notifyMentions } from '@/lib/mentionNotifications'
 
 interface ComposePostProps {
   onClose?: () => void
@@ -202,6 +204,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
       .replace(/<\/p>/gi, '\n').replace(/<p[^>]*>/gi, '')
       .replace(/<(strong|b)>(.*?)<\/\1>/gi, '**$2**')
       .replace(/<img[^>]*data-gif-url="[^"]*"[^>]*>/gi, '')
+      .replace(/<span[^>]*data-mention-uuid="([^"]*)"[^>]*>([^<]*)<\/span>/gi, '[$2](/user/$1)')
       .replace(/<[^>]+>/g, '')
       .replace(/&nbsp;/g, ' ')
       .replace(/&amp;/g, '&')
@@ -339,6 +342,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
   async function handleSubmit() {
     if (!canPost || isSubmitting) return
 
+    const mentionedUuids = extractMentionUuids(editorRef.current, auth?.userUuid)
     const topic = TOPIC_SLUG[selectedTopic] ?? selectedTopic.toLowerCase()
     const meta: Record<string, unknown> = { version: 1, platform: 'web' }
 
@@ -408,7 +412,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
         post_meta: meta,
       },
       {
-        onSuccess: () => {
+        onSuccess: async (data) => {
           setTitle('')
           setBody('')
           setGifUrl(null)
@@ -419,6 +423,16 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
           clearImage()
           onClose?.()
           toast('success', 'Posted successfully')
+          if (auth && mentionedUuids.length > 0) {
+            const result = await notifyMentions({
+              auth,
+              mentionedUuids,
+              postUuid: data.post.uuid,
+              contentType: 'post',
+            })
+            if (result.sent > 0) toast('success', `Mention notification sent to ${result.sent}`)
+            if (result.failed > 0) toast('error', `Failed to notify ${result.failed} mention${result.failed === 1 ? '' : 's'}`)
+          }
         },
         onError: (err) => {
           toast('error', `Failed to post: ${humanizeError(err)}`)
@@ -502,6 +516,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
           data-placeholder="Share your two cents..."
           className="w-full border-none bg-transparent text-base text-white empty:before:content-[attr(data-placeholder)] empty:before:text-white/40 focus:outline-none min-h-[144px] whitespace-pre-wrap break-words"
         />
+        <MentionPicker editorRef={editorRef} onMentionInserted={handleEditorInput} />
 
       {/* Poll UI */}
       {activeOption === 'poll' && (

@@ -1,10 +1,44 @@
 import { CornerUpLeft } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth'
 import { useMessages } from './MessagesContext'
 import { timeAgo, type ChatMessage } from './types'
+
+function renderMessageText(text: string, navigate: ReturnType<typeof useNavigate>, isMine: boolean) {
+  const re = /(\[([^\]]+)\]\(((?:\/post|\/user)\/[0-9a-f-]{36})\))|(https?:\/\/[^\s]+)|(\/post\/[0-9a-f-]{36})/gi
+  const parts: ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  let key = 0
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index))
+    const label = match[2] ?? match[4] ?? match[5]
+    const href = match[3] ?? match[4] ?? match[5]
+    const postMatch = href.match(/\/post\/([0-9a-f-]{36})/i)
+    const userMatch = href.match(/\/user\/([0-9a-f-]{36})/i)
+    const internalHref = postMatch ? `/post/${postMatch[1]}` : userMatch ? `/user/${userMatch[1]}` : null
+    parts.push(
+      <button
+        key={key++}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (internalHref) navigate(internalHref)
+          else window.open(href, '_blank', 'noopener,noreferrer')
+        }}
+        className={cn('cursor-pointer font-semibold hover:underline', isMine ? 'text-[#0f0e0a]' : 'text-[#c8a44d]')}
+      >
+        {label}
+      </button>,
+    )
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex))
+  return parts.length > 0 ? parts : text
+}
 
 interface Props {
   msg: ChatMessage
@@ -16,6 +50,7 @@ interface Props {
 
 export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: Props) {
   const { auth } = useAuth()
+  const navigate = useNavigate()
   const { toggleReaction } = useMessages()
   const isMine = msg.author_uuid === auth?.userUuid
   const author = msg.author_meta
@@ -69,7 +104,7 @@ export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: 
               : 'rounded-bl-md border border-white/[0.06] bg-white/[0.06] text-white/90 shadow-black/20',
           )}
         >
-          {msg.text}
+          {renderMessageText(msg.text, navigate, isMine)}
 
           {/* Action buttons on hover */}
           <div

@@ -37,6 +37,8 @@ import { PostDetailSkeleton, CommentsSkeleton } from '@/components/skeleton/Skel
 import { obfuscateText } from '@/lib/utils'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
 import { getTextWithGifs, insertGifImage, saveGif, removeGif, isGifSaved } from '@/lib/gif'
+import { MentionPicker } from '@/components/mention-picker/MentionPicker'
+import { extractMentionUuids, notifyMentions } from '@/lib/mentionNotifications'
 
 export function PostDetailPage() {
   return (
@@ -266,6 +268,8 @@ export function PostDetail() {
   function handleSubmitComment() {
     if (!uuid || !commentRef.current) return
 
+    const mentionedUuids = extractMentionUuids(commentRef.current, auth?.userUuid)
+
     // Extract GIF URL directly from the DOM before converting to text
     const gifImg = commentRef.current.querySelector('img[data-gif-url]') as HTMLImageElement | null
     const gifMeta = gifImg
@@ -281,12 +285,22 @@ export function PostDetail() {
     commentMutation.mutate(
       { post_uuid: uuid, text, in_reply_to_uuid: uuid, ...gifMeta },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           if (commentRef.current) {
             commentRef.current.innerHTML = ''
             setCommentHasText(false)
           }
           toast('success', 'Comment posted')
+          if (auth && mentionedUuids.length > 0) {
+            const result = await notifyMentions({
+              auth,
+              mentionedUuids,
+              postUuid: uuid,
+              contentType: 'comment',
+            })
+            if (result.sent > 0) toast('success', `Mention notification sent to ${result.sent}`)
+            if (result.failed > 0) toast('error', `Failed to notify ${result.failed} mention${result.failed === 1 ? '' : 's'}`)
+          }
         },
         onError: (err) => {
           toast('error', `Failed to comment: ${humanizeError(err)}`)
@@ -575,6 +589,7 @@ export function PostDetail() {
             }}
             className="w-full min-h-[36px] px-4 py-2 pr-[12.5rem] text-sm text-white empty:before:content-[attr(data-placeholder)] empty:before:text-white/25 focus:outline-none"
           />
+          <MentionPicker editorRef={commentRef} onMentionInserted={() => setCommentHasText(true)} />
           <div className="absolute right-1.5 bottom-1 flex items-center gap-1">
             <button
               disabled={!hasCommentSelection}

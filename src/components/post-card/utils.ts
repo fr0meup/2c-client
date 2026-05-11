@@ -28,7 +28,7 @@ export function cleanPostText(text: string): string {
 
 function parseInline(text: string) {
   // Matches: markdown links [text](url), bold **text**, or plain URLs
-  const INLINE_RE = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+)\))|(\*\*.*?\*\*)|(https?:\/\/[^\s<>[\]()]+)/g
+  const INLINE_RE = /(\[([^\]]+)\]\(((?:https?:\/\/|\/)[^\s)]+)\))|(\*\*.*?\*\*)|(https?:\/\/[^\s<>[\]()]+)/g
 
   const parts: (string | ReturnType<typeof createElement>)[] = []
   let lastIndex = 0

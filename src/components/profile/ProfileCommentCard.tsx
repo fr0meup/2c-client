@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MessageSquare, Triangle, Star } from 'lucide-react'
 import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
-import { timeAgo, cleanPostText } from '@/components/post-card/utils'
+import { timeAgo, cleanPostText, renderPostText } from '@/components/post-card/utils'
 import { useFollow } from './FollowContext'
 import { useVoteComment } from '@/hooks/useVotes'
 import type { Comment } from '@/lib/types'
@@ -104,7 +104,7 @@ export function ProfileCommentCard({ comment, postTitle, initialVote = 0 }: Prop
         return (
           <>
             {strippedText && (
-              <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-white/90">{strippedText}</p>
+              <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-white/90">{renderPostText(strippedText)}</p>
             )}
             {allGifs.map((url, i) => (
               <GifWithStar key={i} url={url} />
