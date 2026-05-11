@@ -1,5 +1,5 @@
-import { Component, Suspense, lazy, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Component, Suspense, lazy, useEffect, useLayoutEffect, type ReactNode } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigationType } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import { routeLoaders } from './lib/routePreload'
 
@@ -66,12 +66,10 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
-const SCROLL_CACHE_KEY = '__scroll_y'
-const SCROLL_PATH_KEY = '__scroll_path'
-
-function currentScrollPath() {
-  return `${window.location.pathname}${window.location.search}`
-}
+// ── Scroll position management ──
+const scrollMap = new Map<string, number>()
+const lockedKeys = new Set<string>()
+let _currentLocationKey = ''
 
 function getPageScrollTop() {
   return Math.max(
@@ -88,28 +86,23 @@ function setPageScrollTop(y: number) {
 }
 
 export function saveScrollPosition() {
-  sessionStorage.setItem(SCROLL_CACHE_KEY, String(getPageScrollTop()))
-  sessionStorage.setItem(SCROLL_PATH_KEY, currentScrollPath())
-}
-
-function consumeScrollPosition(targetPath: string): number | null {
-  const savedPath = sessionStorage.getItem(SCROLL_PATH_KEY)
-  const raw = sessionStorage.getItem(SCROLL_CACHE_KEY)
-  if (raw == null || savedPath !== targetPath) return null
-  sessionStorage.removeItem(SCROLL_CACHE_KEY)
-  sessionStorage.removeItem(SCROLL_PATH_KEY)
-  return Number(raw)
+  if (_currentLocationKey) {
+    scrollMap.set(_currentLocationKey, getPageScrollTop())
+    lockedKeys.add(_currentLocationKey)
+  }
 }
 
 function restoreScrollPosition(y: number) {
+  // Try immediately first
+  setPageScrollTop(y)
+
   let attempts = 0
   let frame = 0
 
   const restore = () => {
     attempts += 1
     setPageScrollTop(y)
-    const maxScroll = Math.max(0, document.body.scrollHeight - window.innerHeight)
-    if (getPageScrollTop() < y && maxScroll < y && attempts < 20) {
+    if (getPageScrollTop() < Math.floor(y) && attempts < 60) {
       frame = requestAnimationFrame(restore)
     }
   }
@@ -119,26 +112,35 @@ function restoreScrollPosition(y: number) {
 }
 
 function ScrollToTop() {
-  const { pathname, search } = useLocation()
-  const currentPath = `${pathname}${search}`
-  const prevPath = useRef(currentPath)
+  const location = useLocation()
+  const navType = useNavigationType()
 
-  useEffect(() => { window.history.scrollRestoration = 'manual' }, [])
+  _currentLocationKey = location.key ?? ''
+
+  useEffect(() => {
+    window.history.scrollRestoration = 'manual'
+
+    const onScroll = () => {
+      if (_currentLocationKey && !lockedKeys.has(_currentLocationKey)) {
+        scrollMap.set(_currentLocationKey, getPageScrollTop())
+      }
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   useLayoutEffect(() => {
-    const prev = prevPath.current
-    prevPath.current = currentPath
+    lockedKeys.clear()
 
-    // Navigating back FROM post detail → restore cached position only if returning to the original page
-    if (prev.startsWith('/post/') && !pathname.startsWith('/post/')) {
-      const saved = consumeScrollPosition(currentPath)
-      if (saved != null) {
+    if (navType === 'POP') {
+      const saved = scrollMap.get(location.key ?? '')
+      if (saved != null && saved > 0) {
         return restoreScrollPosition(saved)
       }
     }
 
     setPageScrollTop(0)
-  }, [currentPath, pathname])
+  }, [location.key, navType])
 
   return null
 }

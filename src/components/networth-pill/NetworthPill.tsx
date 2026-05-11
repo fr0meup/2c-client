@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { usePrefetch } from '@/hooks/usePrefetch'
 import { preloadRoute } from '@/lib/routePreload'
 import { announceNavigationPending } from '@/lib/navigationPending'
+import { saveScrollPosition } from '@/App'
 
 type PillTier =
   | 'bronze'
@@ -140,6 +141,7 @@ export function NetworthPill({
   function handleClick(e: MouseEvent<HTMLDivElement>) {
     if (!canNavigate) return
     e.stopPropagation()
+    saveScrollPosition()
     announceNavigationPending(`/user/${authorUuid}`)
     navigate(`/user/${authorUuid}`)
   }
