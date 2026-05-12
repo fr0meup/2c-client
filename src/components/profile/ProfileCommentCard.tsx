@@ -6,7 +6,7 @@ import { timeAgo, cleanPostText, renderPostText } from '@/components/post-card/u
 import { useFollow } from './FollowContext'
 import { useVoteComment } from '@/hooks/useVotes'
 import type { Comment } from '@/lib/types'
-import { saveGif, removeGif, isGifSaved } from '@/lib/gif'
+import { extractMediaUrls, normalizeMediaUrl, saveGif, removeGif, isGifSaved, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
 import { saveScrollPosition } from '@/App'
 import { announceNavigationPending } from '@/lib/navigationPending'
 
@@ -94,16 +94,15 @@ export function ProfileCommentCard({ comment, postTitle, initialVote = 0 }: Prop
         <p className="whitespace-pre-wrap text-[14px] leading-relaxed italic text-white/30">[deleted]</p>
       ) : (() => {
         const text = cleanPostText(comment.text)
-        const gifRegex = /(https?:\/\/\S+\.gif(?:\?\S*)?)/gi
-        const gifUrls: string[] = text.match(gifRegex) ?? []
-        const strippedText = text.replace(gifRegex, '').trim()
+        const gifUrls = extractMediaUrls(text).map(normalizeMediaUrl)
         const rawGifFromMeta = (comment.comment_meta as { giphy_url?: string })?.giphy_url
-        const gifFromMeta = rawGifFromMeta ? rawGifFromMeta.replace(/\/\d+\.gif/, '/giphy.gif') : undefined
+        const gifFromMeta = rawGifFromMeta ? normalizeMediaUrl(rawGifFromMeta) : undefined
+        const strippedText = stripMediaUrls(text, rawGifFromMeta ? [rawGifFromMeta] : [])
         const allGifs: string[] = [...gifUrls, ...(gifFromMeta && !gifUrls.includes(gifFromMeta) ? [gifFromMeta] : [])]
 
         return (
           <>
-            {strippedText && (
+            {strippedText && strippedText !== ZERO_WIDTH_MEDIA_TEXT && (
               <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-white/90">{renderPostText(strippedText)}</p>
             )}
             {allGifs.map((url, i) => (

@@ -314,6 +314,8 @@ export interface ApiMessage {
   reply_to_message_uuid: string | null
   author_meta: ApiMessageAuthorMeta
   message_meta: Record<string, unknown>
+  giphy_id?: string
+  giphy_url?: string
   deleted_at: string | null
   replyMessageText: string | null
   isBookmarked: boolean

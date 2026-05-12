@@ -2,6 +2,37 @@
 
 // ── GIF Input Helpers ──
 
+export const MEDIA_URL_REGEX = /(https?:\/\/[^\s<>"'`]+?\.(?:gif|gifv|webp|png|jpe?g|apng|avif|bmp|svg|heic|heif|tiff?|ico)(?:[?#][^\s<>"'`]*)?)/gi
+export const ZERO_WIDTH_MEDIA_TEXT = '\u200b'
+
+function mediaRegex(): RegExp {
+  return new RegExp(MEDIA_URL_REGEX.source, 'gi')
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function extractMediaUrls(text: string): string[] {
+  return Array.from(new Set(Array.from(text.matchAll(mediaRegex()), (match) => match[1])))
+}
+
+export function firstMediaUrl(text: string): string | undefined {
+  return extractMediaUrls(text)[0]
+}
+
+export function stripMediaUrls(text: string, extraUrls: string[] = []): string {
+  let stripped = text.replace(mediaRegex(), '')
+  for (const url of extraUrls) {
+    if (url) stripped = stripped.replace(new RegExp(escapeRegExp(url), 'g'), '')
+  }
+  return stripped.trim()
+}
+
+export function normalizeMediaUrl(url: string): string {
+  return url.replace(/\/\d+\.gif(?=([?#]|$))/i, '/giphy.gif')
+}
+
 /** Extract text from a contentEditable div, converting <img> elements back to their src URLs */
 export function getTextWithGifs(el: HTMLElement): string {
   let text = ''

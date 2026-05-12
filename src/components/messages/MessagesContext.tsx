@@ -4,13 +4,13 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useUserRooms, useUserDMs, useExploreRooms, useRoomMessages, useJoinRoom } from '@/hooks/useRooms'
 import { rpc } from '@/lib/api'
 import { OFFLINE_KEY, useAuth } from '@/lib/auth'
+import { firstMediaUrl, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
 import type { ApiRoom, ApiMessage, ApiReaction, GetMessagesResponse, GetRoomResponse, ListRoomsResponse } from '@/lib/types'
 import type { ChatMessage, Room, RoomMember } from './types'
 
 const WS_BASE = 'wss://ds3y2js2k0.execute-api.us-east-2.amazonaws.com/ws/'
 const RECONNECT_DELAY = 2_000
 const MAX_RECONNECT_DELAY = 30_000
-const GIF_REGEX = /(https?:\/\/\S+\.gif(?:\?\S*)?)/gi
 
 interface MessagesContextValue {
   rooms: Room[]
@@ -146,14 +146,16 @@ function mapMessages(messages: ApiMessage[], reactions: ApiReaction[], currentUs
 
   return messages.map((m) => {
     const emojiMap = reactionsByMsg.get(m.uuid)
+    const metaGiphyId = typeof m.message_meta?.giphy_id === 'string' ? m.message_meta.giphy_id : undefined
+    const metaGiphyUrl = typeof m.message_meta?.giphy_url === 'string' ? m.message_meta.giphy_url : undefined
     return {
       uuid: m.uuid,
       room_uuid: m.room_uuid,
       author_uuid: m.author_uuid,
       text: m.text,
       message_meta: {
-        giphy_id: typeof m.message_meta?.giphy_id === 'string' ? m.message_meta.giphy_id : undefined,
-        giphy_url: typeof m.message_meta?.giphy_url === 'string' ? m.message_meta.giphy_url : undefined,
+        giphy_id: metaGiphyId ?? m.giphy_id,
+        giphy_url: metaGiphyUrl ?? m.giphy_url,
       },
       created_at: m.created_at,
       reply_to_uuid: m.reply_to_message_uuid ?? undefined,
@@ -172,6 +174,11 @@ function mapMessages(messages: ApiMessage[], reactions: ApiReaction[], currentUs
       } : undefined,
     }
   })
+}
+
+function messageMediaUrl(message: ApiMessage): string | undefined {
+  const metaUrl = typeof message.message_meta?.giphy_url === 'string' ? message.message_meta.giphy_url : undefined
+  return metaUrl ?? message.giphy_url ?? firstMediaUrl(message.text)
 }
 
 export function MessagesProvider({ children }: { children: ReactNode }) {
@@ -250,9 +257,18 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         (prev) => {
           if (!prev) return prev
           if (prev.messages.some((m) => m.uuid === payload.uuid)) return prev
-          // Remove optimistic local entry from same author with same text
+          const payloadMediaUrl = messageMediaUrl(payload)
+          const payloadText = payloadMediaUrl ? stripMediaUrls(payload.text, [payloadMediaUrl]) || ZERO_WIDTH_MEDIA_TEXT : payload.text
+          // Remove optimistic local entry from same author with same content
           const filtered = prev.messages.filter(
-            (m) => !(m.uuid.startsWith('local-') && m.author_uuid === payload.author_uuid && m.text === payload.text)
+            (m) => {
+              if (!m.uuid.startsWith('local-') || m.author_uuid !== payload.author_uuid) return true
+              const localMediaUrl = messageMediaUrl(m)
+              if (localMediaUrl || payloadMediaUrl) {
+                return localMediaUrl !== payloadMediaUrl
+              }
+              return m.text !== payloadText
+            }
           )
           return { ...prev, messages: [payload, ...filtered] }
         },
@@ -315,8 +331,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   const sendMessage = useCallback((roomUuid: string, text: string, replyToUuid?: string) => {
     const trimmed = text.trim()
     if (!trimmed || !auth) return false
-    const gifUrl = trimmed.match(GIF_REGEX)?.[0]
-    const messageText = trimmed
+    const gifUrl = firstMediaUrl(trimmed)
+    const messageText = gifUrl ? stripMediaUrls(trimmed, [gifUrl]) || ZERO_WIDTH_MEDIA_TEXT : trimmed
     const messageMeta = gifUrl ? { giphy_url: gifUrl, giphy_id: gifUrl } : {}
 
     const newMsg: ApiMessage = {
@@ -342,7 +358,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     const payload: Record<string, unknown> = {
       action: 'sendMessage',
       roomUuid,
-      text: messageText,
+      text: trimmed,
     }
     if (replyToUuid) payload.replyToMessageUuid = replyToUuid
     if (gifUrl) {

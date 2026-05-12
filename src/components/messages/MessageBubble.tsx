@@ -5,11 +5,9 @@ import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth'
-import { saveGif, removeGif, isGifSaved } from '@/lib/gif'
+import { extractMediaUrls, normalizeMediaUrl, saveGif, removeGif, isGifSaved, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
 import { useMessages } from './MessagesContext'
 import { timeAgo, type ChatMessage } from './types'
-
-const GIF_REGEX = /(https?:\/\/\S+\.gif(?:\?\S*)?)/gi
 
 function GifWithStar({ url }: { url: string }) {
   const [saved, setSaved] = useState(() => isGifSaved(url))
@@ -98,9 +96,16 @@ export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: 
   const isMine = msg.author_uuid === auth?.userUuid
   const author = msg.author_meta
 
-  // Extract GIF URLs from message text (same logic as comments)
-  const gifUrls: string[] = msg.text.match(GIF_REGEX) ?? []
-  const strippedText = msg.text.replace(GIF_REGEX, '').trim()
+  // Extract GIF URLs from message text + message_meta fallback
+  const textGifs = extractMediaUrls(msg.text).map(normalizeMediaUrl)
+  const metaGif = msg.message_meta?.giphy_url
+  const normalizedMetaGif = metaGif ? normalizeMediaUrl(metaGif) : undefined
+  const gifUrls = normalizedMetaGif && !textGifs.includes(normalizedMetaGif)
+    ? [...textGifs, normalizedMetaGif]
+    : textGifs
+  // Strip both regex-matched URLs and the meta URL from displayed text
+  let strippedText = stripMediaUrls(msg.text, metaGif ? [metaGif] : [])
+  if (strippedText === ZERO_WIDTH_MEDIA_TEXT) strippedText = ''
 
   if (msg.deleted_at) {
     return (

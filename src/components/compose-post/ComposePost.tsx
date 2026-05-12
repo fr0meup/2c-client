@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query'
 import { ImagePlus, X, ChevronDown, BarChart3, List, Bold, Plus, Minus, Loader2, FileText, Save, Check, MoreHorizontal } from 'lucide-react'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
-import { insertGifImage } from '@/lib/gif'
+import { firstMediaUrl, insertGifImage, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { GenderIcon } from '@/components/gender-icon/GenderIcon'
 import { QuotePostCard } from '@/components/post-card/QuotePostCard'
@@ -238,6 +238,15 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
     // Strip rich text formatting — paste as plain text only
     e.preventDefault()
     const text = e.clipboardData?.getData('text/plain') ?? ''
+    const mediaUrl = firstMediaUrl(text)
+    if (mediaUrl && editorRef.current) {
+      const stripped = stripMediaUrls(text, [mediaUrl])
+      if (stripped) document.execCommand('insertText', false, stripped)
+      insertGifImage(editorRef.current, mediaUrl)
+      setGifUrl(mediaUrl)
+      handleEditorInput()
+      return
+    }
     if (text) document.execCommand('insertText', false, text)
   }
 
@@ -345,16 +354,18 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
     const mentionedUuids = extractMentionUuids(editorRef.current, auth?.userUuid)
     const topic = TOPIC_SLUG[selectedTopic] ?? selectedTopic.toLowerCase()
     const meta: Record<string, unknown> = { version: 1, platform: 'web' }
+    const mediaUrl = gifUrl ?? firstMediaUrl(body)
+    const postText = mediaUrl ? stripMediaUrls(body, [mediaUrl]) || ZERO_WIDTH_MEDIA_TEXT : body.trim() || ZERO_WIDTH_MEDIA_TEXT
 
-    if (gifUrl) {
-      meta.giphy_url = gifUrl
-      meta.giphy_id = gifUrl
-      meta.src = gifUrl
+    if (mediaUrl) {
+      meta.giphy_url = mediaUrl
+      meta.giphy_id = mediaUrl
+      meta.src = mediaUrl
     }
 
     let postType = 0
 
-    if (gifUrl) {
+    if (mediaUrl) {
       postType = 4
     } else if (quotedPost) {
       meta.quote_post = {
@@ -407,7 +418,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
       {
         title: title.trim(),
         topic,
-        text: body.trim() || '\u200b',
+        text: postText,
         post_type: postType,
         post_meta: meta,
       },

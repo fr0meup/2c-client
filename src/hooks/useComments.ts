@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { rpc } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
 import type { Comment, CommentsResponse, ArenaResponse, UserProfileResponse, BookmarksResponse } from '@/lib/types'
 import type { PostResponse } from './usePost'
 
@@ -57,7 +58,7 @@ export function useCreateComment() {
 
       // Strip GIF URL from text when sending via comment_meta so OG client doesn't show the raw link
       const text = params.giphy_url
-        ? params.text.replace(params.giphy_url, '').trim() || '\u200b'
+        ? stripMediaUrls(params.text, [params.giphy_url]) || ZERO_WIDTH_MEDIA_TEXT
         : params.text
 
       return rpc<CreateCommentResponse>(

@@ -6,6 +6,7 @@ import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
 import type { ChatMessage } from './types'
 import { obfuscateText } from '@/lib/utils'
 import { useToast } from '@/components/toast/ToastContext'
+import { firstMediaUrl, stripMediaUrls } from '@/lib/gif'
 
 interface Props {
   onSend: (text: string, replyTo?: string) => void
@@ -52,6 +53,27 @@ export function MessageComposer({ onSend, replyTo, onCancelReply }: Props) {
     if (ref.current) ref.current.style.height = 'auto'
   }
 
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const pasted = e.clipboardData?.getData('text/plain') ?? ''
+    const mediaUrl = firstMediaUrl(pasted)
+    if (!mediaUrl) return
+
+    e.preventDefault()
+    const el = e.currentTarget
+    const start = el.selectionStart
+    const end = el.selectionEnd
+    const stripped = stripMediaUrls(pasted, [mediaUrl])
+    const nextText = text.slice(0, start) + stripped + text.slice(end)
+    setText(nextText)
+    setGifUrl(mediaUrl)
+    requestAnimationFrame(() => {
+      const nextPos = start + stripped.length
+      el.setSelectionRange(nextPos, nextPos)
+      autoresize(el)
+      el.focus()
+    })
+  }
+
   return (
     <div className="shrink-0 border-t border-white/[0.06] bg-[#0a0907]/95 px-3 pb-[calc(14px+env(safe-area-inset-bottom))] pt-[14px] backdrop-blur-md sm:px-4">
       {replyTo && (
@@ -89,6 +111,7 @@ export function MessageComposer({ onSend, replyTo, onCancelReply }: Props) {
               setText(e.target.value)
               autoresize(e.currentTarget)
             }}
+            onPaste={handlePaste}
             onSelect={checkMsgSel}
             onKeyUp={checkMsgSel}
             onMouseUp={checkMsgSel}

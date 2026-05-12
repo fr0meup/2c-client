@@ -27,7 +27,7 @@ import { LinkCard } from './LinkCard'
 import { usePollResults, useLikertResults } from '@/hooks/usePostResults'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 import { VideoPlayer } from '@/components/video-player/VideoPlayer'
-import { saveGif, removeGif, isGifSaved } from '@/lib/gif'
+import { extractMediaUrls, normalizeMediaUrl, saveGif, removeGif, isGifSaved, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
 
 const TEXT_LIMIT = 280
 
@@ -153,15 +153,16 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
   if (!post?.author_meta) return null
 
   const cleanText = cleanPostText(post.text)
-  const gifRegex = /(https?:\/\/\S+\.gif(?:\?\S*)?)/gi
-  const postGifUrls: string[] = cleanText.match(gifRegex) ?? []
-  const textWithoutGifs = cleanText.replace(gifRegex, '').trim()
+  const postGifUrls = extractMediaUrls(cleanText).map(normalizeMediaUrl)
+  const rawGifFromMeta = post.post_meta?.giphy_url
   const gifFromMeta = post.post_meta?.giphy_url
-    ? post.post_meta.giphy_url.replace(/\/\d+\.gif/, '/giphy.gif')
+    ? normalizeMediaUrl(post.post_meta.giphy_url)
     : undefined
+  const textWithoutGifs = stripMediaUrls(cleanText, rawGifFromMeta ? [rawGifFromMeta] : [])
   const allPostGifs: string[] = [...postGifUrls, ...(gifFromMeta && !postGifUrls.includes(gifFromMeta) ? [gifFromMeta] : [])].filter((u) => u !== imageSrc)
-  const isLong = textWithoutGifs.length > TEXT_LIMIT
-  const displayText = !expanded && isLong ? textWithoutGifs.slice(0, TEXT_LIMIT).trimEnd() + '…' : textWithoutGifs
+  const visibleText = textWithoutGifs === ZERO_WIDTH_MEDIA_TEXT ? '' : textWithoutGifs
+  const isLong = visibleText.length > TEXT_LIMIT
+  const displayText = !expanded && isLong ? visibleText.slice(0, TEXT_LIMIT).trimEnd() + '…' : visibleText
 
   function handleVote(dir: 1 | -1) {
     const next = currentVote === dir ? 0 : dir

@@ -36,7 +36,7 @@ import type { ArenaResponse, UserProfileResponse } from '@/lib/types'
 import { PostDetailSkeleton, CommentsSkeleton } from '@/components/skeleton/Skeleton'
 import { obfuscateText } from '@/lib/utils'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
-import { getTextWithGifs, insertGifImage, saveGif, removeGif, isGifSaved } from '@/lib/gif'
+import { extractMediaUrls, firstMediaUrl, getTextWithGifs, insertGifImage, normalizeMediaUrl, saveGif, removeGif, isGifSaved, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
 import { MentionPicker } from '@/components/mention-picker/MentionPicker'
 import { extractMentionUuids, notifyMentions } from '@/lib/mentionNotifications'
 
@@ -272,13 +272,14 @@ export function PostDetail() {
 
     // Extract GIF URL directly from the DOM before converting to text
     const gifImg = commentRef.current.querySelector('img[data-gif-url]') as HTMLImageElement | null
-    const gifMeta = gifImg
-      ? { giphy_url: gifImg.getAttribute('data-gif-url')!, giphy_id: gifImg.getAttribute('data-gif-url')! }
-      : null
+    const gifFromImg = gifImg?.getAttribute('data-gif-url') ?? undefined
 
     // Get text content, stripping the GIF img element
     if (gifImg) gifImg.remove()
-    const text = getTextWithGifs(commentRef.current).trim()
+    const rawText = getTextWithGifs(commentRef.current).trim()
+    const mediaUrl = gifFromImg ?? firstMediaUrl(rawText)
+    const text = mediaUrl ? stripMediaUrls(rawText, [mediaUrl]) || ZERO_WIDTH_MEDIA_TEXT : rawText
+    const gifMeta = mediaUrl ? { giphy_url: mediaUrl, giphy_id: mediaUrl } : null
 
     if (!text && !gifMeta) return
 
@@ -375,16 +376,16 @@ export function PostDetail() {
           />
         ) : (() => {
           const cleaned = cleanPostText(post.text)
-          const gifRegex = /(https?:\/\/\S+\.gif(?:\?\S*)?)/gi
-          const postGifUrls: string[] = cleaned.match(gifRegex) ?? []
-          const strippedText = cleaned.replace(gifRegex, '').trim()
+          const postGifUrls = extractMediaUrls(cleaned).map(normalizeMediaUrl)
+          const rawGifFromMeta = post.post_meta?.giphy_url
           const gifFromMeta = post.post_meta?.giphy_url
-            ? post.post_meta.giphy_url.replace(/\/\d+\.gif/, '/giphy.gif')
+            ? normalizeMediaUrl(post.post_meta.giphy_url)
             : undefined
+          const strippedText = stripMediaUrls(cleaned, rawGifFromMeta ? [rawGifFromMeta] : [])
           const allPostGifs: string[] = [...postGifUrls, ...(gifFromMeta && !postGifUrls.includes(gifFromMeta) ? [gifFromMeta] : [])].filter((u) => u !== post.post_meta?.src)
           return (
             <>
-              {strippedText && (
+              {strippedText && strippedText !== ZERO_WIDTH_MEDIA_TEXT && (
                 <div className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-white/90">
                   {renderPostText(strippedText)}
                 </div>
@@ -578,6 +579,14 @@ export function PostDetail() {
             onPaste={(e) => {
               e.preventDefault()
               const text = e.clipboardData?.getData('text/plain') ?? ''
+              const mediaUrl = firstMediaUrl(text)
+              if (mediaUrl && commentRef.current) {
+                const stripped = stripMediaUrls(text, [mediaUrl])
+                if (stripped) document.execCommand('insertText', false, stripped)
+                insertGifImage(commentRef.current, mediaUrl)
+                setCommentHasText(true)
+                return
+              }
               if (text) document.execCommand('insertText', false, text)
             }}
             onInput={() => {
