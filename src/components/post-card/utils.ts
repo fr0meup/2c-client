@@ -22,6 +22,7 @@ export function cleanPostText(text: string): string {
       return String.fromCodePoint(code)
     })
     .replace(/[\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF\u00AD\u061C\u180E\uFFFC\uFFF9-\uFFFB]|\u034F/g, '')
+    .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
 
