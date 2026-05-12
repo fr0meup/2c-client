@@ -192,24 +192,87 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
   function getEditorText(): string {
     const el = editorRef.current
     if (!el) return ''
-    const html = el.innerHTML
     // Convert <strong>/<b> to ** markers, strip remaining tags
-    return html
-      .replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gi, (_m, inner: string) => {
-        return inner.replace(/<br\s*\/?>/gi, '\n').split('\n').map((l: string) => `> ${l}`).join('\n') + '\n'
+    const isBlock = (elem: HTMLElement) => ['DIV', 'P', 'BLOCKQUOTE', 'UL', 'OL', 'LI'].includes(elem.tagName)
+    const serializeInlineText = (nodes: NodeListOf<ChildNode> | ChildNode[]): string => serializeInlineLines(nodes).join('\n')
+    const serializeInlineNode = (node: ChildNode): string => {
+      if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ''
+      if (node.nodeType !== Node.ELEMENT_NODE) return ''
+
+      const elem = node as HTMLElement
+      if (elem.tagName === 'IMG' && elem.hasAttribute('data-gif-url')) return ''
+      if (elem.hasAttribute('data-mention-uuid')) {
+        const uuid = elem.getAttribute('data-mention-uuid')
+        return uuid ? `[${elem.textContent || ''}](/user/${uuid})` : elem.textContent || ''
+      }
+      if (elem.tagName === 'STRONG' || elem.tagName === 'B') return `**${serializeInlineText(elem.childNodes)}**`
+      if (elem.tagName === 'BR') return '\n'
+      if (isBlock(elem)) return serializeBlock(elem).join('\n')
+      return serializeInlineText(elem.childNodes)
+    }
+    const serializeInlineLines = (nodes: NodeListOf<ChildNode> | ChildNode[]): string[] => {
+      const childNodes = Array.from(nodes)
+      const lines = ['']
+
+      childNodes.forEach((node, index) => {
+        if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'BR') {
+          if (index !== childNodes.length - 1) lines.push('')
+          return
+        }
+
+        const text = serializeInlineNode(node)
+        const split = text.split('\n')
+        lines[lines.length - 1] += split[0]
+        for (let i = 1; i < split.length; i++) lines.push(split[i])
       })
-      .replace(/<li>(.*?)<\/li>/gi, '- $1\n')
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/div>/gi, '\n').replace(/<div[^>]*>/gi, '')
-      .replace(/<\/p>/gi, '\n').replace(/<p[^>]*>/gi, '')
-      .replace(/<(strong|b)>(.*?)<\/\1>/gi, '**$2**')
-      .replace(/<img[^>]*data-gif-url="[^"]*"[^>]*>/gi, '')
-      .replace(/<span[^>]*data-mention-uuid="([^"]*)"[^>]*>([^<]*)<\/span>/gi, '[$2](/user/$1)')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
+
+      return lines
+    }
+    const serializeBlock = (elem: HTMLElement): string[] => {
+      if (elem.tagName === 'BLOCKQUOTE') return serializeInlineLines(elem.childNodes).map((line) => `> ${line}`)
+      if (elem.tagName === 'UL' || elem.tagName === 'OL') {
+        return Array.from(elem.children).flatMap((child) => serializeBlock(child as HTMLElement))
+      }
+      if (elem.tagName === 'LI') {
+        const lines = serializeInlineLines(elem.childNodes)
+        return lines.map((line, index) => index === 0 ? `- ${line}` : line)
+      }
+      return serializeInlineLines(elem.childNodes)
+    }
+    const lines: string[] = []
+    let currentLine = ''
+
+    Array.from(el.childNodes).forEach((node, index, nodes) => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const elem = node as HTMLElement
+        if (elem.tagName === 'BR') {
+          if (index !== nodes.length - 1) {
+            lines.push(currentLine)
+            currentLine = ''
+          }
+          return
+        }
+        if (isBlock(elem)) {
+          if (currentLine !== '') {
+            lines.push(currentLine)
+            currentLine = ''
+          }
+          lines.push(...serializeBlock(elem))
+          return
+        }
+      }
+
+      const text = serializeInlineNode(node as ChildNode)
+      const split = text.split('\n')
+      currentLine += split[0]
+      for (let i = 1; i < split.length; i++) {
+        lines.push(currentLine)
+        currentLine = split[i]
+      }
+    })
+
+    if (currentLine !== '' || lines.length === 0) lines.push(currentLine)
+    return lines.join('\n')
   }
 
   function handleEditorInput() {

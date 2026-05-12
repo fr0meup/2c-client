@@ -22,7 +22,6 @@ export function cleanPostText(text: string): string {
       return String.fromCodePoint(code)
     })
     .replace(/[\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF\u00AD\u061C\u180E\uFFFC\uFFF9-\uFFFB]|\u034F/g, '')
-    .replace(/\n{3,}/g, '\n')
     .trim()
 }
 
@@ -112,9 +111,10 @@ export function renderPostText(raw: string) {
         createElement('ul', { key: `ul-${i}`, className: 'my-0.5' }, ...items)
       )
     } else {
-      // Regular line
       if (i > 0) elements.push(createElement('br', { key: `br-${i}` }))
-      elements.push(createElement(Fragment, { key: `f-${i}` }, ...parseInline(lines[i])))
+      if (lines[i] !== '') {
+        elements.push(createElement(Fragment, { key: `f-${i}` }, ...parseInline(lines[i])))
+      }
       i++
     }
   }
