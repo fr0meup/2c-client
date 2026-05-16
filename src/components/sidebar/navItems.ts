@@ -40,15 +40,15 @@ export const navItems: NavItem[] = [
   {
     label: 'Bookmarks',
     path: '/bookmarks',
-    icon: 'https://iili.io/BtoLApp.png',
-    iconSelected: 'https://iili.io/BtoL5TN.png',
+    icon: 'https://iili.io/BpuaxaI.png',
+    iconSelected: 'https://iili.io/Bpuazvt.png',
     scale: 1.1,
   },
   {
     label: 'Transactions',
     path: '/transactions',
-    icon: 'https://iili.io/BtoL7jI.png',
-    iconSelected: 'https://iili.io/BtoLYQt.png',
+    icon: 'https://iili.io/BpuaIyX.png',
+    iconSelected: 'https://iili.io/Bpuauun.png',
     scale: 0.85,
   },
   {
