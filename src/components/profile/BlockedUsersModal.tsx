@@ -112,11 +112,14 @@ export function BlockedUsersModal({ onClose }: Props) {
           {/* List */}
           {blocked.length > 0 && (
             <div className="flex flex-col gap-1">
-              {blocked.map((entry) => {
-                const isUnblocking = unblockingUuid === entry.blocked_uuid
+              {blocked.map((entry, idx) => {
+                const raw = entry as unknown as Record<string, string>
+                const targetUuid = entry.blocked_uuid || raw.user_uuid || raw.uuid || raw.target_uuid || ''
+                const isUnblocking = targetUuid !== '' && unblockingUuid === targetUuid
+
                 return (
                   <div
-                    key={entry.blocked_uuid}
+                    key={targetUuid || idx}
                     className="flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors hover:bg-white/[0.03]"
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -125,29 +128,38 @@ export function BlockedUsersModal({ onClose }: Props) {
                       </div>
                       <div className="min-w-0">
                         <button
-                          onClick={() => { onClose(); navigate(`/user/${entry.blocked_uuid}`) }}
+                          onClick={() => {
+                            if (targetUuid) {
+                              onClose()
+                              navigate(`/user/${targetUuid}`)
+                            }
+                          }}
                           className="cursor-pointer truncate text-sm font-medium text-white/80 transition-colors hover:text-[#c8a44d]"
                         >
-                          {entry.blocked_uuid.slice(0, 8)}…
+                          {targetUuid ? `${targetUuid.slice(0, 8)}…` : 'Blocked User'}
                         </button>
-                        <p className="text-[11px] text-white/30">
-                          Blocked {timeAgoShort(entry.created_at)}
-                        </p>
+                        {entry.created_at && (
+                          <p className="text-[11px] text-white/30">
+                            Blocked {timeAgoShort(entry.created_at)}
+                          </p>
+                        )}
                       </div>
                     </div>
 
-                    <button
-                      disabled={isUnblocking}
-                      onClick={() => handleUnblock(entry.blocked_uuid)}
-                      className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-[11px] font-medium text-white/60 transition-all hover:border-white/[0.15] hover:bg-white/[0.08] hover:text-white disabled:opacity-50"
-                    >
-                      {isUnblocking ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <ShieldOff className="h-3 w-3" />
-                      )}
-                      Unblock
-                    </button>
+                    {targetUuid && (
+                      <button
+                        disabled={isUnblocking}
+                        onClick={() => handleUnblock(targetUuid)}
+                        className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-[11px] font-medium text-white/60 transition-all hover:border-white/[0.15] hover:bg-white/[0.08] hover:text-white disabled:opacity-50"
+                      >
+                        {isUnblocking ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <ShieldOff className="h-3 w-3" />
+                        )}
+                        Unblock
+                      </button>
+                    )}
                   </div>
                 )
               })}

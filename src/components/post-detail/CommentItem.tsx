@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { MessageSquare, MoreHorizontal, Link2, Trash2, Triangle, Star } from 'lucide-react'
+import { MessageSquare, MoreHorizontal, Link2, Trash2, Triangle, Star, ImagePlus, X, Loader2 } from 'lucide-react'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
-import { timeAgo, cleanPostText, renderPostText } from '@/components/post-card/utils'
+import { timeAgo, cleanPostText, renderPostText, formatExactDateTime } from '@/components/post-card/utils'
 import { useCreateComment, useDeleteComment } from '@/hooks/useComments'
 import { useVoteComment } from '@/hooks/useVotes'
 import { useAuth } from '@/lib/auth'
@@ -12,10 +12,12 @@ import { useToast } from '@/components/toast/ToastContext'
 import { humanizeError } from '@/lib/api'
 import type { Comment } from './CommentThread'
 import { obfuscateText } from '@/lib/utils'
-import { extractMediaUrls, firstMediaUrl, saveGif, removeGif, isGifSaved, getTextWithGifs, insertGifImage, normalizeMediaUrl, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
+import { extractMediaUrls, firstMediaUrl, saveGif, removeGif, isGifSaved, getTextWithGifs, insertGifImage, normalizeMediaUrl, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT, isUploadedUrl, fetchOrConvertImageToFile } from '@/lib/gif'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
 import { MentionPicker } from '@/components/mention-picker/MentionPicker'
 import { extractMentionUuids, notifyMentions } from '@/lib/mentionNotifications'
+import { useUploadImage } from '@/hooks/useUploadImage'
+import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
 
 function GifWithStar({ url }: { url: string }) {
   const [saved, setSaved] = useState(() => isGifSaved(url))
@@ -83,13 +85,18 @@ export function CommentItem({
   const [replyOpen, setReplyOpen] = useState(false)
   const [replyHasText, setReplyHasText] = useState(false)
   const [hasReplySelection, setHasReplySelection] = useState(false)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const replyRef = useRef<HTMLDivElement>(null)
   const { auth } = useAuth()
   const replyMutation = useCreateComment()
   const deleteMutation = useDeleteComment()
   const voteMutation = useVoteComment()
+  const uploadImage = useUploadImage()
   const isOwn = auth?.userUuid === comment.author_uuid
+  const [replyImageFile, setReplyImageFile] = useState<File | null>(null)
+  const [replyImagePreview, setReplyImagePreview] = useState<string | null>(null)
+  const replyFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -138,39 +145,71 @@ export function CommentItem({
     const text = mediaUrl ? stripMediaUrls(rawText, [mediaUrl]) || ZERO_WIDTH_MEDIA_TEXT : rawText
     const gifMeta = mediaUrl ? { giphy_url: mediaUrl, giphy_id: mediaUrl } : null
 
-    if (!text && !gifMeta) return
+    if (!text && !gifMeta && !replyImageFile) return
 
-    replyMutation.mutate(
-      {
-        post_uuid: comment.post_uuid,
-        text,
-        in_reply_to_uuid: comment.uuid,
-        ...gifMeta,
-      },
-      {
-        onSuccess: async () => {
-          if (replyRef.current) {
-            replyRef.current.innerHTML = ''
-            setReplyHasText(false)
-          }
-          setReplyOpen(false)
-          toast('success', 'Reply posted')
-          if (auth && mentionedUuids.length > 0) {
-            const result = await notifyMentions({
-              auth,
-              mentionedUuids,
-              postUuid: comment.post_uuid,
-              contentType: 'comment',
-            })
-            if (result.sent > 0) toast('success', `Mention notification sent to ${result.sent}`)
-            if (result.failed > 0) toast('error', `Failed to notify ${result.failed} mention${result.failed === 1 ? '' : 's'}`)
-          }
+    const doSubmit = (imageUrl?: string) => {
+      const finalImageUrl = imageUrl || mediaUrl
+      replyMutation.mutate(
+        {
+          post_uuid: comment.post_uuid,
+          text,
+          in_reply_to_uuid: comment.uuid,
+          ...(finalImageUrl ? { image_url: finalImageUrl } : {}),
         },
-        onError: (err) => {
-          toast('error', `Failed to reply: ${humanizeError(err)}`)
-        },
+        {
+          onSuccess: async () => {
+            if (replyRef.current) {
+              replyRef.current.innerHTML = ''
+              setReplyHasText(false)
+            }
+            if (mediaUrl) removeGif(mediaUrl)
+            setReplyImageFile(null)
+            setReplyImagePreview(null)
+            setReplyOpen(false)
+            toast('success', 'Reply posted')
+            if (auth && mentionedUuids.length > 0) {
+              const result = await notifyMentions({
+                auth,
+                mentionedUuids,
+                postUuid: comment.post_uuid,
+                contentType: 'comment',
+              })
+              if (result.sent > 0) toast('success', `Mention notification sent to ${result.sent}`)
+              if (result.failed > 0) toast('error', `Failed to notify ${result.failed} mention${result.failed === 1 ? '' : 's'}`)
+            }
+          },
+          onError: (err) => {
+            toast('error', `Failed to reply: ${humanizeError(err)}`)
+          },
+        }
+      )
+    }
+
+    if (replyImageFile || mediaUrl) {
+      const prepareUpload = async () => {
+        if (replyImageFile) {
+          const res = await uploadImage.mutateAsync(replyImageFile)
+          return res.publicURL
+        }
+        if (mediaUrl) {
+          if (isUploadedUrl(mediaUrl)) return mediaUrl
+          try {
+            const gifFile = await fetchOrConvertImageToFile(mediaUrl)
+            const res = await uploadImage.mutateAsync(gifFile)
+            return res.publicURL
+          } catch {
+            return undefined
+          }
+        }
+        return undefined
       }
-    )
+
+      prepareUpload()
+        .then((uploadedUrl) => doSubmit(uploadedUrl))
+        .catch((err) => toast('error', `Media upload failed: ${humanizeError(err)}`))
+    } else {
+      doSubmit()
+    }
   }
 
   const isDeleted = !!comment.deleted_at
@@ -201,7 +240,7 @@ export function CommentItem({
             role={comment.author_meta.role}
             size="small"
           />
-          <span className="text-xs text-white/40">{timeAgo(comment.created_at)}</span>
+          <span className="text-xs text-white/40 cursor-help hover:text-white/60 transition-colors" title={formatExactDateTime(comment.created_at)}>{timeAgo(comment.created_at)}</span>
         </div>
         <div className="relative" ref={menuRef}>
           <button
@@ -256,6 +295,7 @@ export function CommentItem({
           : undefined
         const strippedText = stripMediaUrls(text, rawGifFromMeta ? [rawGifFromMeta] : [])
         const allGifs: string[] = [...gifUrls, ...(gifFromMeta && !gifUrls.includes(gifFromMeta) ? [gifFromMeta] : [])]
+        const commentImageUrl = comment.comment_meta?.image_url
 
         return (
           <>
@@ -267,9 +307,31 @@ export function CommentItem({
             {allGifs.map((url, i) => (
               <GifWithStar key={i} url={url} />
             ))}
+            {commentImageUrl && (
+              <div className="mt-1.5 w-fit">
+                <img
+                  src={commentImageUrl}
+                  alt=""
+                  className="max-w-[320px] max-h-[280px] rounded-xl object-cover cursor-pointer transition-opacity hover:opacity-90"
+                  loading="lazy"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setLightboxUrl(commentImageUrl)
+                  }}
+                />
+              </div>
+            )}
           </>
         )
       })()}
+
+      {lightboxUrl && (
+        <ImageLightbox
+          src={lightboxUrl}
+          downloadName={`comment-${comment.uuid}.jpg`}
+          onClose={() => setLightboxUrl(null)}
+        />
+      )}
 
       {/* Bottom bar: meta + actions */}
       <div className="mt-2 flex items-center gap-2">
@@ -349,7 +411,7 @@ export function CommentItem({
 
       {/* Reply input */}
       {replyOpen && (
-        <div className={`mt-2 relative border border-white/[0.08] bg-white/[0.04] transition-all ${replyHasText ? 'rounded-xl' : 'rounded-full'}`}>
+        <div className={`mt-2 relative border border-white/[0.08] bg-white/[0.04] transition-all ${replyHasText || replyImagePreview ? 'rounded-xl' : 'rounded-full'}`}>
           <div
             ref={replyRef}
             contentEditable
@@ -365,21 +427,70 @@ export function CommentItem({
                 setReplyHasText(true)
                 return
               }
+              // Check for pasted image files
+              const items = e.clipboardData?.items
+              if (items) {
+                for (const item of items) {
+                  if (item.type.startsWith('image/')) {
+                    const file = item.getAsFile()
+                    if (file) {
+                      setReplyImageFile(file)
+                      setReplyImagePreview(URL.createObjectURL(file))
+                      setReplyHasText(true)
+                      return
+                    }
+                  }
+                }
+              }
               if (text) document.execCommand('insertText', false, text)
             }}
             onInput={() => {
               const el = replyRef.current
               if (!el) return
-              const has = el.textContent?.trim() !== '' || el.querySelector('img') !== null
+              const has = el.textContent?.trim() !== '' || el.querySelector('img') !== null || !!replyImageFile
               setReplyHasText(has)
-              if (!has && el.innerHTML !== '') el.innerHTML = ''
+              if (!has && el.innerHTML !== '' && !replyImageFile) el.innerHTML = ''
             }}
             onKeyDown={(e) => {
               if (e.key === 'Escape') setReplyOpen(false)
             }}
-            className="w-full min-h-[36px] px-4 py-2 pr-[12.5rem] text-sm text-white empty:before:content-[attr(data-placeholder)] empty:before:text-white/25 focus:outline-none"
+            className="w-full min-h-[36px] px-4 py-2 pr-[14rem] text-sm text-white empty:before:content-[attr(data-placeholder)] empty:before:text-white/25 focus:outline-none"
           />
           <MentionPicker editorRef={replyRef} onMentionInserted={() => setReplyHasText(true)} />
+          {/* Image preview */}
+          {replyImagePreview && (
+            <div className="relative mx-3 mb-2 w-fit">
+              <img
+                src={replyImagePreview}
+                alt="Upload preview"
+                className="max-h-[120px] max-w-[200px] rounded-lg object-cover"
+              />
+              <button
+                onClick={() => {
+                  setReplyImageFile(null)
+                  setReplyImagePreview(null)
+                  if (!replyRef.current?.textContent?.trim()) setReplyHasText(false)
+                }}
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-black/70 text-white/80 transition-colors hover:bg-black hover:text-white"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+          <input
+            ref={replyFileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              setReplyImageFile(file)
+              setReplyImagePreview(URL.createObjectURL(file))
+              setReplyHasText(true)
+              e.target.value = ''
+            }}
+          />
           <div className="absolute right-1.5 bottom-1 flex items-center gap-1">
             <button
               disabled={!hasReplySelection}
@@ -416,6 +527,14 @@ export function CommentItem({
                 setReplyHasText(true)
               }}
             />
+            <button
+              onClick={() => replyFileInputRef.current?.click()}
+              disabled={uploadImage.isPending}
+              className="flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white/50 disabled:cursor-not-allowed disabled:opacity-30"
+              title="Attach image"
+            >
+              {uploadImage.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
+            </button>
             <GifPickerButton
               onSelect={(url) => {
                 const el = replyRef.current
@@ -425,13 +544,13 @@ export function CommentItem({
               }}
             />
             <button
-              disabled={!replyHasText || replyMutation.isPending}
+              disabled={(!replyHasText && !replyImageFile) || replyMutation.isPending || uploadImage.isPending}
               onClick={handleSubmitReply}
               className={`h-[28px] cursor-pointer px-3 text-xs font-semibold transition-all ${
-                replyHasText ? 'rounded-lg bg-[#c8a44d] text-[#0f0e0a] hover:bg-[#c8a44d]/85' : 'rounded-full bg-white/[0.06] text-white/25'
+                replyHasText || replyImageFile ? 'rounded-lg bg-[#c8a44d] text-[#0f0e0a] hover:bg-[#c8a44d]/85' : 'rounded-full bg-white/[0.06] text-white/25'
               }`}
             >
-              {replyMutation.isPending ? 'Replying…' : 'Reply'}
+              {uploadImage.isPending ? 'Uploading…' : replyMutation.isPending ? 'Replying…' : 'Reply'}
             </button>
           </div>
         </div>

@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, Download, MessageSquare, Triangle, MoreHorizontal, Link2, Trash2, Eye, Quote, UserPlus, UserCheck, Mail, Ban, Bookmark, Loader2, Star } from 'lucide-react'
+import { X, MessageSquare, Triangle, MoreHorizontal, Link2, Trash2, Eye, Quote, UserPlus, UserCheck, Mail, Ban, Bookmark, Loader2, Star } from 'lucide-react'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
 import type { PostCardData } from './types'
-import { cleanPostText, renderPostText, timeAgo } from './utils'
+import { cleanPostText, renderPostText, timeAgo, formatExactDateTime } from './utils'
 import { useVotePost } from '@/hooks/useVotePost'
 import { useDeletePost } from '@/hooks/usePostMutations'
 import { useToggleBookmark } from '@/hooks/useBookmarks'
@@ -13,6 +13,7 @@ import { useFollow } from '@/components/profile/FollowContext'
 import { useToast } from '@/components/toast/ToastContext'
 import { humanizeError } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { useCompose } from '@/layouts/AppLayout'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePrefetch } from '@/hooks/usePrefetch'
 import { preloadRoute } from '@/lib/routePreload'
@@ -23,10 +24,12 @@ import { LikertScale } from './LikertScale'
 import { PicksCard } from './PicksCard'
 import { QuotePostCard } from './QuotePostCard'
 import { TransactionCard } from './TransactionCard'
+import { BudgetCard } from './BudgetCard'
 import { LinkCard } from './LinkCard'
 import { usePollResults, useLikertResults } from '@/hooks/usePostResults'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 import { VideoPlayer } from '@/components/video-player/VideoPlayer'
+import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
 import { extractMediaUrls, normalizeMediaUrl, saveGif, removeGif, isGifSaved, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
 
 const TEXT_LIMIT = 280
@@ -64,7 +67,7 @@ function PlatformIcon({ platform }: { platform?: string }) {
   if (platform === 'ios') {
     return (
       <img
-        src="https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fapple.b409ad25.png&w=32&q=75&dpl=dpl_57sq3a4okDe2tVXZVSYu9FCcDV21"
+        src="https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fapple.0xxwgeqy4kw1g.png&w=32&q=75&dpl=dpl_5ovAARAu8zMP9MtrCL9RTcRsDq7b"
         alt="iOS"
         className="h-3.5 w-3.5 opacity-50"
       />
@@ -73,7 +76,7 @@ function PlatformIcon({ platform }: { platform?: string }) {
   if (platform === 'android') {
     return (
       <img
-        src="https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fandroid.c3fa6e95.png&w=32&q=75&dpl=dpl_57sq3a4okDe2tVXZVSYu9FCcDV21"
+        src="https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fandroid.0ujtbb1oilk8l.png&w=32&q=75&dpl=dpl_5ovAARAu8zMP9MtrCL9RTcRsDq7b"
         alt="Android"
         className="h-3.5 w-3.5 opacity-50"
       />
@@ -99,6 +102,7 @@ interface PostCardProps {
 export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, onQuote }: PostCardProps) {
   const navigate = useNavigate()
   const { auth } = useAuth()
+  const compose = useCompose()
   const { aliasFor, isFollowing, toggleFollow } = useFollow()
   const { toast } = useToast()
   const queryClient = useQueryClient()
@@ -106,7 +110,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
   const unblockUser = useUnblockUser()
   const { prefetchComments, prefetchPost } = usePrefetch()
   const alias = aliasFor(post.author_uuid)
-  const imageSrc = post.post_meta?.src
+  const imageSrc = post.post_meta?.src || post.post_meta?.imageUrl
   const isVideoPost = post.post_meta?.media_type === 'video'
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -130,6 +134,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
   const isLikert = post.post_type === 5
   const isPicks = post.post_type === 7
   const isTransaction = post.post_type === 8
+  const isBudget = post.post_type === 9
   const isLink = post.post_type === 1 && !!post.post_meta?.link
 
   const { data: pollResults } = usePollResults(
@@ -189,7 +194,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
                 role={post.author_meta.role}
                 size="small"
               />
-              <span className="whitespace-nowrap text-xs text-white/40 sm:text-sm">
+              <span className="whitespace-nowrap text-xs text-white/40 sm:text-sm cursor-help hover:text-white/60 transition-colors" title={formatExactDateTime(post.created_at)}>
                 {timeAgo(post.created_at)}
               </span>
               <span className="text-sm text-white/40">·</span>
@@ -230,7 +235,12 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
                     Copy link
                   </button>
                   <button
-                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onQuote?.(post) }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setMenuOpen(false)
+                      if (onQuote) onQuote(post)
+                      else compose.openQuote(post)
+                    }}
                     className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
                   >
                     <Quote className="h-3.5 w-3.5 text-white/40" />
@@ -484,7 +494,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
           )}
 
           {/* Media */}
-          {imageSrc && (
+          {imageSrc && !isTransaction && (
             isVideoPost ? (
               <div className="mx-auto mt-3 w-[85%]" onClick={(e) => e.stopPropagation()}>
                 <VideoPlayer src={imageSrc} compact />
@@ -499,51 +509,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
             )
           )}
 
-          {/* Lightbox */}
-          {lightboxOpen && imageSrc && (
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-              onClick={(e) => { e.stopPropagation(); setLightboxOpen(false) }}
-            >
-              <div className="absolute right-4 top-4 flex items-center gap-2">
-                <button
-                  onClick={async (e) => {
-                    e.stopPropagation()
-                    try {
-                      const resp = await fetch(imageSrc)
-                      const blob = await resp.blob()
-                      const url = URL.createObjectURL(blob)
-                      const a = document.createElement('a')
-                      a.href = url
-                      a.download = `image-${post.uuid}.${blob.type.split('/')[1] || 'jpg'}`
-                      document.body.appendChild(a)
-                      a.click()
-                      document.body.removeChild(a)
-                      URL.revokeObjectURL(url)
-                    } catch { /* ignore */ }
-                  }}
-                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-                  title="Download"
-                >
-                  <Download className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setLightboxOpen(false) }}
-                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-                  title="Close"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              {isVideoPost ? (
-                <div className="max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
-                  <VideoPlayer src={imageSrc} />
-                </div>
-              ) : (
-                <img src={imageSrc} alt="" className="max-h-[90vh] max-w-[90vw] rounded-xl object-contain" onClick={(e) => e.stopPropagation()} />
-              )}
-            </div>
-          )}
+
 
           {/* Transaction card */}
           {isTransaction && post.post_meta && (
@@ -554,6 +520,18 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
               transactionValue={post.post_meta.transactionValue}
               currencyCode={post.post_meta.currencyCode}
               categoryIconUrl={post.post_meta.categoryIconUrl}
+              imageUrl={post.post_meta.imageUrl}
+            />
+          )}
+
+          {/* Budget card */}
+          {isBudget && post.post_meta && (
+            <BudgetCard
+              month={post.post_meta.month}
+              spendingLimit={post.post_meta.spendingLimit}
+              totalAllocated={post.post_meta.totalAllocated}
+              totalSpent={post.post_meta.totalSpent}
+              categories={post.post_meta.categories}
             />
           )}
 
@@ -614,6 +592,34 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
           </div>
         </div>
       </article>
+
+      {/* Lightbox */}
+      {lightboxOpen && imageSrc && (
+        isVideoPost ? (
+          <div
+            className="fixed inset-0 z-[9999] flex h-screen w-screen items-center justify-center overflow-hidden bg-black/90 backdrop-blur-md select-none"
+            onClick={(e) => { e.stopPropagation(); setLightboxOpen(false) }}
+          >
+            <div className="absolute right-4 top-4 flex items-center gap-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); setLightboxOpen(false) }}
+                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+              <VideoPlayer src={imageSrc} />
+            </div>
+          </div>
+        ) : (
+          <ImageLightbox
+            src={imageSrc}
+            downloadName={`post-${post.uuid}.jpg`}
+            onClose={() => setLightboxOpen(false)}
+          />
+        )
+      )}
 
       {deleteModalOpen && (
         <ConfirmDeleteModal

@@ -208,6 +208,7 @@ function VoteButton({
               textShadow: isSelected ? tier.glow : 'none',
             }}
           >
+            {avgNw < 0 && '-'}
             <span className="text-[9px] opacity-50">$</span>
             {formatNumber(avgNw)}
           </span>

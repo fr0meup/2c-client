@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import type { PostCardData } from './types'
-import { timeAgo, renderPostText } from './utils'
+import { timeAgo, renderPostText, formatExactDateTime } from './utils'
 
 interface QuotePostCardProps {
   quote: PostCardData
@@ -56,7 +56,7 @@ export function QuotePostCard({ quote, className = '' }: QuotePostCardProps) {
               role={quote.author_meta.role}
               size="small"
             />
-            <span className="text-[11px] text-white/30">
+            <span className="text-[11px] text-white/30 cursor-help hover:text-white/50 transition-colors" title={formatExactDateTime(quote.created_at)}>
               {timeAgo(quote.created_at)}
             </span>
             {quote.topic && (

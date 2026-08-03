@@ -183,3 +183,66 @@ export function removeFave(url: string): string[] {
 export function isFave(url: string): boolean {
   return getFaveGifs().includes(url)
 }
+
+export function isUploadedUrl(url?: string): boolean {
+  if (!url) return false
+  return url.includes('twocents-ugc.s3') || url.includes('api.twocents.money') || url.includes('/s3-upload') || url.includes('/ugc-proxy')
+}
+
+export async function fetchOrConvertImageToFile(url: string): Promise<File> {
+  let blob: Blob | null = null
+
+  // 1. Direct fetch
+  try {
+    const res = await fetch(url)
+    if (res.ok) {
+      blob = await res.blob()
+    }
+  } catch {
+    /* CORS or network error */
+  }
+
+  // 2. Proxy fetch
+  if (!blob) {
+    try {
+      const proxyUrl = `/ugc-proxy?url=${encodeURIComponent(url)}`
+      const res = await fetch(proxyUrl)
+      if (res.ok) {
+        blob = await res.blob()
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // 3. Canvas fallback
+  if (!blob) {
+    blob = await new Promise<Blob>((resolve, reject) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth || 400
+        canvas.height = img.naturalHeight || 300
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(img, 0, 0)
+          canvas.toBlob((b) => {
+            if (b) resolve(b)
+            else reject(new Error('Canvas to blob failed'))
+          }, 'image/png')
+        } else {
+          reject(new Error('No canvas context'))
+        }
+      }
+      img.onerror = () => reject(new Error('Image failed to load'))
+      img.src = url
+    })
+  }
+
+  const mime = blob.type || 'image/png'
+  const ext = mime.includes('gif') ? 'gif' : mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : mime.includes('webp') ? 'webp' : 'png'
+  const filename = `media-${Date.now()}.${ext}`
+
+  return new File([blob], filename, { type: mime })
+}

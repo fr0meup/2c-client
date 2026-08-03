@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { Download } from 'lucide-react'
 import { ComposePost } from '@/components/compose-post/ComposePost'
 import { AdvancedSearchPanel, hasAdvancedParams } from '@/components/feed-filters/AdvancedSearchModal'
 import { PostCard } from '@/components/post-card/PostCard'
@@ -27,6 +28,69 @@ function isResultSort(value: string | null): value is ResultSort {
   return value != null && value in RESULT_SORT_LABELS
 }
 
+function downloadSearchDataset(
+  posts: PostCardData[],
+  voteMap: Map<string, 1 | -1 | 0>,
+  pollVoteMap: Map<string, number>,
+  pickVoteMap: Map<string, 'yes' | 'no'>,
+  searchQuery?: string
+) {
+  if (posts.length === 0) return
+
+  const votesArray: { content_uuid: string; vote_type: 1 | -1 | 0 }[] = []
+  const pollsArray: { post_uuid: string; option: number }[] = []
+  const picksArray: { post_uuid: string; vote: 'yes' | 'no' }[] = []
+
+  for (const post of posts) {
+    const v = voteMap.get(post.uuid)
+    if (v !== undefined && v !== 0) {
+      votesArray.push({ content_uuid: post.uuid, vote_type: v })
+    }
+    const p = pollVoteMap.get(post.uuid)
+    if (p !== undefined) {
+      pollsArray.push({ post_uuid: post.uuid, option: p })
+    }
+    const pk = pickVoteMap.get(post.uuid)
+    if (pk !== undefined) {
+      picksArray.push({ post_uuid: post.uuid, vote: pk })
+    }
+  }
+
+  let newestDate: string | null = null
+  let oldestDate: string | null = null
+  for (const p of posts) {
+    if (p.created_at) {
+      if (!newestDate || p.created_at > newestDate) newestDate = p.created_at
+      if (!oldestDate || p.created_at < oldestDate) oldestDate = p.created_at
+    }
+  }
+
+  const dataset = {
+    posts,
+    votes: votesArray,
+    polls: pollsArray,
+    picks: picksArray,
+    meta: {
+      count: posts.length,
+      query: searchQuery || null,
+      exportedAt: new Date().toISOString(),
+      newestPostDate: newestDate,
+      oldestPostDate: oldestDate,
+    },
+  }
+
+  const jsonStr = JSON.stringify(dataset, null, 2)
+  const blob = new Blob([jsonStr], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `2c-dataset-${(searchQuery || 'search').replace(/[^a-zA-Z0-9_-]/g, '_')}-${Date.now()}.json`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 export function Feed() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -39,11 +103,16 @@ export function Feed() {
   // Read date + filter params
   const dateFrom = searchParams.get('date_from')
   const dateTo = searchParams.get('date_to')
-  const hasAdv = searchParams.has('adv')
-  const isDateFiltering = !!(dateFrom || dateTo)
-  const scanKey = `${dateFrom ?? ''}|${dateTo ?? ''}|${searchParams.get('adv_topic') ?? ''}`
+  const hasAdv = searchParams.has('adv') || searchParams.has('min_balance') || searchParams.has('max_balance') || searchParams.has('genders') || searchParams.has('verified') || searchParams.has('country') || searchParams.has('city') || searchParams.has('has_image') || searchParams.has('has_video') || searchParams.has('has_poll') || searchParams.has('has_likert')
+  const isDateFiltering = !!(dateFrom || dateTo || searchQuery || hasAdv)
+  const now = new Date()
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const effectiveDateFrom = dateFrom || '2024-12-06'
+  const effectiveDateTo = dateTo || todayStr
+  const scanKey = `${effectiveDateFrom}|${effectiveDateTo}|${searchParams.get('adv_topic') ?? ''}`
   const sortParam = searchParams.get('sort')
-  const resultSort: ResultSort = isResultSort(sortParam) ? sortParam : 'newest'
+  const defaultSort: ResultSort = 'newest'
+  const resultSort: ResultSort = isResultSort(sortParam) ? sortParam : defaultSort
   const [sortOpen, setSortOpen] = useState(false)
   const sortRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -57,7 +126,7 @@ export function Feed() {
 
   function selectResultSort(sort: ResultSort) {
     const params = new URLSearchParams(location.search)
-    if (sort === 'newest') params.delete('sort')
+    if (sort === defaultSort) params.delete('sort')
     else params.set('sort', sort)
     const nextSearch = params.toString()
     navigate(nextSearch ? `/?${nextSearch}` : '/', { replace: true })
@@ -85,7 +154,7 @@ export function Feed() {
   // Server-side: only topic + search query. Everything else is client-side filtered.
   const advTopic = searchParams.get('adv_topic') || undefined
 
-  // ── Normal feed (useFeed) — disabled when date filtering ──
+  // ── Normal feed (useFeed) — disabled when date/search filtering ──
   const {
     data,
     isLoading,
@@ -110,11 +179,11 @@ export function Feed() {
     return () => window.removeEventListener(NAVIGATION_PENDING_EVENT, handlePending)
   }, [isDateFiltering, location.search, refetch])
 
-  // ── Concurrent bulk fetch — enabled when date filtering ──
+  // ── Concurrent bulk fetch — enabled when date/search filtering ──
   // serverParams is empty so changing client-side filters won't re-fetch
   const bulk = useBulkDateFetch({
-    dateFrom: dateFrom || '',
-    dateTo: dateTo || '',
+    dateFrom: effectiveDateFrom,
+    dateTo: effectiveDateTo,
     concurrency: 20,
     topic: advTopic,
     serverParams: {},
@@ -159,7 +228,7 @@ export function Feed() {
   // Client-side filtering for worker results
   const posts = useMemo(() => {
   let nextPosts = [...rawPosts]
-  if (isDateFiltering && hasAdv) {
+  if (isDateFiltering) {
     const fSearch = searchQuery?.trim().toLowerCase()
     const fMinBal = searchParams.get('min_balance')
     const fMaxBal = searchParams.get('max_balance')
@@ -213,7 +282,7 @@ export function Feed() {
   }
 
   // Post-search sort (applied after filtering)
-  if (hasAdv && isDateFiltering) {
+  if (isDateFiltering) {
     switch (resultSort) {
       case 'oldest':
         nextPosts.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
@@ -326,46 +395,61 @@ export function Feed() {
         ) : (
           <>
             {isDateFiltering && (
-              <div className="relative flex items-center justify-center text-xs text-white/25">
+              <div className="relative flex items-center justify-between text-xs text-white/25">
                 <span>
                   {posts.length} post{posts.length !== 1 ? 's' : ''} found
-                  {` · ${bulk.scanned} scanned`}
+                  {bulk.scanned > 0 ? ` · ${bulk.scanned} scanned` : ''}
                 </span>
-                {hasAdv && !bulk.isLoading && (
-                  <div ref={sortRef} className="absolute right-0">
+
+                <div className="flex items-center gap-1.5">
+                  {posts.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => setSortOpen(!sortOpen)}
-                      className={cn(
-                        'inline-flex h-6 cursor-pointer items-center gap-1 rounded-full border px-2 text-[10px] font-medium transition-all',
-                        sortOpen
-                          ? 'border-[#c8a44d]/30 bg-[#c8a44d]/10 text-[#c8a44d]'
-                          : 'border-white/[0.08] bg-white/[0.03] text-white/40 hover:border-white/[0.12] hover:text-white/60'
-                      )}
+                      onClick={() => downloadSearchDataset(posts, voteMap, pollVoteMap, pickVoteMap, searchQuery)}
+                      className="inline-flex h-6 cursor-pointer items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 text-[10px] font-medium text-white/50 transition-all hover:border-[#c8a44d]/30 hover:bg-[#c8a44d]/10 hover:text-[#c8a44d]"
+                      title="Download matching dataset as JSON"
                     >
-                      {RESULT_SORT_LABELS[resultSort]}
-                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={cn('transition-transform', sortOpen && 'rotate-180')}><path d="m6 9 6 6 6-6"/></svg>
+                      <Download className="h-3 w-3" />
+                      <span>Dataset ({posts.length})</span>
                     </button>
-                    {sortOpen && (
-                      <div className="absolute right-0 top-full z-50 mt-1 min-w-[9rem] rounded-lg border border-white/[0.06] bg-[#141410] py-1 shadow-lg">
-                        {Object.entries(RESULT_SORT_LABELS).map(([val, label]) => (
-                          <button
-                            key={val}
-                            onClick={() => selectResultSort(val as ResultSort)}
-                            className={cn(
-                              'flex w-full cursor-pointer items-center px-3 py-1.5 text-xs transition-colors',
-                              resultSort === val
-                                ? 'bg-white/[0.03] text-[#c8a44d]'
-                                : 'text-white/60 hover:bg-white/[0.03] hover:text-white/80'
-                            )}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                  )}
+
+                  {!bulk.isLoading && (
+                    <div ref={sortRef} className="relative z-20">
+                      <button
+                        type="button"
+                        onClick={() => setSortOpen(!sortOpen)}
+                        className={cn(
+                          'inline-flex h-6 cursor-pointer items-center gap-1 rounded-full border px-2 text-[10px] font-medium transition-all',
+                          sortOpen
+                            ? 'border-[#c8a44d]/30 bg-[#c8a44d]/10 text-[#c8a44d]'
+                            : 'border-white/[0.08] bg-white/[0.03] text-white/40 hover:border-white/[0.12] hover:text-white/60'
+                        )}
+                      >
+                        {RESULT_SORT_LABELS[resultSort]}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={cn('transition-transform', sortOpen && 'rotate-180')}><path d="m6 9 6 6 6-6"/></svg>
+                      </button>
+                      {sortOpen && (
+                        <div className="absolute right-0 top-full z-50 mt-1 min-w-[9rem] rounded-lg border border-white/[0.06] bg-[#141410] py-1 shadow-lg">
+                          {Object.entries(RESULT_SORT_LABELS).map(([val, label]) => (
+                            <button
+                              key={val}
+                              onClick={() => selectResultSort(val as ResultSort)}
+                              className={cn(
+                                'flex w-full cursor-pointer items-center px-3 py-1.5 text-xs transition-colors',
+                                resultSort === val
+                                  ? 'bg-[#c8a44d]/10 font-medium text-[#c8a44d]'
+                                  : 'text-white/60 hover:bg-white/[0.03] hover:text-white/80'
+                              )}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             {visiblePosts.map((post) => (

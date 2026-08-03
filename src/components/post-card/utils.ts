@@ -15,6 +15,25 @@ export function timeAgo(dateStr: string): string {
   return `${months}mo`
 }
 
+export function formatExactDateTime(dateStr?: string): string {
+  if (!dateStr) return ''
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    return d.toLocaleString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+  } catch {
+    return dateStr ?? ''
+  }
+}
+
 export function cleanPostText(text: string): string {
   return text
     .replace(/&#\d+;/g, (match) => {

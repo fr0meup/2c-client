@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MessageSquare, Triangle, Star } from 'lucide-react'
 import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
-import { timeAgo, cleanPostText, renderPostText } from '@/components/post-card/utils'
+import { timeAgo, cleanPostText, renderPostText, formatExactDateTime } from '@/components/post-card/utils'
 import { useFollow } from './FollowContext'
 import { useVoteComment } from '@/hooks/useVotes'
 import type { Comment } from '@/lib/types'
 import { extractMediaUrls, normalizeMediaUrl, saveGif, removeGif, isGifSaved, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
+import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
 import { saveScrollPosition } from '@/App'
 import { announceNavigationPending } from '@/lib/navigationPending'
 
@@ -63,6 +64,7 @@ export function ProfileCommentCard({ comment, postTitle, initialVote = 0 }: Prop
   const isDeleted = !!comment.deleted_at
   const [currentVote, setCurrentVote] = useState<1 | -1 | 0>(initialVote)
   const [voteCount, setVoteCount] = useState(comment.upvote_count)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const voteMutation = useVoteComment()
 
   function handleVote(dir: 1 | -1) {
@@ -99,6 +101,7 @@ export function ProfileCommentCard({ comment, postTitle, initialVote = 0 }: Prop
         const gifFromMeta = rawGifFromMeta ? normalizeMediaUrl(rawGifFromMeta) : undefined
         const strippedText = stripMediaUrls(text, rawGifFromMeta ? [rawGifFromMeta] : [])
         const allGifs: string[] = [...gifUrls, ...(gifFromMeta && !gifUrls.includes(gifFromMeta) ? [gifFromMeta] : [])]
+        const commentImageUrl = (comment.comment_meta as { image_url?: string })?.image_url
 
         return (
           <>
@@ -108,9 +111,31 @@ export function ProfileCommentCard({ comment, postTitle, initialVote = 0 }: Prop
             {allGifs.map((url, i) => (
               <GifWithStar key={i} url={url} />
             ))}
+            {commentImageUrl && (
+              <div className="mt-1.5 w-fit">
+                <img
+                  src={commentImageUrl}
+                  alt=""
+                  className="max-w-[280px] max-h-[200px] rounded-xl object-cover cursor-pointer transition-opacity hover:opacity-90"
+                  loading="lazy"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setLightboxUrl(commentImageUrl)
+                  }}
+                />
+              </div>
+            )}
           </>
         )
       })()}
+
+      {lightboxUrl && (
+        <ImageLightbox
+          src={lightboxUrl}
+          downloadName={`comment-${comment.uuid}.jpg`}
+          onClose={() => setLightboxUrl(null)}
+        />
+      )}
 
       {/* Footer: meta pill + timestamp + vote buttons */}
       <div className="flex items-center gap-2">
@@ -122,7 +147,7 @@ export function ProfileCommentCard({ comment, postTitle, initialVote = 0 }: Prop
           arena={comment.author_meta.arena}
           variant="comment"
         />
-        <span className="text-xs text-white/30">{timeAgo(comment.created_at)}</span>
+        <span className="text-xs text-white/30 cursor-help hover:text-white/50 transition-colors" title={formatExactDateTime(comment.created_at)}>{timeAgo(comment.created_at)}</span>
 
         <div className="ml-auto flex h-[38px] items-center rounded-full border border-[#c8a44d]/20 bg-gradient-to-b from-white/[0.07] to-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_4px_rgba(0,0,0,0.15)]">
           <button

@@ -1,17 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useMutation } from '@tanstack/react-query'
-import { ImagePlus, X, ChevronDown, BarChart3, List, Bold, Plus, Minus, Loader2, FileText, Save, Check, MoreHorizontal } from 'lucide-react'
+import { ImagePlus, X, ChevronDown, BarChart3, List, Bold, Plus, Minus, Loader2, FileText, Save, Check, MoreHorizontal, Pin } from 'lucide-react'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
-import { firstMediaUrl, insertGifImage, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
+import { firstMediaUrl, insertGifImage, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT, saveGif, fetchOrConvertImageToFile, isUploadedUrl } from '@/lib/gif'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { GenderIcon } from '@/components/gender-icon/GenderIcon'
 import { QuotePostCard } from '@/components/post-card/QuotePostCard'
 import { useAuth } from '@/lib/auth'
 import { useUserProfile } from '@/hooks/useUserProfile'
 import { useCreatePost } from '@/hooks/usePostMutations'
+import { useUploadImage } from '@/hooks/useUploadImage'
 import { useToast } from '@/components/toast/ToastContext'
-import { humanizeError, rpc } from '@/lib/api'
+import { humanizeError } from '@/lib/api'
 import { saveDraft, getDraftCount } from '@/lib/drafts'
 import type { Draft } from '@/lib/drafts'
 import { DraftsModal } from './DraftsModal'
@@ -21,6 +21,9 @@ import { obfuscateText } from '@/lib/utils'
 import { MentionPicker } from '@/components/mention-picker/MentionPicker'
 import { extractMentionUuids, notifyMentions } from '@/lib/mentionNotifications'
 
+import { getCustomTopics, initCustomTopics, addCustomTopic, removeCustomTopic, formatTopicSlug } from '@/lib/customTopics'
+import { getPinnedTopic, setPinnedTopic } from '@/lib/pinnedTopic'
+
 interface ComposePostProps {
   onClose?: () => void
   scrollHeight?: number
@@ -29,44 +32,7 @@ interface ComposePostProps {
 }
 
 const COMPOSE_TOPICS = new Set(TOPIC_MENU.flatMap((g) => g.items))
-
-interface UploadImageResult {
-  presignedURL: string
-  publicURL: string
-}
-
-function useUploadImage() {
-  const { auth } = useAuth()
-
-  return useMutation({
-    mutationFn: async (file: File): Promise<{ publicURL: string; isVideo: boolean }> => {
-      if (!auth) throw new Error('Not authenticated')
-
-      const isVideo = file.type.startsWith('video/')
-      const upload = await rpc<UploadImageResult>(
-        '/v1/media/uploadImage',
-        { contentType: 'image/png', size: file.size },
-        auth.token,
-        auth.userUuid
-      )
-      const presigned = new URL(upload.presignedURL)
-      const putRes = await fetch('/s3-upload' + presigned.pathname + presigned.search, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type || 'image/png',
-          'x-amz-server-side-encryption': 'AES256',
-        },
-        body: file,
-      })
-
-      if (!putRes.ok) {
-        throw new Error(`S3 upload failed: ${putRes.status} ${putRes.statusText}`)
-      }
-
-      return { publicURL: upload.publicURL, isVideo }
-    },
-  })
-}
+const MAX_POLL_OPTIONS = 10
 
 export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, defaultTopic }: ComposePostProps) {
   const { auth } = useAuth()
@@ -76,13 +42,22 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
   const uploadImage = useUploadImage()
   const { toast } = useToast()
 
+  const [customTopics, setCustomTopics] = useState<string[]>(() => getCustomTopics())
+  const [addingCustomTopic, setAddingCustomTopic] = useState(false)
+  const [newTopicInput, setNewTopicInput] = useState('')
+
+  useEffect(() => {
+    initCustomTopics().then((topics) => setCustomTopics(topics))
+  }, [])
+
   const [title, setTitle] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [body, setBody] = useState('')
+  const [pinnedTopic, setPinnedTopicState] = useState<string>(() => getPinnedTopic())
   const [selectedTopic, setSelectedTopic] = useState(
-    defaultTopic && COMPOSE_TOPICS.has(defaultTopic) ? defaultTopic : 'Lounge'
+    defaultTopic && (COMPOSE_TOPICS.has(defaultTopic) || getCustomTopics().includes(defaultTopic)) ? defaultTopic : getPinnedTopic()
   )
   const [topicMenuOpen, setTopicMenuOpen] = useState(false)
   const [activeOption, setActiveOption] = useState<PostOption>(null)
@@ -415,20 +390,28 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
     if (!canPost || isSubmitting) return
 
     const mentionedUuids = extractMentionUuids(editorRef.current, auth?.userUuid)
-    const topic = TOPIC_SLUG[selectedTopic] ?? selectedTopic.toLowerCase()
+    const topic = TOPIC_SLUG[selectedTopic] ?? formatTopicSlug(selectedTopic)
     const meta: Record<string, unknown> = { version: 1, platform: 'web' }
     const mediaUrl = gifUrl ?? firstMediaUrl(body)
     const postText = mediaUrl ? stripMediaUrls(body, [mediaUrl]) || ZERO_WIDTH_MEDIA_TEXT : body.trim() || ZERO_WIDTH_MEDIA_TEXT
 
-    if (mediaUrl) {
-      meta.giphy_url = mediaUrl
-      meta.giphy_id = mediaUrl
-      meta.src = mediaUrl
-    }
-
     let postType = 0
 
     if (mediaUrl) {
+      saveGif(mediaUrl)
+      let finalUrl = mediaUrl
+      if (!isUploadedUrl(mediaUrl)) {
+        try {
+          const gifFile = await fetchOrConvertImageToFile(mediaUrl)
+          const result = await uploadImage.mutateAsync(gifFile)
+          finalUrl = result.publicURL
+        } catch {
+          /* fallback */
+        }
+      }
+      meta.src = finalUrl
+      meta.giphy_url = finalUrl
+      meta.giphy_id = finalUrl
       postType = 4
     } else if (quotedPost) {
       meta.quote_post = {
@@ -452,8 +435,13 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
         postType = 4
         try {
           const result = await uploadImage.mutateAsync(imageFile)
-          meta.src = result.publicURL
-          if (result.isVideo) meta.media_type = 'video'
+          const mediaSrc = result.isVideo && !result.publicURL.includes('#') ? `${result.publicURL}#video.mp4` : result.publicURL
+          meta.src = mediaSrc
+          if (result.isVideo) {
+            meta.media_type = 'video'
+            meta.video_url = mediaSrc
+            meta.video = mediaSrc
+          }
         } catch {
           return
         }
@@ -470,8 +458,13 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
       // Upload media first, then attach the public URL
       try {
         const result = await uploadImage.mutateAsync(imageFile)
-        meta.src = result.publicURL
-        if (result.isVideo) meta.media_type = 'video'
+        const mediaSrc = result.isVideo && !result.publicURL.includes('#') ? `${result.publicURL}#video.mp4` : result.publicURL
+        meta.src = mediaSrc
+        if (result.isVideo) {
+          meta.media_type = 'video'
+          meta.video_url = mediaSrc
+          meta.video = mediaSrc
+        }
       } catch {
         return // upload failed, don't create the post
       }
@@ -487,6 +480,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
       },
       {
         onSuccess: async (data) => {
+          if (mediaUrl) removeGif(mediaUrl)
           setTitle('')
           setBody('')
           setGifUrl(null)
@@ -545,7 +539,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
         {user?.arena && (
           <span className="flex items-center gap-1 text-sm text-white/40">
             <img
-              src="https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Flocation-icon.bbe094a7.png&w=48&q=75&dpl=dpl_57sq3a4okDe2tVXZVSYu9FCcDV21"
+              src="https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Flocation-icon.432s1sddmkeug.png&w=48&q=75&dpl=dpl_5ovAARAu8zMP9MtrCL9RTcRsDq7b"
               alt=""
               className="h-6 w-6 opacity-60"
             />
@@ -635,7 +629,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
               )}
             </div>
           ))}
-          {pollOptions.length < 4 && (
+          {pollOptions.length < MAX_POLL_OPTIONS && (
             <button
               onClick={() => setPollOptions((prev) => [...prev, ''])}
               className="flex cursor-pointer items-center gap-1 text-xs text-white/40 transition-colors hover:text-white"
@@ -993,7 +987,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
               onClick={() => setTopicMenuOpen((prev) => !prev)}
               className="flex h-8 max-w-[7rem] cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border border-white/[0.08] bg-white/[0.04] px-3 text-xs font-medium text-white/40 transition-all hover:border-[#c8a44d]/20 hover:text-white/60 sm:max-w-[9rem]"
             >
-              <span className="truncate">{selectedTopic}</span>
+              <span className="truncate">{selectedTopic.replace(/^\$/, '')}</span>
               <ChevronDown
                 className={`h-3 w-3 transition-transform duration-200 ${topicMenuOpen ? 'rotate-180' : ''}`}
               />
@@ -1006,32 +1000,136 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
                   scrollbarColor: '#333330 transparent',
                 }}
               >
-                {TOPIC_MENU.map((group, i) => (
-                  <div key={group.category}>
-                    {i > 0 && (
-                      <div className="my-1.5 border-t border-white/[0.06]" />
-                    )}
-                    <p className="px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-white/40">
-                      {group.category}
-                    </p>
-                    {group.items.map((item) => (
-                      <button
-                        key={item}
-                        onClick={() => {
-                          setSelectedTopic(item)
-                          setTopicMenuOpen(false)
-                        }}
-                        className={`w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors duration-150 ${
-                          selectedTopic === item
-                            ? 'bg-[#c8a44d]/10 font-medium text-[#c8a44d]'
-                            : 'text-white/80 hover:bg-white/[0.06] hover:text-white'
-                        }`}
-                      >
-                        {item}
-                      </button>
-                    ))}
+                {TOPIC_MENU.map((group, i) => {
+                  const rawItems = group.category === 'General' ? [...group.items, ...customTopics] : group.items
+                  const groupItems = pinnedTopic && rawItems.includes(pinnedTopic)
+                    ? [pinnedTopic, ...rawItems.filter((item) => item !== pinnedTopic)]
+                    : rawItems
+
+                  return (
+                    <div key={group.category}>
+                      {i > 0 && (
+                        <div className="my-1.5 border-t border-white/[0.06]" />
+                      )}
+                      <div className="flex items-center justify-between px-2.5 py-1.5">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
+                          {group.category}
+                        </p>
+                        {group.category === 'General' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setAddingCustomTopic((p) => !p)
+                            }}
+                            className="cursor-pointer text-white/40 transition-colors hover:text-white"
+                            title="Add custom topic"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      {group.category === 'General' && addingCustomTopic && (
+                        <div className="mx-2 my-1.5 flex items-center gap-1.5 rounded-lg border border-[#c8a44d]/30 bg-white/[0.04] p-1.5">
+                          <input
+                            type="text"
+                            autoFocus
+                            placeholder="Custom topic (e.g. my-topic)..."
+                            value={newTopicInput}
+                            onChange={(e) => setNewTopicInput(e.target.value)}
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter' && newTopicInput.trim()) {
+                                e.preventDefault()
+                                const addedName = await addCustomTopic(newTopicInput)
+                                setCustomTopics(getCustomTopics())
+                                setSelectedTopic(addedName)
+                                setNewTopicInput('')
+                                setAddingCustomTopic(false)
+                                setTopicMenuOpen(false)
+                              }
+                              if (e.key === 'Escape') {
+                                setAddingCustomTopic(false)
+                                setNewTopicInput('')
+                              }
+                            }}
+                            className="w-full bg-transparent text-xs text-white placeholder:text-white/30 focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!newTopicInput.trim()) return
+                              const addedName = await addCustomTopic(newTopicInput)
+                              setCustomTopics(getCustomTopics())
+                              setSelectedTopic(addedName)
+                              setNewTopicInput('')
+                              setAddingCustomTopic(false)
+                              setTopicMenuOpen(false)
+                            }}
+                            className="cursor-pointer rounded bg-[#c8a44d] px-2 py-0.5 text-[10px] font-bold text-[#0f0e0a] transition-opacity hover:opacity-90"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      )}
+                      {groupItems.map((item) => {
+                        const isCustom = customTopics.includes(item)
+                        const isPinned = pinnedTopic === item
+                        return (
+                          <div key={item} className="group/item relative flex items-center justify-between">
+                            <button
+                              onClick={() => {
+                                setSelectedTopic(item)
+                                setTopicMenuOpen(false)
+                              }}
+                              className={`flex w-full items-center px-3 py-2 text-sm transition-colors ${
+                                item === selectedTopic
+                                  ? 'bg-white/[0.03] text-[#c8a44d]'
+                                  : 'text-white/60 hover:bg-white/[0.03] hover:text-white/80'
+                              }`}
+                            >
+                              {item.replace(/^\$/, '')}
+                            </button>
+
+                            <div className="absolute right-3 flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  const nextPin = setPinnedTopic(item)
+                                  setPinnedTopicState(nextPin)
+                                }}
+                                className={`cursor-pointer transition-colors ${
+                                  isPinned
+                                    ? 'text-[#c8a44d]'
+                                    : 'text-white/20 hover:text-white/70 opacity-0 group-hover/item:opacity-100'
+                                }`}
+                                title={isPinned ? 'Unpin default posting topic' : 'Pin as default posting topic'}
+                              >
+                                <Pin className={`h-3.5 w-3.5 ${isPinned ? 'fill-[#c8a44d]' : ''}`} />
+                              </button>
+
+                              {isCustom && (
+                                <button
+                                  type="button"
+                                  onClick={async (e) => {
+                                    e.stopPropagation()
+                                    const updated = await removeCustomTopic(item)
+                                    setCustomTopics(updated)
+                                    if (selectedTopic === item) setSelectedTopic(getPinnedTopic())
+                                    if (pinnedTopic === item) setPinnedTopicState(setPinnedTopic(null))
+                                  }}
+                                  className="cursor-pointer text-white/30 transition-colors hover:text-rose-400 opacity-0 group-hover/item:opacity-100"
+                                  title={`Delete ${item}`}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                      )
+                    })}
                   </div>
-                ))}
+                )})}
               </div>
             )}
           </div>

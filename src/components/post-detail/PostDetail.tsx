@@ -5,14 +5,15 @@ import {
   MessageSquare,
   Triangle,
   Eye,
-  Download,
   X,
   Star,
+  ImagePlus,
+  Loader2,
 } from 'lucide-react'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
-import { timeAgo, renderPostText, cleanPostText } from '@/components/post-card/utils'
+import { timeAgo, renderPostText, cleanPostText, formatExactDateTime } from '@/components/post-card/utils'
 import { usePollResults, useLikertResults } from '@/hooks/usePostResults'
 
 import { PollCard } from '@/components/post-card/PollCard'
@@ -20,6 +21,7 @@ import { LikertScale } from '@/components/post-card/LikertScale'
 import { PicksCard } from '@/components/post-card/PicksCard'
 import { QuotePostCard } from '@/components/post-card/QuotePostCard'
 import { TransactionCard } from '@/components/post-card/TransactionCard'
+import { BudgetCard } from '@/components/post-card/BudgetCard'
 import { LinkCard } from '@/components/post-card/LinkCard'
 import { VideoPlayer } from '@/components/video-player/VideoPlayer'
 import { CommentThread, type Comment } from './CommentThread'
@@ -36,9 +38,11 @@ import type { ArenaResponse, UserProfileResponse } from '@/lib/types'
 import { PostDetailSkeleton, CommentsSkeleton } from '@/components/skeleton/Skeleton'
 import { obfuscateText } from '@/lib/utils'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
-import { extractMediaUrls, firstMediaUrl, getTextWithGifs, insertGifImage, normalizeMediaUrl, saveGif, removeGif, isGifSaved, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
+import { extractMediaUrls, firstMediaUrl, getTextWithGifs, insertGifImage, normalizeMediaUrl, saveGif, removeGif, isGifSaved, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT, isUploadedUrl, fetchOrConvertImageToFile } from '@/lib/gif'
 import { MentionPicker } from '@/components/mention-picker/MentionPicker'
 import { extractMentionUuids, notifyMentions } from '@/lib/mentionNotifications'
+import { useUploadImage } from '@/hooks/useUploadImage'
+import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
 
 export function PostDetailPage() {
   return (
@@ -145,6 +149,7 @@ export function PostDetail() {
 
   const voteMutation = useVotePost()
   const commentMutation = useCreateComment()
+  const uploadImage = useUploadImage()
   const isOwn = auth?.userUuid === post?.author_uuid
 
   // Poll user vote from the post response
@@ -155,16 +160,11 @@ export function PostDetail() {
   const [commentHasText, setCommentHasText] = useState(false)
   const [hasCommentSelection, setHasCommentSelection] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [commentImageFile, setCommentImageFile] = useState<File | null>(null)
+  const [commentImagePreview, setCommentImagePreview] = useState<string | null>(null)
   const commentRef = useRef<HTMLDivElement>(null)
+  const commentFileInputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    if (!lightboxOpen) return
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previousOverflow
-    }
-  }, [lightboxOpen])
 
   useEffect(() => {
     function checkCommentSel() {
@@ -281,33 +281,65 @@ export function PostDetail() {
     const text = mediaUrl ? stripMediaUrls(rawText, [mediaUrl]) || ZERO_WIDTH_MEDIA_TEXT : rawText
     const gifMeta = mediaUrl ? { giphy_url: mediaUrl, giphy_id: mediaUrl } : null
 
-    if (!text && !gifMeta) return
+    if (!text && !gifMeta && !commentImageFile) return
 
-    commentMutation.mutate(
-      { post_uuid: uuid, text, in_reply_to_uuid: uuid, ...gifMeta },
-      {
-        onSuccess: async () => {
-          if (commentRef.current) {
-            commentRef.current.innerHTML = ''
-            setCommentHasText(false)
+    const doSubmit = (imageUrl?: string) => {
+      const finalImageUrl = imageUrl || mediaUrl
+      commentMutation.mutate(
+        { post_uuid: uuid, text, in_reply_to_uuid: uuid, ...(finalImageUrl ? { image_url: finalImageUrl } : {}) },
+        {
+          onSuccess: async () => {
+            if (mediaUrl) removeGif(mediaUrl)
+            if (commentRef.current) {
+              commentRef.current.innerHTML = ''
+              setCommentHasText(false)
+            }
+            setCommentImageFile(null)
+            setCommentImagePreview(null)
+            toast('success', 'Comment posted')
+            if (auth && mentionedUuids.length > 0) {
+              const result = await notifyMentions({
+                auth,
+                mentionedUuids,
+                postUuid: uuid,
+                contentType: 'comment',
+              })
+              if (result.sent > 0) toast('success', `Mention notification sent to ${result.sent}`)
+              if (result.failed > 0) toast('error', `Failed to notify ${result.failed} mention${result.failed === 1 ? '' : 's'}`)
+            }
+          },
+          onError: (err) => {
+            toast('error', `Failed to comment: ${humanizeError(err)}`)
+          },
+        }
+      )
+    }
+
+    if (commentImageFile || mediaUrl) {
+      const prepareUpload = async () => {
+        if (commentImageFile) {
+          const res = await uploadImage.mutateAsync(commentImageFile)
+          return res.publicURL
+        }
+        if (mediaUrl) {
+          if (isUploadedUrl(mediaUrl)) return mediaUrl
+          try {
+            const gifFile = await fetchOrConvertImageToFile(mediaUrl)
+            const res = await uploadImage.mutateAsync(gifFile)
+            return res.publicURL
+          } catch {
+            return undefined
           }
-          toast('success', 'Comment posted')
-          if (auth && mentionedUuids.length > 0) {
-            const result = await notifyMentions({
-              auth,
-              mentionedUuids,
-              postUuid: uuid,
-              contentType: 'comment',
-            })
-            if (result.sent > 0) toast('success', `Mention notification sent to ${result.sent}`)
-            if (result.failed > 0) toast('error', `Failed to notify ${result.failed} mention${result.failed === 1 ? '' : 's'}`)
-          }
-        },
-        onError: (err) => {
-          toast('error', `Failed to comment: ${humanizeError(err)}`)
-        },
+        }
+        return undefined
       }
-    )
+
+      prepareUpload()
+        .then((uploadedUrl) => doSubmit(uploadedUrl))
+        .catch((err) => toast('error', `Media upload failed: ${humanizeError(err)}`))
+    } else {
+      doSubmit()
+    }
   }
 
   if (postLoading) {
@@ -320,10 +352,11 @@ export function PostDetail() {
     )
   }
 
-  const imageSrc = post.post_meta?.src
+  const imageSrc = post.post_meta?.src || post.post_meta?.imageUrl
   const isVideoPost = post.post_meta?.media_type === 'video'
   const isPicks = post.post_type === 7
   const isTransaction = post.post_type === 8
+  const isBudget = post.post_type === 9
   const isLink = post.post_type === 1 && !!post.post_meta?.link
 
   return (
@@ -338,7 +371,7 @@ export function PostDetail() {
             role={post.author_meta.role}
             size="small"
           />
-          <span className="text-xs text-white/40 sm:text-sm">{timeAgo(post.created_at)}</span>
+          <span className="text-xs text-white/40 sm:text-sm cursor-help hover:text-white/60 transition-colors" title={formatExactDateTime(post.created_at)}>{timeAgo(post.created_at)}</span>
           {post.topic && (
             <>
               <span className="text-sm text-white/40">·</span>
@@ -419,7 +452,7 @@ export function PostDetail() {
         )}
 
         {/* Media */}
-        {imageSrc && (
+        {imageSrc && !isTransaction && (
           <div className="mt-3 overflow-hidden rounded-2xl">
             {isVideoPost ? (
               <VideoPlayer src={imageSrc} />
@@ -436,46 +469,30 @@ export function PostDetail() {
 
         {/* Lightbox */}
         {lightboxOpen && imageSrc && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/80 backdrop-blur-sm"
-            onClick={() => setLightboxOpen(false)}
-          >
-            <div className="absolute right-4 top-4 flex items-center gap-2">
-              <button
-                onClick={async (e) => {
-                  e.stopPropagation()
-                  try {
-                    const resp = await fetch(imageSrc)
-                    const blob = await resp.blob()
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = `image-${post.uuid}.${blob.type.split('/')[1] || 'jpg'}`
-                    document.body.appendChild(a)
-                    a.click()
-                    document.body.removeChild(a)
-                    URL.revokeObjectURL(url)
-                  } catch { /* ignore */ }
-                }}
-                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
-              >
-                <Download className="h-4 w-4" />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); setLightboxOpen(false) }}
-                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            {isVideoPost ? (
+          isVideoPost ? (
+            <div
+              className="fixed inset-0 z-[9999] flex h-screen w-screen items-center justify-center overflow-hidden bg-black/90 backdrop-blur-md select-none"
+              onClick={() => setLightboxOpen(false)}
+            >
+              <div className="absolute right-4 top-4 flex items-center gap-2">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setLightboxOpen(false) }}
+                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
               <div className="max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
                 <VideoPlayer src={imageSrc} />
               </div>
-            ) : (
-              <img src={imageSrc} alt="" className="max-h-[90vh] max-w-[90vw] object-contain" onClick={(e) => e.stopPropagation()} />
-            )}
-          </div>
+            </div>
+          ) : (
+            <ImageLightbox
+              src={imageSrc}
+              downloadName={`post-${post.uuid}.jpg`}
+              onClose={() => setLightboxOpen(false)}
+            />
+          )
         )}
 
         {/* Transaction card */}
@@ -487,6 +504,18 @@ export function PostDetail() {
             transactionValue={post.post_meta.transactionValue}
             currencyCode={post.post_meta.currencyCode}
             categoryIconUrl={post.post_meta.categoryIconUrl}
+            imageUrl={post.post_meta.imageUrl}
+          />
+        )}
+
+        {/* Budget card */}
+        {isBudget && post.post_meta && (
+          <BudgetCard
+            month={post.post_meta.month}
+            spendingLimit={post.post_meta.spendingLimit}
+            totalAllocated={post.post_meta.totalAllocated}
+            totalSpent={post.post_meta.totalSpent}
+            categories={post.post_meta.categories}
           />
         )}
 
@@ -571,7 +600,7 @@ export function PostDetail() {
       {/* Comment input */}
       <div className="pt-1 pb-3">
         <h2 className="text-sm font-bold text-white">Comments</h2>
-        <div className={`mt-2 relative border border-white/[0.08] bg-white/[0.04] transition-all ${commentHasText ? 'rounded-xl' : 'rounded-full'}`}>
+        <div className={`mt-2 relative border border-white/[0.08] bg-white/[0.04] transition-all ${commentHasText || commentImagePreview ? 'rounded-xl' : 'rounded-full'}`}>
           <div
             ref={commentRef}
             contentEditable
@@ -587,18 +616,67 @@ export function PostDetail() {
                 setCommentHasText(true)
                 return
               }
+              // Check for pasted image files
+              const items = e.clipboardData?.items
+              if (items) {
+                for (const item of items) {
+                  if (item.type.startsWith('image/')) {
+                    const file = item.getAsFile()
+                    if (file) {
+                      setCommentImageFile(file)
+                      setCommentImagePreview(URL.createObjectURL(file))
+                      setCommentHasText(true)
+                      return
+                    }
+                  }
+                }
+              }
               if (text) document.execCommand('insertText', false, text)
             }}
             onInput={() => {
               const el = commentRef.current
               if (!el) return
-              const hasText = el.textContent?.trim() !== '' || el.querySelector('img') !== null
+              const hasText = el.textContent?.trim() !== '' || el.querySelector('img') !== null || !!commentImageFile
               setCommentHasText(hasText)
-              if (!hasText && el.innerHTML !== '') el.innerHTML = ''
+              if (!hasText && el.innerHTML !== '' && !commentImageFile) el.innerHTML = ''
             }}
-            className="w-full min-h-[36px] px-4 py-2 pr-[12.5rem] text-sm text-white empty:before:content-[attr(data-placeholder)] empty:before:text-white/25 focus:outline-none"
+            className="w-full min-h-[36px] px-4 py-2 pr-[14rem] text-sm text-white empty:before:content-[attr(data-placeholder)] empty:before:text-white/25 focus:outline-none"
           />
           <MentionPicker editorRef={commentRef} onMentionInserted={() => setCommentHasText(true)} />
+          {/* Image preview */}
+          {commentImagePreview && (
+            <div className="relative mx-3 mb-2 w-fit">
+              <img
+                src={commentImagePreview}
+                alt="Upload preview"
+                className="max-h-[120px] max-w-[200px] rounded-lg object-cover"
+              />
+              <button
+                onClick={() => {
+                  setCommentImageFile(null)
+                  setCommentImagePreview(null)
+                  if (!commentRef.current?.textContent?.trim()) setCommentHasText(false)
+                }}
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-black/70 text-white/80 transition-colors hover:bg-black hover:text-white"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+          <input
+            ref={commentFileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              setCommentImageFile(file)
+              setCommentImagePreview(URL.createObjectURL(file))
+              setCommentHasText(true)
+              e.target.value = ''
+            }}
+          />
           <div className="absolute right-1.5 bottom-1 flex items-center gap-1">
             <button
               disabled={!hasCommentSelection}
@@ -635,6 +713,14 @@ export function PostDetail() {
                 setCommentHasText(true)
               }}
             />
+            <button
+              onClick={() => commentFileInputRef.current?.click()}
+              disabled={uploadImage.isPending}
+              className="flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white/50 disabled:cursor-not-allowed disabled:opacity-30"
+              title="Attach image"
+            >
+              {uploadImage.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
+            </button>
             <GifPickerButton
               onSelect={(url) => {
                 const el = commentRef.current
@@ -644,15 +730,15 @@ export function PostDetail() {
               }}
             />
             <button
-              disabled={!commentHasText || commentMutation.isPending}
+              disabled={(!commentHasText && !commentImageFile) || commentMutation.isPending || uploadImage.isPending}
               onClick={handleSubmitComment}
               className={`h-[28px] cursor-pointer px-3 text-xs font-semibold transition-all ${
-                commentHasText
+                commentHasText || commentImageFile
                   ? 'rounded-lg bg-[#c8a44d] text-[#0f0e0a] hover:bg-[#c8a44d]/85'
                   : 'rounded-full bg-white/[0.06] text-white/25'
               }`}
             >
-              {commentMutation.isPending ? 'Posting…' : 'Post'}
+              {uploadImage.isPending ? 'Uploading…' : commentMutation.isPending ? 'Posting…' : 'Post'}
             </button>
           </div>
         </div>

@@ -289,9 +289,9 @@ export function RoomChat() {
     setTimeout(() => el.classList.remove('msg-flash'), 1400)
   }
 
-  function handleSend(text: string, replyToUuid?: string) {
+  function handleSend(text: string, replyToUuid?: string, imageUrl?: string) {
     if (!uuid) return
-    sendMessage(uuid, text, replyToUuid)
+    sendMessage(uuid, text, replyToUuid, imageUrl)
     setReplyTo(null)
   }
 

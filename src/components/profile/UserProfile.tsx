@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Triangle, Users, UserPlus, UserCheck, Loader2, X } from 'lucide-react'
+import { Triangle, Users, UserPlus, UserCheck, Loader2, X, Ban } from 'lucide-react'
 
 import { useAuth } from '@/lib/auth'
 import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
@@ -40,6 +40,7 @@ export interface BalancePoint {
 export interface UserProfileData {
   uuid: string
   username?: string
+  disabled?: number
   balance: number
   delta_balance?: number
   bio?: string
@@ -199,6 +200,7 @@ export function UserProfile() {
   const u = firstPage.user
   const profile: UserProfileData = {
     uuid: u.uuid,
+    disabled: u.disabled,
     balance: u.balance,
     delta_balance: Number(u.delta_balance) || 0,
     bio: u.bio,
@@ -282,6 +284,15 @@ export function UserProfile() {
                 <span className="text-[11px] uppercase tracking-wider text-white/30">Joined</span>
                 <span className="font-medium text-white/80">{joinedAgo(profile.created_at)}</span>
               </span>
+              {profile.disabled === 1 && (
+                <>
+                  <span className="h-5 w-px shrink-0 bg-white/[0.1]" />
+                  <span className="flex items-center gap-1 px-3 py-2 text-[12px] font-medium text-rose-400">
+                    <Ban className="h-3 w-3 text-rose-400/80" />
+                    Timed Out
+                  </span>
+                </>
+              )}
             </UserMetaPill>
           </div>
 

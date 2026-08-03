@@ -145,6 +145,7 @@ export function PollCard({
                         textShadow: isWinning ? tier.glow : 'none',
                       }}
                     >
+                      {avgBal < 0 && '-'}
                       <span className="text-[9px] opacity-50">$</span>
                       {formatNumber(avgBal)}
                     </span>

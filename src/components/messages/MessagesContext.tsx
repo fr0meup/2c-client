@@ -20,7 +20,7 @@ interface MessagesContextValue {
   isLoading: boolean
   getRoom: (uuid: string) => Room | undefined
   getMessages: (uuid: string) => ChatMessage[]
-  sendMessage: (roomUuid: string, text: string, replyToUuid?: string) => boolean
+  sendMessage: (roomUuid: string, text: string, replyToUuid?: string, imageUrl?: string) => Promise<boolean> | boolean
   toggleReaction: (messageUuid: string, emoji: string) => void
   markRoomRead: (uuid: string) => void
   joinRoom: (uuid: string) => void
@@ -148,12 +148,23 @@ function mapMessages(messages: ApiMessage[], reactions: ApiReaction[], currentUs
     const emojiMap = reactionsByMsg.get(m.uuid)
     const metaGiphyId = typeof m.message_meta?.giphy_id === 'string' ? m.message_meta.giphy_id : undefined
     const metaGiphyUrl = typeof m.message_meta?.giphy_url === 'string' ? m.message_meta.giphy_url : undefined
+    const metaImageUrl = typeof m.message_meta?.imageUrl === 'string'
+      ? m.message_meta.imageUrl
+      : typeof m.message_meta?.image_url === 'string'
+        ? m.message_meta.image_url
+        : typeof m.message_meta?.src === 'string'
+          ? m.message_meta.src
+          : undefined
+
     return {
       uuid: m.uuid,
       room_uuid: m.room_uuid,
       author_uuid: m.author_uuid,
       text: m.text,
       message_meta: {
+        imageUrl: metaImageUrl,
+        image_url: metaImageUrl,
+        src: metaImageUrl,
         giphy_id: metaGiphyId ?? m.giphy_id,
         giphy_url: metaGiphyUrl ?? m.giphy_url,
       },
@@ -177,7 +188,15 @@ function mapMessages(messages: ApiMessage[], reactions: ApiReaction[], currentUs
 }
 
 function messageMediaUrl(message: ApiMessage): string | undefined {
-  const metaUrl = typeof message.message_meta?.giphy_url === 'string' ? message.message_meta.giphy_url : undefined
+  const metaUrl = typeof message.message_meta?.imageUrl === 'string'
+    ? message.message_meta.imageUrl
+    : typeof message.message_meta?.image_url === 'string'
+      ? message.message_meta.image_url
+      : typeof message.message_meta?.src === 'string'
+        ? message.message_meta.src
+        : typeof message.message_meta?.giphy_url === 'string'
+          ? message.message_meta.giphy_url
+          : undefined
   return metaUrl ?? message.giphy_url ?? firstMediaUrl(message.text)
 }
 
@@ -328,53 +347,98 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     }
   }, [activeRoomUuid, socketSend])
 
-  const sendMessage = useCallback((roomUuid: string, text: string, replyToUuid?: string) => {
-    const trimmed = text.trim()
-    if (!trimmed || !auth) return false
-    const gifUrl = firstMediaUrl(trimmed)
-    const messageText = gifUrl ? stripMediaUrls(trimmed, [gifUrl]) || ZERO_WIDTH_MEDIA_TEXT : trimmed
-    const messageMeta = gifUrl ? { giphy_url: gifUrl, giphy_id: gifUrl } : {}
+  const sendMessage = useCallback(
+    async (roomUuid: string, text: string, replyToUuid?: string, imageUrl?: string) => {
+      const trimmed = text.trim()
+      if (!trimmed && !imageUrl) return false
+      if (!auth) return false
 
-    const newMsg: ApiMessage = {
-      uuid: `local-${Date.now()}`,
-      room_uuid: roomUuid,
-      author_uuid: auth.userUuid,
-      text: messageText,
-      created_at: new Date().toISOString(),
-      role: 'user',
-      reply_to_message_uuid: replyToUuid ?? null,
-      author_meta: { age: 0, gender: '', balance: 0, arena: '', subscription_type: 0 },
-      message_meta: messageMeta,
-      deleted_at: null,
-      replyMessageText: null,
-      isBookmarked: false,
-    }
+      const gifUrl = firstMediaUrl(trimmed)
+      const messageText = gifUrl ? stripMediaUrls(trimmed, [gifUrl]) || ZERO_WIDTH_MEDIA_TEXT : trimmed
+      const messageMeta: Record<string, unknown> = {}
+      if (imageUrl) {
+        messageMeta.imageUrl = imageUrl
+        messageMeta.image_url = imageUrl
+        messageMeta.src = imageUrl
+      } else if (gifUrl) {
+        messageMeta.giphy_url = gifUrl
+        messageMeta.giphy_id = gifUrl
+      }
 
-    queryClient.setQueryData<GetMessagesResponse>(
-      ['rooms', 'messages', roomUuid],
-      (prev) => prev ? { ...prev, messages: [newMsg, ...prev.messages] } : undefined
-    )
+      const newMsg: ApiMessage = {
+        uuid: `local-${Date.now()}`,
+        room_uuid: roomUuid,
+        author_uuid: auth.userUuid,
+        text: messageText,
+        created_at: new Date().toISOString(),
+        role: 'user',
+        reply_to_message_uuid: replyToUuid ?? null,
+        author_meta: { age: 0, gender: '', balance: 0, arena: '', subscription_type: 0 },
+        message_meta: messageMeta,
+        deleted_at: null,
+        replyMessageText: null,
+        isBookmarked: false,
+      }
 
-    const payload: Record<string, unknown> = {
-      action: 'sendMessage',
-      roomUuid,
-      text: trimmed,
-    }
-    if (replyToUuid) payload.replyToMessageUuid = replyToUuid
-    if (gifUrl) {
-      payload.giphy_url = gifUrl
-      payload.giphy_id = gifUrl
-      payload.message_meta = messageMeta
-      payload.messageMeta = messageMeta
-    }
+      queryClient.setQueryData<GetMessagesResponse>(
+        ['rooms', 'messages', roomUuid],
+        (prev) => prev ? { ...prev, messages: [newMsg, ...prev.messages] } : undefined
+      )
 
-    const sent = socketSend(payload)
-    if (!sent) {
-      // Socket not ready — refetch to sync
-      queryClient.invalidateQueries({ queryKey: ['rooms', 'messages', roomUuid] })
-    }
-    return sent
-  }, [auth, queryClient, socketSend])
+      if (imageUrl) {
+        try {
+          const res = await rpc<{ message?: ApiMessage }>(
+            '/v1/rooms/sendMessageRest',
+            {
+              roomUuid,
+              text: trimmed,
+              replyToMessageUuid: replyToUuid || '',
+              imageUrl,
+            },
+            auth.token,
+            auth.userUuid
+          )
+          if (res?.message) {
+            queryClient.setQueryData<GetMessagesResponse>(
+              ['rooms', 'messages', roomUuid],
+              (prev) => {
+                if (!prev) return prev
+                const filtered = prev.messages.filter((m) => m.uuid !== newMsg.uuid && m.uuid !== res.message!.uuid)
+                return { ...prev, messages: [res.message!, ...filtered] }
+              }
+            )
+          }
+          queryClient.invalidateQueries({ queryKey: ['rooms'] })
+          queryClient.invalidateQueries({ queryKey: ['rooms', 'messages', roomUuid] })
+          return true
+        } catch {
+          queryClient.invalidateQueries({ queryKey: ['rooms', 'messages', roomUuid] })
+          return false
+        }
+      }
+
+      const payload: Record<string, unknown> = {
+        action: 'sendMessage',
+        roomUuid,
+        text: trimmed,
+      }
+      if (replyToUuid) payload.replyToMessageUuid = replyToUuid
+      if (gifUrl) {
+        payload.giphy_url = gifUrl
+        payload.giphy_id = gifUrl
+        payload.message_meta = messageMeta
+        payload.messageMeta = messageMeta
+      }
+
+      const sent = socketSend(payload)
+      if (!sent) {
+        // Socket not ready — refetch to sync
+        queryClient.invalidateQueries({ queryKey: ['rooms', 'messages', roomUuid] })
+      }
+      return sent
+    },
+    [auth, queryClient, socketSend],
+  )
 
   const toggleReaction = useCallback((messageUuid: string, emoji: string) => {
     if (!auth || !activeRoomUuid) return

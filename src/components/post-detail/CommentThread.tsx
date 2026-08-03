@@ -11,6 +11,7 @@ export interface Comment {
   comment_meta?: {
     giphy_id?: string
     giphy_url?: string
+    image_url?: string
   } | null
   text: string
   upvote_count: number

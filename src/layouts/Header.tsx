@@ -1,9 +1,9 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { headerLoaders } from '@/lib/routePreload'
-import { NAVIGATION_PENDING_EVENT } from '@/lib/navigationPending'
+import { NAVIGATION_PENDING_EVENT, announceNavigationPending } from '@/lib/navigationPending'
 
 const FeedFilters = lazy(headerLoaders.feed)
 const PostDetailHeader = lazy(headerLoaders.post)
@@ -100,11 +100,17 @@ export function HeaderLeft() {
       style={{ width: 'calc(50% - 372px)' }}
     >
       <div className="fixed top-0 flex h-[72px] w-60 items-start justify-start pl-7 pt-6" style={{ left: 'calc(50% - 600px)' }}>
-        <img
-          src="https://www.twocents.money/_next/image?url=%2F2centsLogo.png&w=1920&q=75"
-          alt="2C Feed"
-          className="h-12 object-contain"
-        />
+        <Link
+          to="/"
+          onClick={() => announceNavigationPending('/')}
+          className="cursor-pointer transition-opacity hover:opacity-85 active:scale-[0.98]"
+        >
+          <img
+            src="https://www.twocents.money/_next/image?url=%2F2centsLogo.png&w=1920&q=75"
+            alt="2C Feed"
+            className="h-12 object-contain"
+          />
+        </Link>
       </div>
     </header>
   )

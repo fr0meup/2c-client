@@ -123,7 +123,7 @@ export function UserMetaPill({
         <>
           <span className={`flex shrink-0 items-center gap-1 ${sm ? 'px-2 py-1' : 'px-3 py-2'}`}>
             <img
-              src="https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Flocation-icon.bbe094a7.png&w=48&q=75&dpl=dpl_57sq3a4okDe2tVXZVSYu9FCcDV21"
+              src="https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Flocation-icon.432s1sddmkeug.png&w=48&q=75&dpl=dpl_5ovAARAu8zMP9MtrCL9RTcRsDq7b"
               alt=""
               className={`${sm ? 'h-3 w-3' : 'h-4 w-4'} shrink-0 opacity-60`}
             />

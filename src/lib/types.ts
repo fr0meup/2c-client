@@ -38,6 +38,7 @@ export interface PostMeta {
   platform?: 'ios' | 'android' | 'web'
   version?: number
   src?: string
+  imageUrl?: string
   sensitive?: boolean
   media_type?: 'image' | 'video'
   poll?: string[]
@@ -66,6 +67,19 @@ export interface PostMeta {
   // gif
   giphy_url?: string
   giphy_id?: string
+  // budget post (post_type 9)
+  month?: string
+  spendingLimit?: number
+  totalAllocated?: number
+  totalSpent?: number
+  categories?: Array<{
+    id: string
+    label: string
+    color: string
+    icon: string
+    allocated: number
+    spent: number
+  }>
 }
 
 export interface Post {

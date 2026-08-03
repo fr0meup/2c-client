@@ -17,6 +17,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/s3-upload/, ''),
       },
+      '/ugc-proxy': {
+        target: 'https://api.twocents.money',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/ugc-proxy/, ''),
+      },
     },
   },
 })

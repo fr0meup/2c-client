@@ -87,33 +87,64 @@ function setPageScrollTop(y: number) {
 
 export function saveScrollPosition() {
   if (_currentLocationKey) {
-    scrollMap.set(_currentLocationKey, getPageScrollTop())
+    const y = getPageScrollTop()
+    if (y > 0) {
+      scrollMap.set(_currentLocationKey, y)
+    }
     lockedKeys.add(_currentLocationKey)
   }
 }
 
-function restoreScrollPosition(y: number) {
-  // Try immediately first
-  setPageScrollTop(y)
+function restoreScrollPosition(targetY: number) {
+  setPageScrollTop(targetY)
 
   let attempts = 0
-  let frame = 0
+  let animationFrameId: number
+  let resizeObserver: ResizeObserver | null = null
 
   const restore = () => {
-    attempts += 1
-    setPageScrollTop(y)
-    if (getPageScrollTop() < Math.floor(y) && attempts < 60) {
-      frame = requestAnimationFrame(restore)
+    attempts++
+    setPageScrollTop(targetY)
+    const current = getPageScrollTop()
+
+    // Continue attempting until we reach target Y or max attempts (~3 seconds)
+    if (Math.abs(current - targetY) >= 5 && attempts < 180) {
+      animationFrameId = requestAnimationFrame(restore)
     }
   }
 
-  frame = requestAnimationFrame(restore)
-  return () => cancelAnimationFrame(frame)
+  animationFrameId = requestAnimationFrame(restore)
+
+  // Re-apply when DOM resizes as images/posts render in
+  if (typeof ResizeObserver !== 'undefined' && document.body) {
+    resizeObserver = new ResizeObserver(() => {
+      if (getPageScrollTop() < Math.floor(targetY) - 5) {
+        setPageScrollTop(targetY)
+      }
+    })
+    resizeObserver.observe(document.body)
+  }
+
+  return () => {
+    cancelAnimationFrame(animationFrameId)
+    if (resizeObserver) resizeObserver.disconnect()
+  }
 }
 
 function ScrollToTop() {
   const location = useLocation()
   const navType = useNavigationType()
+
+  // Lock and save previous location's scroll position before switching routes
+  if (_currentLocationKey && _currentLocationKey !== (location.key ?? '')) {
+    if (!lockedKeys.has(_currentLocationKey)) {
+      const y = getPageScrollTop()
+      if (y > 0) {
+        scrollMap.set(_currentLocationKey, y)
+      }
+      lockedKeys.add(_currentLocationKey)
+    }
+  }
 
   _currentLocationKey = location.key ?? ''
 
@@ -122,9 +153,13 @@ function ScrollToTop() {
 
     const onScroll = () => {
       if (_currentLocationKey && !lockedKeys.has(_currentLocationKey)) {
-        scrollMap.set(_currentLocationKey, getPageScrollTop())
+        const y = getPageScrollTop()
+        if (y > 0) {
+          scrollMap.set(_currentLocationKey, y)
+        }
       }
     }
+
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])

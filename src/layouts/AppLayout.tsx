@@ -183,8 +183,9 @@ export function AppLayout() {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
       const target = e.target instanceof Element ? e.target.closest('a[href]') : null
       if (!(target instanceof HTMLAnchorElement)) return
+      if (target.hasAttribute('download') || target.download || target.href.startsWith('blob:')) return
       const url = new URL(target.href, window.location.href)
-      if (url.origin !== window.location.origin) return
+      if (url.protocol === 'blob:' || url.origin !== window.location.origin) return
       const next = `${url.pathname}${url.search}`
       const current = `${location.pathname}${location.search}`
       if (next !== current && url.pathname !== location.pathname) {

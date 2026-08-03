@@ -1,13 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { SlidersHorizontal } from 'lucide-react'
+import { SlidersHorizontal, X, Pin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TOPICS, TOPIC_MENU, FEED_PARAM_TO_TOPIC, getFeedUrl } from './config'
 import { usePrefetch } from '@/hooks/usePrefetch'
 import { preloadRoute } from '@/lib/routePreload'
 import { announceNavigationPending } from '@/lib/navigationPending'
 import { addSearchHistory, clearSearchHistory, getSearchHistory } from '@/lib/searchHistory'
+
+import { getCustomTopics, initCustomTopics, removeCustomTopic } from '@/lib/customTopics'
+import { getPinnedTopic, setPinnedTopic } from '@/lib/pinnedTopic'
 
 export function FeedFilters() {
   const navigate = useNavigate()
@@ -18,6 +21,12 @@ export function FeedFilters() {
   const [searchValue, setSearchValue] = useState(currentQuery)
   const [advLoading, setAdvLoading] = useState(false)
   const [topicsOpen, setTopicsOpen] = useState(false)
+  const [customTopics, setCustomTopics] = useState<string[]>(() => getCustomTopics())
+  const [pinnedTopic, setPinnedTopicState] = useState<string>(() => getPinnedTopic())
+
+  useEffect(() => {
+    initCustomTopics().then((topics) => setCustomTopics(topics))
+  }, [])
   const [historyOpen, setHistoryOpen] = useState(false)
   const [searchHistory, setSearchHistory] = useState<string[]>(() => getSearchHistory())
   const [pendingTopic, setPendingTopic] = useState<string | null>(null)
@@ -258,7 +267,7 @@ export function FeedFilters() {
         }}
       >
         <img
-          src="https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fsearch.8f12a89e.png&w=1200&q=75&dpl=dpl_57sq3a4okDe2tVXZVSYu9FCcDV21"
+          src="https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Fsearch.3qvc_4ngs6ro7.png&w=1920&q=75&dpl=dpl_5ovAARAu8zMP9MtrCL9RTcRsDq7b"
           alt="Search"
           className="h-7 w-7 object-contain opacity-70 transition-transform duration-200 group-hover:scale-110"
         />
@@ -354,30 +363,77 @@ export function FeedFilters() {
               className="feed-topics-dropdown absolute right-0 top-full z-50 mt-1.5 max-h-[min(70vh,28rem)] w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-white/[0.06] bg-[#141410] py-1 shadow-lg"
               style={{ scrollbarWidth: 'thin', scrollbarColor: '#333330 transparent' }}
             >
-            {menuGroups.map((group) => (
-              <div key={group.category}>
-                <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white/30">
-                  {group.category}
-                </div>
-                {group.items.map((item) => (
-                  <button
-                    key={item}
-                    onMouseEnter={() => prefetchTopic(item)}
-                    onFocus={() => prefetchTopic(item)}
-                    onTouchStart={() => prefetchTopic(item)}
-                    onClick={() => navigateTopic(item)}
-                    className={cn(
-                      'flex w-full items-center px-3 py-2 text-sm transition-colors',
-                      item === activeTopic
-                        ? 'bg-white/[0.03] text-[#c8a44d]'
-                        : 'text-white/60 hover:bg-white/[0.03] hover:text-white/80'
-                    )}
-                  >
-                    {item}
-                  </button>
-                ))}
+            {menuGroups.map((group) => {
+              const rawItems = group.category === 'General' ? [...group.items, ...customTopics] as string[] : [...group.items] as string[]
+              const groupItems = pinnedTopic && rawItems.includes(pinnedTopic)
+                ? [pinnedTopic, ...rawItems.filter((i) => i !== pinnedTopic)]
+                : rawItems
+
+              return (
+                <div key={group.category}>
+                  <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white/30">
+                    {group.category}
+                  </div>
+                  {groupItems.map((item) => {
+                    const isCustom = customTopics.includes(item)
+                    const isPinned = pinnedTopic === item
+                    return (
+                      <div key={item} className="group/item relative flex items-center justify-between">
+                        <button
+                          onMouseEnter={() => prefetchTopic(item)}
+                          onFocus={() => prefetchTopic(item)}
+                          onTouchStart={() => prefetchTopic(item)}
+                          onClick={() => navigateTopic(item)}
+                          className={cn(
+                            'flex w-full items-center px-3 py-2 text-sm transition-colors',
+                            item === activeTopic
+                              ? 'bg-white/[0.03] text-[#c8a44d]'
+                              : 'text-white/60 hover:bg-white/[0.03] hover:text-white/80'
+                          )}
+                        >
+                          {item.replace(/^\$/, '')}
+                        </button>
+
+                      <div className="absolute right-3 flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const nextPin = setPinnedTopic(item)
+                            setPinnedTopicState(nextPin)
+                          }}
+                          className={`cursor-pointer transition-colors ${
+                            isPinned
+                              ? 'text-[#c8a44d]'
+                              : 'text-white/20 hover:text-white/70 opacity-0 group-hover/item:opacity-100'
+                          }`}
+                          title={isPinned ? 'Unpin default posting topic' : 'Pin as default posting topic'}
+                        >
+                          <Pin className={`h-3.5 w-3.5 ${isPinned ? 'fill-[#c8a44d]' : ''}`} />
+                        </button>
+
+                        {isCustom && (
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation()
+                              const updated = await removeCustomTopic(item)
+                              setCustomTopics(updated)
+                              if (activeTopic === item) navigateTopic('New')
+                              if (pinnedTopic === item) setPinnedTopicState(setPinnedTopic(null))
+                            }}
+                            className="cursor-pointer text-white/30 transition-colors hover:text-rose-400 opacity-0 group-hover/item:opacity-100"
+                            title={`Delete ${item}`}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            ))}
+            )})}
           </div>
         )}
         </div>

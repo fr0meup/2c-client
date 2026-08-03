@@ -6,10 +6,11 @@ import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth'
 import { extractMediaUrls, normalizeMediaUrl, saveGif, removeGif, isGifSaved, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
+import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
 import { useMessages } from './MessagesContext'
 import { timeAgo, type ChatMessage } from './types'
 
-function GifWithStar({ url }: { url: string }) {
+function GifWithStar({ url, onOpenLightbox }: { url: string; onOpenLightbox?: (url: string) => void }) {
   const [saved, setSaved] = useState(() => isGifSaved(url))
 
   useEffect(() => {
@@ -22,8 +23,9 @@ function GifWithStar({ url }: { url: string }) {
     <div className="group/gif relative mt-1.5 w-fit">
       <img
         src={url}
-        alt="GIF"
-        className="max-w-[240px] rounded-lg"
+        alt="Media"
+        onClick={() => onOpenLightbox?.(url)}
+        className="max-h-[300px] max-w-[280px] cursor-pointer rounded-lg object-cover transition-opacity hover:opacity-95"
         loading="lazy"
       />
       <button
@@ -96,15 +98,18 @@ export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: 
   const isMine = msg.author_uuid === auth?.userUuid
   const author = msg.author_meta
 
-  // Extract GIF URLs from message text + message_meta fallback
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+
+  // Extract media/GIF URLs from message text + message_meta fallback
+  const metaMediaUrl = msg.message_meta?.imageUrl || msg.message_meta?.image_url || msg.message_meta?.src || msg.message_meta?.giphy_url
+  const normalizedMetaMedia = metaMediaUrl ? normalizeMediaUrl(metaMediaUrl) : undefined
   const textGifs = extractMediaUrls(msg.text).map(normalizeMediaUrl)
-  const metaGif = msg.message_meta?.giphy_url
-  const normalizedMetaGif = metaGif ? normalizeMediaUrl(metaGif) : undefined
-  const gifUrls = normalizedMetaGif && !textGifs.includes(normalizedMetaGif)
-    ? [...textGifs, normalizedMetaGif]
-    : textGifs
+  const gifUrls = Array.from(new Set([
+    ...(normalizedMetaMedia ? [normalizedMetaMedia] : []),
+    ...textGifs,
+  ]))
   // Strip both regex-matched URLs and the meta URL from displayed text
-  let strippedText = stripMediaUrls(msg.text, metaGif ? [metaGif] : [])
+  let strippedText = stripMediaUrls(msg.text, metaMediaUrl ? [metaMediaUrl] : [])
   if (strippedText === ZERO_WIDTH_MEDIA_TEXT) strippedText = ''
 
   if (msg.deleted_at) {
@@ -189,7 +194,7 @@ export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: 
         {gifUrls.length > 0 && (
           <div className={cn('relative', isMine ? 'self-end' : 'self-start')}>
             {gifUrls.map((url, i) => (
-              <GifWithStar key={i} url={url} />
+              <GifWithStar key={i} url={url} onOpenLightbox={(u) => setLightboxSrc(u)} />
             ))}
             {/* Action buttons on hover for GIF-only messages */}
             {!strippedText && (
@@ -246,6 +251,7 @@ export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: 
 
         <span className="px-1 text-[10px] text-white/25 tabular-nums">{timeAgo(msg.created_at)}</span>
       </div>
+      {lightboxSrc && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </div>
   )
 }

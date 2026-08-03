@@ -56,8 +56,11 @@ export interface ChatMessage {
   author_uuid: string
   text: string
   message_meta?: {
+    imageUrl?: string
+    image_url?: string
     giphy_id?: string
     giphy_url?: string
+    src?: string
   } | null
   created_at: string
   reply_to_uuid?: string

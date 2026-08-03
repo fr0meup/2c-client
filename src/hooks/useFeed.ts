@@ -39,6 +39,8 @@ export interface AdvancedSearchParams {
   sort_by?: string
 }
 
+import { formatTopicSlug } from '@/lib/customTopics'
+
 export function useFeed(topic: string, searchQuery?: string, advanced?: AdvancedSearchParams, jumpCursor?: string, enabled = true) {
   const { auth } = useAuth()
 
@@ -47,7 +49,7 @@ export function useFeed(topic: string, searchQuery?: string, advanced?: Advanced
     queryFn: async ({ pageParam, signal }) => {
       if (!auth) throw new Error('Not authenticated')
 
-      const apiTopic = TOPIC_TO_API[topic]
+      const apiTopic = topic in TOPIC_TO_API ? TOPIC_TO_API[topic] : formatTopicSlug(topic)
 
       // Client-side sorts — always use chronological for the API
       const rawFilter = advanced?.filter ?? 'chronological'
