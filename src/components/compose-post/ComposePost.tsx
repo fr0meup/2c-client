@@ -398,7 +398,6 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
     let postType = 0
 
     if (mediaUrl) {
-      saveGif(mediaUrl)
       let finalUrl = mediaUrl
       if (!isUploadedUrl(mediaUrl)) {
         try {
@@ -406,7 +405,8 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
           const result = await uploadImage.mutateAsync(gifFile)
           finalUrl = result.publicURL
         } catch {
-          /* fallback */
+          toast('error', 'Could not fetch image from URL. Try downloading and uploading the file directly.')
+          return
         }
       }
       meta.src = finalUrl
@@ -480,7 +480,6 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
       },
       {
         onSuccess: async (data) => {
-          if (mediaUrl) removeGif(mediaUrl)
           setTitle('')
           setBody('')
           setGifUrl(null)

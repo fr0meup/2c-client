@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth'
 import { extractMediaUrls, normalizeMediaUrl, saveGif, removeGif, isGifSaved, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
 import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
 import { useMessages } from './MessagesContext'
-import { timeAgo, type ChatMessage } from './types'
+import { timeAgo, formatExactTime, type ChatMessage } from './types'
 
 function GifWithStar({ url, onOpenLightbox }: { url: string; onOpenLightbox?: (url: string) => void }) {
   const [saved, setSaved] = useState(() => isGifSaved(url))
@@ -249,7 +249,12 @@ export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: 
           </div>
         )}
 
-        <span className="px-1 text-[10px] text-white/25 tabular-nums">{timeAgo(msg.created_at)}</span>
+        <span
+          title={formatExactTime(msg.created_at)}
+          className="cursor-default px-1 text-[10px] text-white/25 tabular-nums transition-colors hover:text-white/60"
+        >
+          {timeAgo(msg.created_at)}
+        </span>
       </div>
       {lightboxSrc && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </div>

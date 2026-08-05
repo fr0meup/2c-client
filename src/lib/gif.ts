@@ -191,31 +191,56 @@ export function isUploadedUrl(url?: string): boolean {
 
 export async function fetchOrConvertImageToFile(url: string): Promise<File> {
   let blob: Blob | null = null
+  const isGifUrl = /\.gif(?:[?#]|$)/i.test(url)
 
-  // 1. Direct fetch
+  // 1. Direct fetch (handles 200 OK and 304 Not Modified)
   try {
-    const res = await fetch(url)
-    if (res.ok) {
-      blob = await res.blob()
+    const res = await fetch(url, { cache: 'no-cache' })
+    if (res.ok || res.status === 304) {
+      const b = await res.blob()
+      if (b && b.size > 0) blob = b
     }
   } catch {
     /* CORS or network error */
   }
 
-  // 2. Proxy fetch
+  // 2. Direct fetch fallback without cache option
   if (!blob) {
     try {
-      const proxyUrl = `/ugc-proxy?url=${encodeURIComponent(url)}`
-      const res = await fetch(proxyUrl)
-      if (res.ok) {
-        blob = await res.blob()
+      const res = await fetch(url)
+      if (res.ok || res.status === 304) {
+        const b = await res.blob()
+        if (b && b.size > 0) blob = b
       }
     } catch {
       /* ignore */
     }
   }
 
-  // 3. Canvas fallback
+  // 3. CORS Proxy Fallbacks (images.weserv.nl with &n=-1&output=gif, allorigins)
+  if (!blob) {
+    const proxies = [
+      `https://images.weserv.nl/?url=${encodeURIComponent(url)}&n=-1&output=gif`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    ]
+    for (const proxyUrl of proxies) {
+      try {
+        const res = await fetch(proxyUrl)
+        const ct = res.headers.get('content-type') || ''
+        if ((res.ok || res.status === 304) && !ct.includes('application/json') && !ct.includes('text/html')) {
+          const b = await res.blob()
+          if (b && b.size > 0 && !b.type.includes('json')) {
+            blob = b
+            break
+          }
+        }
+      } catch {
+        /* try next proxy */
+      }
+    }
+  }
+
+  // 4. Canvas fallback (last resort)
   if (!blob) {
     blob = await new Promise<Blob>((resolve, reject) => {
       const img = new Image()
@@ -228,9 +253,9 @@ export async function fetchOrConvertImageToFile(url: string): Promise<File> {
         if (ctx) {
           ctx.drawImage(img, 0, 0)
           canvas.toBlob((b) => {
-            if (b) resolve(b)
+            if (b && b.size > 0) resolve(b)
             else reject(new Error('Canvas to blob failed'))
-          }, 'image/png')
+          }, isGifUrl ? 'image/gif' : 'image/png')
         } else {
           reject(new Error('No canvas context'))
         }
@@ -240,7 +265,17 @@ export async function fetchOrConvertImageToFile(url: string): Promise<File> {
     })
   }
 
-  const mime = blob.type || 'image/png'
+  if (!blob || blob.size === 0) {
+    throw new Error('Unable to retrieve image data')
+  }
+
+  let mime = blob.type
+  if (isGifUrl || mime.includes('gif')) {
+    mime = 'image/gif'
+  } else if (!mime || mime === 'application/octet-stream') {
+    mime = 'image/png'
+  }
+
   const ext = mime.includes('gif') ? 'gif' : mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : mime.includes('webp') ? 'webp' : 'png'
   const filename = `media-${Date.now()}.${ext}`
 

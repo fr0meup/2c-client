@@ -19,7 +19,7 @@ import { extractMentionUuids, notifyMentions } from '@/lib/mentionNotifications'
 import { useUploadImage } from '@/hooks/useUploadImage'
 import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
 
-function GifWithStar({ url }: { url: string }) {
+function GifWithStar({ url, onOpenLightbox }: { url: string; onOpenLightbox?: (url: string) => void }) {
   const [saved, setSaved] = useState(() => isGifSaved(url))
 
   useEffect(() => {
@@ -32,12 +32,22 @@ function GifWithStar({ url }: { url: string }) {
     <div className="group/gif relative mt-1.5 w-fit">
       <img
         src={url}
-        alt="GIF"
-        className="max-w-[240px] rounded-lg"
+        alt=""
+        onClick={(e) => {
+          if (onOpenLightbox) {
+            e.stopPropagation()
+            onOpenLightbox(url)
+          }
+        }}
+        className={`max-w-[320px] max-h-[280px] rounded-xl object-cover transition-opacity ${
+          onOpenLightbox ? 'cursor-pointer hover:opacity-90' : ''
+        }`}
         loading="lazy"
       />
       <button
-        onClick={() => {
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
           if (saved) {
             removeGif(url)
             setSaved(false)
@@ -51,7 +61,7 @@ function GifWithStar({ url }: { url: string }) {
             ? 'bg-[#c8a44d]/90 text-[#0f0e0a]'
             : 'bg-black/60 text-white/60 hover:bg-black/80 hover:text-white'
         }`}
-        title={saved ? 'Remove from saved GIFs' : 'Save GIF'}
+        title={saved ? 'Remove from saved GIFs' : 'Save to GIF picker'}
       >
         <Star className={`h-3 w-3 ${saved ? 'fill-current' : ''}`} />
       </button>
@@ -148,7 +158,7 @@ export function CommentItem({
     if (!text && !gifMeta && !replyImageFile) return
 
     const doSubmit = (imageUrl?: string) => {
-      const finalImageUrl = imageUrl || mediaUrl
+      const finalImageUrl = imageUrl || (isUploadedUrl(mediaUrl) ? mediaUrl : undefined)
       replyMutation.mutate(
         {
           post_uuid: comment.post_uuid,
@@ -162,7 +172,6 @@ export function CommentItem({
               replyRef.current.innerHTML = ''
               setReplyHasText(false)
             }
-            if (mediaUrl) removeGif(mediaUrl)
             setReplyImageFile(null)
             setReplyImagePreview(null)
             setReplyOpen(false)
@@ -193,19 +202,21 @@ export function CommentItem({
         }
         if (mediaUrl) {
           if (isUploadedUrl(mediaUrl)) return mediaUrl
-          try {
-            const gifFile = await fetchOrConvertImageToFile(mediaUrl)
-            const res = await uploadImage.mutateAsync(gifFile)
-            return res.publicURL
-          } catch {
-            return undefined
-          }
+          const gifFile = await fetchOrConvertImageToFile(mediaUrl)
+          const res = await uploadImage.mutateAsync(gifFile)
+          return res.publicURL
         }
         return undefined
       }
 
       prepareUpload()
-        .then((uploadedUrl) => doSubmit(uploadedUrl))
+        .then((uploadedUrl) => {
+          if (uploadedUrl) {
+            doSubmit(uploadedUrl)
+          } else {
+            toast('error', 'Could not fetch image from URL. Try downloading and uploading the file directly.')
+          }
+        })
         .catch((err) => toast('error', `Media upload failed: ${humanizeError(err)}`))
     } else {
       doSubmit()
@@ -294,8 +305,12 @@ export function CommentItem({
           ? normalizeMediaUrl(comment.comment_meta.giphy_url)
           : undefined
         const strippedText = stripMediaUrls(text, rawGifFromMeta ? [rawGifFromMeta] : [])
-        const allGifs: string[] = [...gifUrls, ...(gifFromMeta && !gifUrls.includes(gifFromMeta) ? [gifFromMeta] : [])]
         const commentImageUrl = comment.comment_meta?.image_url
+        const allMedia: string[] = Array.from(new Set([
+          ...gifUrls,
+          ...(gifFromMeta ? [gifFromMeta] : []),
+          ...(commentImageUrl ? [commentImageUrl] : [])
+        ]))
 
         return (
           <>
@@ -304,23 +319,9 @@ export function CommentItem({
                 {renderPostText(strippedText)}
               </p>
             )}
-            {allGifs.map((url, i) => (
-              <GifWithStar key={i} url={url} />
+            {allMedia.map((url, i) => (
+              <GifWithStar key={i} url={url} onOpenLightbox={(u) => setLightboxUrl(u)} />
             ))}
-            {commentImageUrl && (
-              <div className="mt-1.5 w-fit">
-                <img
-                  src={commentImageUrl}
-                  alt=""
-                  className="max-w-[320px] max-h-[280px] rounded-xl object-cover cursor-pointer transition-opacity hover:opacity-90"
-                  loading="lazy"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setLightboxUrl(commentImageUrl)
-                  }}
-                />
-              </div>
-            )}
           </>
         )
       })()}

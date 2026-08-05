@@ -37,7 +37,7 @@ export function getCustomTopics(): string[] {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
+    return Array.isArray(parsed) ? Array.from(new Set(parsed.map((t: string) => String(t).replace(/^\$/, '')))) : []
   } catch {
     return []
   }
@@ -60,7 +60,7 @@ export async function initCustomTopics(): Promise<string[]> {
       const req = tx.objectStore(STORE_NAME).getAll()
       req.onsuccess = () => {
         const items = req.result as CustomTopicItem[]
-        const topicNames = items.map((i) => i.name)
+        const topicNames = Array.from(new Set(items.map((i) => i.name.replace(/^\$/, ''))))
         syncToLocalStorage(topicNames)
         resolve(topicNames)
       }
@@ -76,19 +76,18 @@ export async function addCustomTopic(rawName: string): Promise<string> {
   const name = rawName.trim().replace(/^\$/, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-')
   if (!name) throw new Error('Topic name cannot be empty')
 
-  const formattedName = name.startsWith('$') ? name : `$${name}`
   const slug = name.toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-')
 
   const item: CustomTopicItem = {
     id: slug,
-    name: formattedName,
+    name: name,
     slug,
     createdAt: new Date().toISOString(),
   }
 
-  const current = getCustomTopics()
-  if (!current.includes(formattedName)) {
-    const next = [...current, formattedName]
+  const current = getCustomTopics().map((t) => t.replace(/^\$/, ''))
+  if (!current.includes(name)) {
+    const next = [...current, name]
     syncToLocalStorage(next)
   }
 
@@ -104,7 +103,7 @@ export async function addCustomTopic(rawName: string): Promise<string> {
     /* ignore */
   }
 
-  return formattedName
+  return name
 }
 
 /** Convert any topic name into API slug */
@@ -115,15 +114,18 @@ export function formatTopicSlug(name: string): string {
 
 /** Remove a custom topic from IndexedDB and sync cache */
 export async function removeCustomTopic(name: string): Promise<string[]> {
+  const cleanName = name.replace(/^\$/, '')
   const current = getCustomTopics()
-  const next = current.filter((t) => t !== name)
+  const next = current.map((t) => t.replace(/^\$/, '')).filter((t) => t !== cleanName)
   syncToLocalStorage(next)
 
   try {
     const db = await openDb()
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite')
-      tx.objectStore(STORE_NAME).delete(name)
+      const store = tx.objectStore(STORE_NAME)
+      store.delete(cleanName)
+      store.delete(`$${cleanName}`)
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
     })

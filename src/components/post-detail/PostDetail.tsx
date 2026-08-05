@@ -284,12 +284,11 @@ export function PostDetail() {
     if (!text && !gifMeta && !commentImageFile) return
 
     const doSubmit = (imageUrl?: string) => {
-      const finalImageUrl = imageUrl || mediaUrl
+      const finalImageUrl = imageUrl || (isUploadedUrl(mediaUrl) ? mediaUrl : undefined)
       commentMutation.mutate(
         { post_uuid: uuid, text, in_reply_to_uuid: uuid, ...(finalImageUrl ? { image_url: finalImageUrl } : {}) },
         {
           onSuccess: async () => {
-            if (mediaUrl) removeGif(mediaUrl)
             if (commentRef.current) {
               commentRef.current.innerHTML = ''
               setCommentHasText(false)
@@ -323,19 +322,21 @@ export function PostDetail() {
         }
         if (mediaUrl) {
           if (isUploadedUrl(mediaUrl)) return mediaUrl
-          try {
-            const gifFile = await fetchOrConvertImageToFile(mediaUrl)
-            const res = await uploadImage.mutateAsync(gifFile)
-            return res.publicURL
-          } catch {
-            return undefined
-          }
+          const gifFile = await fetchOrConvertImageToFile(mediaUrl)
+          const res = await uploadImage.mutateAsync(gifFile)
+          return res.publicURL
         }
         return undefined
       }
 
       prepareUpload()
-        .then((uploadedUrl) => doSubmit(uploadedUrl))
+        .then((uploadedUrl) => {
+          if (uploadedUrl) {
+            doSubmit(uploadedUrl)
+          } else {
+            toast('error', 'Could not fetch image from URL. Try downloading and uploading the file directly.')
+          }
+        })
         .catch((err) => toast('error', `Media upload failed: ${humanizeError(err)}`))
     } else {
       doSubmit()

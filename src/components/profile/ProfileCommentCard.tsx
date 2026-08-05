@@ -100,31 +100,21 @@ export function ProfileCommentCard({ comment, postTitle, initialVote = 0 }: Prop
         const rawGifFromMeta = (comment.comment_meta as { giphy_url?: string })?.giphy_url
         const gifFromMeta = rawGifFromMeta ? normalizeMediaUrl(rawGifFromMeta) : undefined
         const strippedText = stripMediaUrls(text, rawGifFromMeta ? [rawGifFromMeta] : [])
-        const allGifs: string[] = [...gifUrls, ...(gifFromMeta && !gifUrls.includes(gifFromMeta) ? [gifFromMeta] : [])]
         const commentImageUrl = (comment.comment_meta as { image_url?: string })?.image_url
+        const allMedia: string[] = Array.from(new Set([
+          ...gifUrls,
+          ...(gifFromMeta ? [gifFromMeta] : []),
+          ...(commentImageUrl ? [commentImageUrl] : [])
+        ]))
 
         return (
           <>
             {strippedText && strippedText !== ZERO_WIDTH_MEDIA_TEXT && (
               <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-white/90">{renderPostText(strippedText)}</p>
             )}
-            {allGifs.map((url, i) => (
+            {allMedia.map((url, i) => (
               <GifWithStar key={i} url={url} />
             ))}
-            {commentImageUrl && (
-              <div className="mt-1.5 w-fit">
-                <img
-                  src={commentImageUrl}
-                  alt=""
-                  className="max-w-[280px] max-h-[200px] rounded-xl object-cover cursor-pointer transition-opacity hover:opacity-90"
-                  loading="lazy"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setLightboxUrl(commentImageUrl)
-                  }}
-                />
-              </div>
-            )}
           </>
         )
       })()}
