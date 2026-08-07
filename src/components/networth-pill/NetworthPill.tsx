@@ -116,10 +116,15 @@ const MOD_UUIDS = new Set([
   'e5dbcd9b-6dc9-4831-ad30-43f50d72487d',
 ])
 
+const NEWS_UUIDS = new Set([
+  'news',
+])
+
 function getTierFromUUID(uuid: string, subscriptionType: number, networth: number, role?: string): PillTier {
   const lower = uuid.toLowerCase()
   if (lower === 'admin') return 'admin'
   if (lower === 'penny') return 'penny'
+  if (lower === 'news' || NEWS_UUIDS.has(lower) || role === 'news') return 'news'
   if (role === 'moderator' || MOD_UUIDS.has(lower)) return 'mod'
   if (subscriptionType === 0) return 'unverified'
   return getTierFromNetworth(networth)
