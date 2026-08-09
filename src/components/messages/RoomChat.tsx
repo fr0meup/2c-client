@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { ArrowLeft, Hash, Lock, Users, Link2, Check, Terminal, LogOut } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
@@ -11,6 +11,61 @@ import { fmtCount, gradientCss, type ChatMessage } from './types'
 import { RoomInfoModal } from './RoomInfoModal'
 
 const BATCH = 50
+
+function formatDateLabel(dateStr: string): string {
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return ''
+
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+
+  const msgDate = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+
+  if (msgDate.getTime() === today.getTime()) {
+    return 'Today'
+  }
+  if (msgDate.getTime() === yesterday.getTime()) {
+    return 'Yesterday'
+  }
+
+  const day = d.getDate()
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ]
+  const month = monthNames[d.getMonth()]
+  const year = d.getFullYear()
+
+  if (year === now.getFullYear()) {
+    return `${day} ${month}`
+  }
+  return `${day} ${month} ${year}`
+}
+
+function isDifferentDay(d1Str?: string, d2Str?: string): boolean {
+  if (!d1Str || !d2Str) return true
+  const d1 = new Date(d1Str)
+  const d2 = new Date(d2Str)
+  return (
+    d1.getFullYear() !== d2.getFullYear() ||
+    d1.getMonth() !== d2.getMonth() ||
+    d1.getDate() !== d2.getDate()
+  )
+}
+
+function DateDivider({ dateStr }: { dateStr: string }) {
+  const label = formatDateLabel(dateStr)
+  if (!label) return null
+  return (
+    <div className="my-3 flex items-center justify-center select-none">
+      <span className="text-center text-[13px] font-medium text-white/50 tracking-wide">
+        {label}
+      </span>
+    </div>
+  )
+}
 
 export function Room() {
   return <RoomChat />
@@ -329,20 +384,24 @@ export function RoomChat() {
             )}
             {messages.map((msg, i) => {
               const prev = messages[i - 1]
+              const showDateDivider = !prev || isDifferentDay(prev?.created_at, msg.created_at)
               const showAuthor =
                 msg.author_uuid !== auth?.userUuid &&
-                (!prev || prev.author_uuid !== msg.author_uuid)
+                (!prev || prev.author_uuid !== msg.author_uuid || showDateDivider)
+
               return (
-                <MessageBubble
-                  key={msg.uuid}
-                  msg={msg}
-                  showAuthor={showAuthor}
-                  onReply={setReplyTo}
-                  onJumpTo={jumpTo}
-                  innerRef={(el) => {
-                    messageRefs.current[msg.uuid] = el
-                  }}
-                />
+                <Fragment key={msg.uuid}>
+                  {showDateDivider && <DateDivider dateStr={msg.created_at} />}
+                  <MessageBubble
+                    msg={msg}
+                    showAuthor={showAuthor}
+                    onReply={setReplyTo}
+                    onJumpTo={jumpTo}
+                    innerRef={(el) => {
+                      messageRefs.current[msg.uuid] = el
+                    }}
+                  />
+                </Fragment>
               )
             })}
             </>

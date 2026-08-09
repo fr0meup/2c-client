@@ -167,7 +167,7 @@ export function CommentItem({
           ...(finalImageUrl ? { image_url: finalImageUrl } : {}),
         },
         {
-          onSuccess: async () => {
+          onSuccess: async (data: any) => {
             if (replyRef.current) {
               replyRef.current.innerHTML = ''
               setReplyHasText(false)
@@ -177,10 +177,12 @@ export function CommentItem({
             setReplyOpen(false)
             toast('success', 'Reply posted')
             if (auth && mentionedUuids.length > 0) {
+              const createdCommentUuid = data?.comment?.uuid || data?.uuid
               const result = await notifyMentions({
                 auth,
                 mentionedUuids,
                 postUuid: comment.post_uuid,
+                commentUuid: createdCommentUuid,
                 contentType: 'comment',
               })
               if (result.sent > 0) toast('success', `Mention notification sent to ${result.sent}`)

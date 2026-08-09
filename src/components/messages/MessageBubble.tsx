@@ -65,17 +65,22 @@ function renderMessageText(text: string, navigate: ReturnType<typeof useNavigate
     const userMatch = href.match(/\/user\/([0-9a-f-]{36})/i)
     const internalHref = postMatch ? `/post/${postMatch[1]}` : userMatch ? `/user/${userMatch[1]}` : null
     parts.push(
-      <button
+      <a
         key={key++}
+        href={internalHref || href}
         onClick={(e) => {
+          e.preventDefault()
           e.stopPropagation()
           if (internalHref) navigate(internalHref)
           else window.open(href, '_blank', 'noopener,noreferrer')
         }}
-        className={cn('cursor-pointer font-semibold hover:underline', isMine ? 'text-[#0f0e0a]' : 'text-[#c8a44d]')}
+        className={cn(
+          'inline cursor-pointer font-semibold underline underline-offset-2 break-all text-left',
+          isMine ? 'text-[#0f0e0a]' : 'text-[#c8a44d]',
+        )}
       >
         {label}
-      </button>,
+      </a>,
     )
     lastIndex = match.index + match[0].length
   }
@@ -156,7 +161,7 @@ export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: 
         {strippedText && (
         <div
           className={cn(
-            'relative rounded-2xl px-3.5 py-2 text-[13.5px] leading-relaxed shadow-sm [overflow-wrap:anywhere]',
+            'relative rounded-2xl px-3.5 py-2 text-[13.5px] leading-relaxed shadow-sm whitespace-pre-wrap break-words',
             isMine
               ? 'rounded-br-md bg-[#c8a44d] text-[#0f0e0a] shadow-black/30'
               : 'rounded-bl-md border border-white/[0.06] bg-white/[0.06] text-white/90 shadow-black/20',

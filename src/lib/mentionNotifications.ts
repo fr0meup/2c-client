@@ -12,6 +12,7 @@ interface NotifyMentionsParams {
   auth: AuthLike
   mentionedUuids: string[]
   postUuid: string
+  commentUuid?: string
   contentType: 'post' | 'comment'
 }
 
@@ -26,10 +27,13 @@ export function extractMentionUuids(el: HTMLElement | null, currentUserUuid?: st
   return Array.from(new Set(uuids))
 }
 
-function postUrl(postUuid: string): string {
-  const origin = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
-    ? 'https://twocents.money'
-    : window.location.origin
+function buildNotificationUrl(postUuid: string, commentUuid?: string, originHost?: string): string {
+  const origin = originHost || (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
+    ? 'https://www.twocents.money'
+    : window.location.origin)
+  if (commentUuid) {
+    return `${origin}/post/${postUuid}?comment=${commentUuid}`
+  }
   return `${origin}/post/${postUuid}`
 }
 
@@ -81,7 +85,7 @@ function sendWsMessage(token: string, roomUuid: string, text: string): Promise<v
   })
 }
 
-export async function notifyMentions({ auth, mentionedUuids, postUuid, contentType }: NotifyMentionsParams): Promise<{ sent: number; failed: number }> {
+export async function notifyMentions({ auth, mentionedUuids, postUuid, commentUuid, contentType }: NotifyMentionsParams): Promise<{ sent: number; failed: number }> {
   const recipients = Array.from(new Set(mentionedUuids)).filter((uuid) => uuid !== auth.userUuid)
   if (recipients.length === 0) return { sent: 0, failed: 0 }
 
@@ -89,7 +93,10 @@ export async function notifyMentions({ auth, mentionedUuids, postUuid, contentTy
 
   const results = await Promise.allSettled(recipients.map(async (recipientUuid) => {
     const recipientNw = await getUserNetworth(auth, recipientUuid)
-    const text = `${senderNw} mentioned ${recipientNw} in a ${contentType}.\ncheck it out here: ${postUrl(postUuid)}\ncustom client: http://localhost:5173/post/${postUuid}`
+    const targetUrl = buildNotificationUrl(postUuid, commentUuid, 'https://twocents.money')
+    const localUrl = buildNotificationUrl(postUuid, commentUuid, 'http://localhost:5173')
+    const text = `${senderNw} mentioned ${recipientNw} in a ${contentType}.\nCheck it out here:\n${targetUrl}\n\nCustom client:\n${localUrl}`
+
     const dm = await rpc<{ room: { uuid: string } }>(
       '/v1/rooms/startDM',
       { recipientUuid },

@@ -186,6 +186,25 @@ export function PostDetail() {
     setCurrentVote(userVote?.vote_type ?? 0)
   }, [postData])
 
+  // Auto-scroll to target comment when opening a comment mention link (?comment={uuid} or #comment-{uuid})
+  useEffect(() => {
+    if (!commentsLoading && comments.length > 0) {
+      const searchParams = new URLSearchParams(location.search)
+      const targetCommentUuid = searchParams.get('comment') || (location.hash ? location.hash.replace('#comment-', '').replace('#', '') : null)
+      if (!targetCommentUuid) return
+
+      const targetId = `comment-${targetCommentUuid}`
+      const el = document.getElementById(targetId) || document.getElementById(targetCommentUuid)
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          el.classList.add('bg-[#c8a44d]/10', 'transition-colors', 'duration-500')
+          setTimeout(() => el.classList.remove('bg-[#c8a44d]/10'), 2500)
+        }, 150)
+      }
+    }
+  }, [commentsLoading, comments.length, location.search, location.hash])
+
   // Sync comment_count + upvote_count back to feed / profile caches so navigating back shows fresh numbers
   useEffect(() => {
     if (!postData?.post) return
@@ -288,7 +307,7 @@ export function PostDetail() {
       commentMutation.mutate(
         { post_uuid: uuid, text, in_reply_to_uuid: uuid, ...(finalImageUrl ? { image_url: finalImageUrl } : {}) },
         {
-          onSuccess: async () => {
+          onSuccess: async (data: any) => {
             if (commentRef.current) {
               commentRef.current.innerHTML = ''
               setCommentHasText(false)
@@ -297,10 +316,12 @@ export function PostDetail() {
             setCommentImagePreview(null)
             toast('success', 'Comment posted')
             if (auth && mentionedUuids.length > 0) {
+              const createdCommentUuid = data?.comment?.uuid || data?.uuid
               const result = await notifyMentions({
                 auth,
                 mentionedUuids,
                 postUuid: uuid,
+                commentUuid: createdCommentUuid,
                 contentType: 'comment',
               })
               if (result.sent > 0) toast('success', `Mention notification sent to ${result.sent}`)
