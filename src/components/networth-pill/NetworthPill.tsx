@@ -15,6 +15,7 @@ type PillTier =
   | 'admin'
   | 'mod'
   | 'news'
+  | 'staff'
   | 'penny'
   | 'unverified'
 
@@ -33,6 +34,7 @@ const PILL_IMAGES: Record<PillTier, string> = {
   mod: 'https://www.twocents.money/pills/mod.png',
   evil: 'https://www.twocents.money/pills/evil2.png',
   news: 'https://www.twocents.money/pills/news2.png',
+  staff: 'https://twocents.money/pills/dark_staff_badge_bg.png',
   bronze: 'https://www.twocents.money/pills/bronze2.png',
   silver: 'https://www.twocents.money/pills/silver2.png',
   gold: 'https://www.twocents.money/pills/gold4.png',
@@ -51,6 +53,7 @@ const PILL_COLORS: Record<PillTier, string> = {
   evil: '#FF4E5A',
   mod: '#FFB34B',
   news: '#FF525B',
+  staff: '#0044BB',
   unverified: '#ACC4C1',
   ultra: '#9590c4',
   penny: '#8B4513',
@@ -73,6 +76,7 @@ const TEXT_STYLES: Record<PillTier, CSSProperties> = {
   evil: gradientText('#FF4E5A', '#ED3341'),
   mod: gradientText('#FFC294', '#FFB34B'),
   news: gradientText('#FF7075', '#FF525B'),
+  staff: { color: '#ffffff', textShadow: '0 0.5px 1px rgba(0, 0, 0, 0.4)' },
   unverified: { color: '#ffffff' },
   ultra: gradientText('#232323', '#1D1668'),
   penny: {
@@ -85,6 +89,7 @@ const SPECIAL_LABELS: Partial<Record<PillTier, string>> = {
   admin: 'ANDI',
   mod: 'MOD',
   news: 'NEWS',
+  staff: 'STAFF',
   penny: 'PENNY',
 }
 
@@ -124,6 +129,7 @@ function getTierFromUUID(uuid: string, subscriptionType: number, networth: numbe
   const lower = uuid.toLowerCase()
   if (lower === 'admin') return 'admin'
   if (lower === 'penny') return 'penny'
+  if (lower === 'staff' || role === 'staff') return 'staff'
   if (lower === 'news' || NEWS_UUIDS.has(lower) || role === 'news') return 'news'
   if (role === 'moderator' || MOD_UUIDS.has(lower)) return 'mod'
   if (subscriptionType === 0) return 'unverified'
@@ -196,20 +202,32 @@ export function NetworthPill({
     )
   }
 
+  const isStaff = actualTier === 'staff'
+
   return (
     <div
       onClick={canNavigate ? handleClick : undefined}
       onMouseEnter={canNavigate ? handleHover : undefined}
-      className={`relative inline-flex max-w-full items-center ${hasSpecialLabel ? 'justify-center px-2' : 'gap-1 pl-0.5 pr-1.5'} ${config.height} ${config.text} ${config.minWidth} ${className}${canNavigate ? ' cursor-pointer' : ''}`}
-      style={{
-        borderStyle: 'solid',
-        borderWidth: `${config.borderWidth}px`,
-        borderImageSource: `url(${pillImage})`,
-        borderImageSlice: '27 fill',
-        borderImageWidth: '50px',
-        borderImageRepeat: 'stretch',
-        backgroundColor: 'transparent',
-      }}
+      className={`relative inline-flex max-w-full items-center justify-center ${hasSpecialLabel ? 'px-3.5' : 'gap-1 pl-0.5 pr-1.5'} ${config.height} ${config.text} ${config.minWidth} ${className}${canNavigate ? ' cursor-pointer' : ''}`}
+      style={
+        isStaff
+          ? {
+              backgroundImage: `url(${pillImage})`,
+              backgroundSize: '100% 100%',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'center',
+              backgroundColor: 'transparent',
+            }
+          : {
+              borderStyle: 'solid',
+              borderWidth: `${config.borderWidth}px`,
+              borderImageSource: `url(${pillImage})`,
+              borderImageSlice: '27 fill',
+              borderImageWidth: '50px',
+              borderImageRepeat: 'stretch',
+              backgroundColor: 'transparent',
+            }
+      }
     >
       {!hasSpecialLabel && (
         <span
@@ -235,11 +253,11 @@ export function NetworthPill({
       )}
 
       <span
-        className={`${config.text} min-w-0 truncate leading-none`}
+        className={`${config.text} flex items-center justify-center min-w-0 truncate leading-none text-center`}
         style={{
           ...textStyle,
-          fontWeight: 500,
-          marginTop: '-1px',
+          fontWeight: isStaff ? 700 : 500,
+          marginTop: isStaff ? 0 : '-1px',
         }}
       >
         {displayValue}
