@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { rpc } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
+import { formatTextForApi } from '@/lib/utils'
 import type { Comment, CommentsResponse, ArenaResponse, UserProfileResponse, BookmarksResponse } from '@/lib/types'
 import type { PostResponse } from './usePost'
 
@@ -58,9 +59,10 @@ export function useCreateComment() {
       if (!auth) throw new Error('Not authenticated')
 
       const mediaUrl = params.image_url || params.giphy_url
-      const text = mediaUrl
+      const rawText = mediaUrl
         ? stripMediaUrls(params.text, [mediaUrl]) || ZERO_WIDTH_MEDIA_TEXT
         : params.text
+      const text = rawText === ZERO_WIDTH_MEDIA_TEXT ? rawText : formatTextForApi(rawText)
 
       const effectiveImageUrl = params.image_url || params.giphy_url
 

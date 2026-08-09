@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCities } from '@/hooks/useCities'
 import { TOPIC_MENU } from '@/components/feed-filters/config'
 import { TOPIC_TO_API } from '@/hooks/useFeed'
 import { addSearchHistory, clearSearchHistory, getSearchHistory } from '@/lib/searchHistory'
+import { clearPostCache, getCacheMeta } from '@/lib/postCache'
+import { clearBulkMemoryCache } from '@/hooks/useBulkDateFetch'
+import { useToast } from '@/components/toast/ToastContext'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const DAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
@@ -430,6 +433,16 @@ export function AdvancedSearchPanel() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [searchHistory, setSearchHistory] = useState<string[]>(() => getSearchHistory())
 
+  const { toast } = useToast()
+  const [cachedCount, setCachedCount] = useState<number>(() => getCacheMeta().count)
+
+  const handleClearCache = async () => {
+    clearBulkMemoryCache()
+    await clearPostCache()
+    setCachedCount(0)
+    toast('success', 'IndexedDB post cache cleared. Next scan will run a fresh fetch.')
+  }
+
   const cityOptions = country && citiesData ? (citiesData.cities[country] || []).sort() : []
 
   const toggleGender = (g: string) => {
@@ -748,13 +761,25 @@ export function AdvancedSearchPanel() {
 
       {/* Footer — outside onboarding wrapper so spotlight excludes it */}
       {expanded && (
-        <div className="flex items-center justify-between border-t border-white/[0.06] px-4 py-2.5">
-          <button
-            onClick={handleReset}
-            className="cursor-pointer text-[11px] font-medium text-white/30 transition-colors hover:text-white/60"
-          >
-            Reset all
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleReset}
+              className="cursor-pointer text-[11px] font-medium text-white/30 transition-colors hover:text-white/60"
+            >
+              Reset all
+            </button>
+            <span className="text-white/10">•</span>
+            <button
+              onClick={handleClearCache}
+              title="Clear saved posts from local IndexedDB cache to force a fresh platform scan"
+              className="group flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-[#c8a44d]/70 transition-colors hover:text-[#c8a44d]"
+            >
+              <Trash2 className="h-3 w-3 text-[#c8a44d]/60 transition-transform group-hover:scale-110" />
+              <span>Clear Cache {cachedCount > 0 ? `(${cachedCount.toLocaleString()} posts)` : '(empty)'}</span>
+            </button>
+          </div>
+
           <button
             data-onboarding="apply-filters"
             onClick={handleApply}

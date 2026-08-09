@@ -58,7 +58,7 @@ export function getTextWithGifs(el: HTMLElement): string {
       }
     }
   }
-  return text
+  return text.replace(/\u00A0/g, ' ').replace(/&nbsp;/gi, ' ')
 }
 
 /** Insert a GIF image element at the bottom of a contentEditable div */

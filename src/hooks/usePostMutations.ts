@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { rpc } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { formatTextForApi } from '@/lib/utils'
 import type { Post } from '@/lib/types'
 
 // ── Create Post ──
@@ -31,7 +32,7 @@ export function useCreatePost() {
         {
           title: params.title,
           topic: params.topic,
-          text: params.text,
+          text: formatTextForApi(params.text),
           post_type: params.post_type,
           post_meta: params.post_meta,
         },

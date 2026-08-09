@@ -200,6 +200,8 @@ async function clearLocalData() {
   Object.keys(appLocalStorage()).forEach((key) => localStorage.removeItem(key))
   try { indexedDB.deleteDatabase('2c-drafts') } catch { /* ignore */ }
   try {
+    const { clearBulkMemoryCache } = await import('@/hooks/useBulkDateFetch')
+    clearBulkMemoryCache()
     const { clearPostCache } = await import('@/lib/postCache')
     await clearPostCache()
   } catch {

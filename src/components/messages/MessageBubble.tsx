@@ -9,6 +9,7 @@ import { extractMediaUrls, normalizeMediaUrl, saveGif, removeGif, isGifSaved, st
 import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
 import { useMessages } from './MessagesContext'
 import { timeAgo, formatExactTime, type ChatMessage } from './types'
+import { cleanPostText } from '@/components/post-card/utils'
 
 function GifWithStar({ url, onOpenLightbox }: { url: string; onOpenLightbox?: (url: string) => void }) {
   const [saved, setSaved] = useState(() => isGifSaved(url))
@@ -114,7 +115,7 @@ export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: 
     ...textGifs,
   ]))
   // Strip both regex-matched URLs and the meta URL from displayed text
-  let strippedText = stripMediaUrls(msg.text, metaMediaUrl ? [metaMediaUrl] : [])
+  let strippedText = cleanPostText(stripMediaUrls(msg.text, metaMediaUrl ? [metaMediaUrl] : []))
   if (strippedText === ZERO_WIDTH_MEDIA_TEXT) strippedText = ''
 
   if (msg.deleted_at) {

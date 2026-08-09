@@ -356,3 +356,7 @@ export function useBulkDateFetch({
 
   return { posts, votes, polls, pickVotes, isLoading, scanned }
 }
+
+export function clearBulkMemoryCache(): void {
+  sessionBulkCache.clear()
+}

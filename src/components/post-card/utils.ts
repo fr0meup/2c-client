@@ -35,13 +35,19 @@ export function formatExactDateTime(dateStr?: string): string {
 }
 
 export function cleanPostText(text: string): string {
+  if (!text) return ''
   return text
+    .replace(/&nbsp;|\u00A0/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&(?:apos|#39);/gi, "'")
     .replace(/&#\d+;/g, (match) => {
       const code = parseInt(match.replace(/&#|;/g, ''), 10)
       return String.fromCodePoint(code)
     })
     .replace(/[\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF\u00AD\u061C\u180E\uFFFC\uFFF9-\uFFFB]|\u034F/g, '')
-    .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
 
@@ -100,6 +106,8 @@ export function renderPostText(raw: string) {
   const elements: ReturnType<typeof createElement>[] = []
 
   let i = 0
+  let emptyLineCount = 0
+
   while (i < lines.length) {
     // Collect consecutive blockquote lines
     if (/^>\s?/.test(lines[i])) {
@@ -115,6 +123,7 @@ export function renderPostText(raw: string) {
           className: 'my-1 border-l-2 border-[#c8a44d]/30 pl-3 text-white/50 italic',
         }, ...quoteLines)
       )
+      emptyLineCount = 0
     // Collect consecutive bullet lines
     } else if (/^-\s/.test(lines[i])) {
       const items: typeof elements = []
@@ -130,10 +139,21 @@ export function renderPostText(raw: string) {
       elements.push(
         createElement('ul', { key: `ul-${i}`, className: 'my-0.5' }, ...items)
       )
+      emptyLineCount = 0
     } else {
-      if (i > 0) elements.push(createElement('br', { key: `br-${i}` }))
-      if (lines[i] !== '') {
+      const isBlank = lines[i].trim() === '' || lines[i] === '\u3164' || lines[i] === 'ㅤ'
+
+      if (isBlank) {
+        emptyLineCount++
+      } else {
+        if (i > 0) {
+          const brCount = Math.max(1, emptyLineCount > 1 ? emptyLineCount - 1 : 1)
+          for (let b = 0; b < brCount; b++) {
+            elements.push(createElement('br', { key: `br-${i}-${b}` }))
+          }
+        }
         elements.push(createElement(Fragment, { key: `f-${i}` }, ...parseInline(lines[i])))
+        emptyLineCount = 0
       }
       i++
     }

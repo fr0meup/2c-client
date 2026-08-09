@@ -21,3 +21,22 @@ export function obfuscateText(text: string): string {
   }
   return current
 }
+
+const HANGUL_FILLER = '\u3164' // ㅤ
+
+export function formatTextForApi(raw: string): string {
+  if (!raw) return raw
+
+  let text = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+
+  // 1. Any 2+ consecutive newlines (or empty lines with spaces) -> \n\nㅤ\n\n
+  text = text.replace(/(?:[ \t]*\n[ \t]*){2,}/g, `\n\n${HANGUL_FILLER}\n\n`)
+
+  // 2. Any single newline -> \n\n
+  const PLACEHOLDER = '___HANGUL_FILLER_GAP___'
+  text = text.replace(new RegExp(`\\n\\n${HANGUL_FILLER}\\n\\n`, 'g'), PLACEHOLDER)
+  text = text.replace(/\n/g, '\n\n')
+  text = text.replace(new RegExp(PLACEHOLDER, 'g'), `\n\n${HANGUL_FILLER}\n\n`)
+
+  return text.trim()
+}
