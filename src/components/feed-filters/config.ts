@@ -2,8 +2,8 @@ export const TOPICS = ['New', 'Hot', 'Following', 'Picks', 'Topics'] as const
 
 export const TOPIC_MENU = [
   { category: 'General', items: ['Lounge', 'Situation monitoring', 'Dating'] },
-  { category: 'Markets', items: ['Stocks', 'Cryptocurrency', 'Real estate'] },
-  { category: 'Business', items: ['Business and entrepreneurship', 'AI and tech'] },
+  { category: 'Markets', items: ['Stocks', 'Cryptocurrency'] },
+  { category: 'Business', items: ['AI and tech'] },
   { category: 'Advice', items: ['Ask a millionaire'] },
   { category: 'Platform', items: ['Announcements', 'Bugs and feedback'] },
 ] as const

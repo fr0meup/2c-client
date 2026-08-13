@@ -371,7 +371,7 @@ export function Feed() {
 
   return (
     <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pt-3 pb-6 sm:px-8">
-      <div className="w-full max-w-[670px] space-y-4 xl:-ml-[245px]">
+      <div className="w-full max-w-[670px] space-y-4 xl:-ml-[245px]" data-content-column>
         <div data-onboarding="feed-compose">
           {hasAdvancedParams(location.search) ? <AdvancedSearchPanel /> : !hideCompose ? <ComposePost defaultTopic={activeTopic} /> : null}
         </div>

@@ -14,6 +14,9 @@ const Leaderboard = lazy(routeLoaders.leaderboard)
 const Bookmarks = lazy(routeLoaders.bookmarks)
 const Profile = lazy(routeLoaders.profile)
 const PostDetailPage = lazy(routeLoaders.post)
+const NotFoundPage = lazy(() => import('./pages/NotFound').then(m => ({ default: m.NotFoundPage })))
+
+import { CenteredGuidelineShell } from './components/not-found/CenteredGuidelineShell'
 
 function PageFallback() {
   return <div className="min-h-[calc(100vh-72px)] bg-[#0a0907]" />
@@ -21,11 +24,11 @@ function PageFallback() {
 
 function Transactions() {
   return (
-    <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pt-3 pb-6 sm:px-8">
-      <div className="flex w-full max-w-[670px] items-center justify-center xl:-ml-[245px]" style={{ minHeight: 'calc(100vh - 72px - 48px)' }}>
+    <CenteredGuidelineShell>
+      <div className="flex items-center justify-center py-6">
         <p className="text-sm font-medium text-white/40">Coming soon (I'm lying, this is probably never coming.)</p>
       </div>
-    </div>
+    </CenteredGuidelineShell>
   )
 }
 
@@ -213,6 +216,8 @@ function App() {
                 <Route path="/bookmarks" element={<Bookmarks />} />
                 <Route path="/transactions" element={<Transactions />} />
                 <Route path="/user/:uuid" element={<Profile />} />
+                <Route path="/404" element={<NotFoundPage />} />
+                <Route path="*" element={<NotFoundPage />} />
               </Route>
             </Route>
           </Routes>

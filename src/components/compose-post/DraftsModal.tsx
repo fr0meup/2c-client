@@ -48,7 +48,7 @@ export function DraftsModal({ onClose, onLoad, onDelete }: Props) {
     } else if (draft.mediaBlob && draft.mediaType?.startsWith('image/')) {
       badges.push({ icon: <ImagePlus className="h-3 w-3" />, label: 'Image' })
     }
-    if (draft.activeOption === 'poll') {
+    if (draft.activeOption === 'poll' || (Array.isArray(draft.pollOptions) && draft.pollOptions.length > 0 && draft.pollOptions.some((o) => o.trim() !== ''))) {
       badges.push({ icon: <BarChart3 className="h-3 w-3" />, label: 'Poll' })
     }
     if (draft.activeOption === 'likert') {

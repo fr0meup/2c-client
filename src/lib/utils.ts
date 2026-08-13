@@ -40,3 +40,8 @@ export function formatTextForApi(raw: string): string {
 
   return text.trim()
 }
+
+export function formatTopicSlug(name: string): string {
+  const clean = name.replace(/^\$/, '').trim()
+  return clean.toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-')
+}

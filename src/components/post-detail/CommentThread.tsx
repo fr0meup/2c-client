@@ -58,17 +58,23 @@ export function CommentThread({
                 style={{ left: '-2px', top: 0, width: '12px', height: '100%', overflow: 'visible' }}
                 preserveAspectRatio="none"
               >
-                <path
-                  d="M1,0 L1,20 Q1,28 9,28"
-                  fill="none"
-                  stroke="#c8a44d"
-                  strokeWidth="2"
-                  strokeLinejoin="round"
-                  strokeOpacity="0.35"
-                />
-                {!isLast && (
-                  <line x1="1" y1="20" x2="1" y2="100%" stroke="#c8a44d" strokeWidth="2" strokeOpacity="0.35" />
-                )}
+                <g opacity="0.35" stroke="#c8a44d" strokeWidth="2" fill="none" strokeLinejoin="round" strokeLinecap="round">
+                  {!isLast ? (
+                    <>
+                      {/* Continuous vertical line for full item height */}
+                      <line x1="1" y1="0" x2="1" y2="100%" />
+                      {/* Smooth branch curve to comment */}
+                      <path d="M 1,20 Q 1,28 9,28" />
+                    </>
+                  ) : (
+                    <>
+                      {/* Vertical line down to curve start */}
+                      <line x1="1" y1="0" x2="1" y2="20" />
+                      {/* Smooth branch curve to comment */}
+                      <path d="M 1,20 Q 1,28 9,28" />
+                    </>
+                  )}
+                </g>
               </svg>
             )}
 

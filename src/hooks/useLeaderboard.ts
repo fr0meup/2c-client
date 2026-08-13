@@ -6,14 +6,10 @@ import type { LeaderboardType, LeaderboardEntry } from '@/components/leaderboard
 
 /** Map UI board type → API param name */
 export const BOARD_API_NAME: Record<LeaderboardType, string> = {
-  ppe: 'Elo',
-  picks_szn: 'picksSzn',
   top_100: 'top100',
   highest_debt: 'highestDebt',
-  credit_cards: 'creditCards',
   biggest_gains: 'Biggest Gains',
   biggest_losses: 'Biggest Losses',
-  league: 'Streaks',
 }
 
 /** Convert an API leaderboard entry to the UI LeaderboardEntry shape */
@@ -35,7 +31,7 @@ export function mapEntry(
     uuid: e.uuid,
     balance,
     subscription_type: e.subscription_type ?? 1,
-    elo_rating: boardType === 'ppe' && points != null ? points : 0,
+    elo_rating: 0,
     gender: (e.gender as 'M' | 'F') ?? undefined,
     age: e.age,
     arena: e.arena,

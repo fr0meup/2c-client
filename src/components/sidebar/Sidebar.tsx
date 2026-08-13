@@ -40,7 +40,7 @@ export function Sidebar({ onNewPostClick }: SidebarProps) {
 
   return (
     <aside className="fixed left-[calc(50%-600px)] top-[72px] hidden h-[calc(100vh-72px)] w-60 flex-col px-3 py-3 font-[Inter,-apple-system,BlinkMacSystemFont,'Segoe_UI',sans-serif] xl:flex">
-      <nav className="flex flex-1 flex-col gap-1.5">
+      <nav className="flex flex-1 flex-col gap-1.5" data-sidebar-column>
         {items.map((item) => (
           <SidebarNavLink key={item.path} item={item} />
         ))}
@@ -84,7 +84,7 @@ function SidebarNavLink({ item }: { item: NavItem }) {
   if (item.label === 'Feed') {
     const isActive = isFeedPath(location.pathname, location.search)
     return (
-      <NavLink to="/" end onClick={handleClick} onMouseEnter={handlePreload} onFocus={handlePreload} className={`${baseClass} ${isActive ? baseActive : baseInactive}`}>
+      <NavLink to="/" end data-feed-nav-item onClick={handleClick} onMouseEnter={handlePreload} onFocus={handlePreload} className={`${baseClass} ${isActive ? baseActive : baseInactive}`}>
         <NavIcon item={item} isActive={isActive} />
         <span>{item.label}</span>
       </NavLink>
@@ -109,6 +109,7 @@ function SidebarNavLink({ item }: { item: NavItem }) {
       onMouseEnter={handlePreload}
       onFocus={handlePreload}
       className={({ isActive }) => `${baseClass} ${isActive ? baseActive : baseInactive}`}
+      data-me-nav-item={item.label === 'Me' ? 'true' : undefined}
       {...(item.label === 'Me' ? { 'data-onboarding': 'me-nav' } : {})}
     >
       {({ isActive }) => (

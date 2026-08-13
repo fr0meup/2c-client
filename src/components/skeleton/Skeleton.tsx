@@ -46,46 +46,47 @@ export function PostCardSkeleton() {
 
 export function PostDetailSkeleton() {
   return (
-    <div className="flex flex-col">
-      <div className="pb-4 pt-1.5">
-        {/* Author row */}
-        <div className="mt-1.5 flex items-center gap-2">
-          <Skeleton className="h-6 w-28 rounded-full" />
-          <Skeleton className="h-4 w-12" />
-          <Skeleton className="h-4 w-20" />
-        </div>
-        {/* Title */}
-        <Skeleton className="mt-3 h-6 w-3/4" />
-        {/* Body */}
-        <Skeleton className="mt-3 h-4 w-full" />
-        <Skeleton className="mt-1.5 h-4 w-full" />
-        <Skeleton className="mt-1.5 h-4 w-5/6" />
-        <Skeleton className="mt-1.5 h-4 w-2/3" />
-        {/* Image placeholder */}
-        <Skeleton className="mt-4 h-56 w-full rounded-2xl" />
-        {/* Bottom bar */}
-        <div className="mt-4 flex items-center gap-2.5">
-          <Skeleton className="h-[38px] flex-1 rounded-full" />
-          <Skeleton className="h-[38px] w-24 rounded-full" />
-          <Skeleton className="h-[38px] w-28 rounded-full" />
-        </div>
-        <div className="mt-4 h-px bg-white/[0.06]" />
-      </div>
-      {/* Comment input */}
-      <div className="pt-1 pb-3">
-        <Skeleton className="h-4 w-20" />
-        <Skeleton className="mt-2 h-10 w-full rounded-full" />
-      </div>
-      {/* Comments */}
-      {[...Array(3)].map((_, i) => (
-        <div key={i} className="flex gap-3 py-3">
-          <Skeleton className="h-6 w-20 shrink-0 rounded-full" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
+    <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pb-6 sm:px-8">
+      <div className="w-full max-w-[670px] xl:-ml-[245px]" data-content-column>
+        <div className="flex flex-col">
+          <div className="pb-4 pt-1.5">
+            {/* Author row */}
+            <div className="mt-1.5 flex items-center gap-2">
+              <Skeleton className="h-6 w-28 rounded-full" />
+              <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+            {/* Title */}
+            <Skeleton className="mt-3.5 h-6 w-3/4" />
+            {/* Body */}
+            <Skeleton className="mt-3 h-4 w-full" />
+            <Skeleton className="mt-1.5 h-4 w-5/6" />
+            <Skeleton className="mt-1.5 h-4 w-2/3" />
+            {/* Bottom bar */}
+            <div className="mt-4 flex items-center gap-2.5">
+              <Skeleton className="h-[38px] flex-1 rounded-full" />
+              <Skeleton className="h-[38px] w-24 rounded-full" />
+              <Skeleton className="h-[38px] w-28 rounded-full" />
+            </div>
+            <div className="mt-4 h-px bg-white/[0.06]" />
           </div>
+          {/* Comment input */}
+          <div className="pt-1 pb-3">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="mt-2 h-10 w-full rounded-full" />
+          </div>
+          {/* Comments */}
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="flex gap-3 py-3">
+              <Skeleton className="h-6 w-20 shrink-0 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
     </div>
   )
 }

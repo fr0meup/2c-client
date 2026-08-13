@@ -39,7 +39,7 @@ export interface AdvancedSearchParams {
   sort_by?: string
 }
 
-import { formatTopicSlug } from '@/lib/customTopics'
+import { formatTopicSlug } from '@/lib/utils'
 
 export function useFeed(topic: string, searchQuery?: string, advanced?: AdvancedSearchParams, jumpCursor?: string, enabled = true) {
   const { auth } = useAuth()

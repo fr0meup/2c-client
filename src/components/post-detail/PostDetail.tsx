@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useParams, useLocation } from 'react-router-dom'
 import {
   MessageCircle,
@@ -28,6 +28,9 @@ import { CommentThread, type Comment } from './CommentThread'
 import { usePost } from '@/hooks/usePost'
 import { useComments } from '@/hooks/useComments'
 import { useVotePost } from '@/hooks/useVotePost'
+import { useIsBlocked } from '@/hooks/useBlock'
+import { NotFoundCard } from '@/components/not-found/NotFoundCard'
+import { CenteredGuidelineShell } from '@/components/not-found/CenteredGuidelineShell'
 import { useCreateComment } from '@/hooks/useComments'
 import { useFollow } from '@/components/profile/FollowContext'
 import { useToast } from '@/components/toast/ToastContext'
@@ -45,13 +48,7 @@ import { useUploadImage } from '@/hooks/useUploadImage'
 import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
 
 export function PostDetailPage() {
-  return (
-    <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pb-6 sm:px-8">
-      <div className="w-full max-w-[670px] xl:-ml-[245px]">
-        <PostDetail />
-      </div>
-    </div>
-  )
+  return <PostDetail />
 }
 
 function GifWithStar({ url }: { url: string }) {
@@ -122,7 +119,32 @@ export function PostDetail() {
 
     return undefined
   })()
-  const post = postData?.post
+
+  // Fallback to cached post if query failed/errored or is loading
+  const cachedPost = useMemo(() => {
+    if (postData?.post) return postData.post
+    if (!uuid) return null
+
+    const single = queryClient.getQueryData<PostResponse>(['post', uuid])
+    if (single?.post) return single.post
+
+    const feedQueries = queryClient.getQueriesData<any>({ queryKey: ['feed'] })
+    for (const [, feedData] of feedQueries) {
+      if (!feedData) continue
+      const pages = feedData.pages || [feedData]
+      for (const page of pages) {
+        const posts = page?.posts || page?.recentPosts?.posts || []
+        const found = posts.find((p: any) => p.uuid === uuid)
+        if (found) return found
+      }
+    }
+    return null
+  }, [postData?.post, uuid, queryClient])
+
+  const post = postData?.post || cachedPost
+  const authorUuid = post?.author_uuid
+  const isAuthorBlocked = useIsBlocked(authorUuid)
+
   const { data: commentsData, isLoading: commentsLoading } = useComments(uuid)
 
   // Map API comments to the component's Comment type
@@ -364,13 +386,15 @@ export function PostDetail() {
     }
   }
 
-  if (postLoading) {
+  if (postLoading && !cachedPost) {
     return <PostDetailSkeleton />
   }
 
-  if (!post) {
+  if (!post || isAuthorBlocked) {
     return (
-      <div className="px-4 py-20 text-center text-white/40">Post not found</div>
+      <CenteredGuidelineShell>
+        <NotFoundCard type="post" targetUuid={authorUuid} />
+      </CenteredGuidelineShell>
     )
   }
 
@@ -382,10 +406,12 @@ export function PostDetail() {
   const isLink = post.post_type === 1 && !!post.post_meta?.link
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pb-6 sm:px-8">
+      <div className="w-full max-w-[670px] xl:-ml-[245px]" data-content-column>
+        <div className="w-full flex flex-col">
       <div className="pb-4 pt-1.5">
         {/* Author info row */}
-        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 sm:flex-nowrap sm:gap-2">
+        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 sm:flex-nowrap sm:gap-2" data-postcard-networth-pill>
           <NetworthPill
             networth={post.author_meta.balance}
             subscriptionType={post.author_meta.subscription_type}
@@ -418,7 +444,7 @@ export function PostDetail() {
 
         {/* Title */}
         {post.title && (
-          <h1 className="mt-3 text-xl font-bold text-white">{post.title}</h1>
+          <h1 className="mt-3 text-xl font-bold text-white">{post.title.trim()}</h1>
         )}
 
         {/* Body */}
@@ -436,7 +462,7 @@ export function PostDetail() {
           const gifFromMeta = post.post_meta?.giphy_url
             ? normalizeMediaUrl(post.post_meta.giphy_url)
             : undefined
-          const strippedText = stripMediaUrls(cleaned, rawGifFromMeta ? [rawGifFromMeta] : [])
+          const strippedText = stripMediaUrls(cleaned, rawGifFromMeta ? [rawGifFromMeta] : []).trimStart()
           const allPostGifs: string[] = [...postGifUrls, ...(gifFromMeta && !postGifUrls.includes(gifFromMeta) ? [gifFromMeta] : [])].filter((u) => u !== post.post_meta?.src)
           return (
             <>
@@ -785,6 +811,8 @@ export function PostDetail() {
           />
         </div>
       )}
+        </div>
+      </div>
     </div>
   )
 }

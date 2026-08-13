@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { ImagePlus, X, ChevronDown, BarChart3, List, Bold, Plus, Minus, Loader2, FileText, Save, Check, MoreHorizontal, Pin } from 'lucide-react'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
-import { firstMediaUrl, insertGifImage, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT, saveGif, fetchOrConvertImageToFile, isUploadedUrl } from '@/lib/gif'
+import { firstMediaUrl, insertGifImage, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT, fetchOrConvertImageToFile, isUploadedUrl } from '@/lib/gif'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { GenderIcon } from '@/components/gender-icon/GenderIcon'
 import { QuotePostCard } from '@/components/post-card/QuotePostCard'
@@ -17,11 +17,9 @@ import type { Draft } from '@/lib/drafts'
 import { DraftsModal } from './DraftsModal'
 import { TOPIC_MENU, TOPIC_SLUG, type PostOption } from './config'
 import type { PostCardData } from '@/components/post-card/types'
-import { obfuscateText } from '@/lib/utils'
+import { obfuscateText, formatTopicSlug } from '@/lib/utils'
 import { MentionPicker } from '@/components/mention-picker/MentionPicker'
 import { extractMentionUuids, notifyMentions } from '@/lib/mentionNotifications'
-
-import { getCustomTopics, initCustomTopics, addCustomTopic, removeCustomTopic, formatTopicSlug } from '@/lib/customTopics'
 import { getPinnedTopic, setPinnedTopic } from '@/lib/pinnedTopic'
 
 interface ComposePostProps {
@@ -34,21 +32,13 @@ interface ComposePostProps {
 const COMPOSE_TOPICS = new Set(TOPIC_MENU.flatMap((g) => g.items))
 const MAX_POLL_OPTIONS = 10
 
-export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, defaultTopic }: ComposePostProps) {
+export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, defaultTopic }: ComposePostProps) {
   const { auth } = useAuth()
   const { data: profileData } = useUserProfile(auth?.userUuid)
   const user = profileData?.pages[0]?.user
   const createPost = useCreatePost()
   const uploadImage = useUploadImage()
   const { toast } = useToast()
-
-  const [customTopics, setCustomTopics] = useState<string[]>(() => getCustomTopics())
-  const [addingCustomTopic, setAddingCustomTopic] = useState(false)
-  const [newTopicInput, setNewTopicInput] = useState('')
-
-  useEffect(() => {
-    initCustomTopics().then((topics) => setCustomTopics(topics))
-  }, [])
 
   const [title, setTitle] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -57,7 +47,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
   const [body, setBody] = useState('')
   const [pinnedTopic, setPinnedTopicState] = useState<string>(() => getPinnedTopic())
   const [selectedTopic, setSelectedTopic] = useState(
-    defaultTopic && (COMPOSE_TOPICS.has(defaultTopic) || getCustomTopics().includes(defaultTopic)) ? defaultTopic : getPinnedTopic()
+    defaultTopic && COMPOSE_TOPICS.has(defaultTopic) ? defaultTopic : getPinnedTopic()
   )
   const [topicMenuOpen, setTopicMenuOpen] = useState(false)
   const [activeOption, setActiveOption] = useState<PostOption>(null)
@@ -251,9 +241,15 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
   }
 
   function handleEditorInput() {
+    const el = editorRef.current
+    if (el) {
+      const hasContent = (el.textContent?.trim() ?? '') !== '' || el.querySelector('img') !== null
+      if (!hasContent && el.innerHTML !== '') {
+        el.innerHTML = ''
+      }
+    }
     setBody(getEditorText())
     // Sync gifUrl state: clear if the GIF img was removed from the editor
-    const el = editorRef.current
     if (el && gifUrl && !el.querySelector('img[data-gif-url]')) {
       setGifUrl(null)
     }
@@ -320,7 +316,17 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
     if (opt === 'likert') setLikertValue(null)
   }, [])
 
-  const canPost = title.trim().length > 0 || body.trim().length > 0 || imageFile !== null || gifUrl !== null
+  const hasPollContent = activeOption === 'poll' && Array.isArray(pollOptions) && pollOptions.some((o) => o.trim().length > 0)
+  const hasLikertContent = activeOption === 'likert' && likertValue !== null
+
+  const canPost =
+    title.trim().length > 0 ||
+    body.trim().length > 0 ||
+    imageFile !== null ||
+    gifUrl !== null ||
+    hasPollContent ||
+    hasLikertContent
+
   const isSubmitting = createPost.isPending || uploadImage.isPending
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -342,6 +348,8 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
 
   async function handleSaveDraft() {
     if (!canPost) return
+    const isPoll = activeOption === 'poll' || (Array.isArray(pollOptions) && pollOptions.some((o) => o.trim() !== ''))
+
     const draft: Draft = {
       id: crypto.randomUUID(),
       createdAt: Date.now(),
@@ -349,9 +357,9 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
       body,
       bodyHtml: editorRef.current?.innerHTML ?? '',
       topic: selectedTopic,
-      activeOption,
-      pollOptions,
-      likertValue,
+      activeOption: isPoll ? 'poll' : activeOption,
+      pollOptions: isPoll ? pollOptions : [],
+      likertValue: activeOption === 'likert' ? likertValue : null,
       mediaBlob: imageFile ? await imageFile.arrayBuffer() : null,
       mediaType: imageFile?.type ?? null,
       mediaName: imageFile?.name ?? null,
@@ -365,21 +373,44 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
   function handleLoadDraft(draft: Draft) {
     setTitle(draft.title)
     setSelectedTopic(draft.topic)
-    setActiveOption(draft.activeOption)
-    setPollOptions(draft.pollOptions)
-    setLikertValue(draft.likertValue)
 
-    if (editorRef.current) {
-      editorRef.current.innerHTML = draft.bodyHtml
-      handleEditorInput()
+    // Clear image state without calling clearImage() (which clobbers activeOption)
+    if (imagePreview) URL.revokeObjectURL(imagePreview)
+    setImageFile(null)
+    setImagePreview(null)
+
+    // Restore poll / likert / image option
+    const hasFilledPoll = Array.isArray(draft.pollOptions) && draft.pollOptions.some((o) => o.trim() !== '')
+    const isPoll = draft.activeOption === 'poll' || hasFilledPoll
+
+    if (isPoll) {
+      setPollOptions(draft.pollOptions && draft.pollOptions.length > 0 ? draft.pollOptions : ['', ''])
+      setActiveOption('poll')
+      setLikertValue(null)
+    } else if (draft.activeOption === 'likert' || draft.likertValue !== null) {
+      setActiveOption('likert')
+      setLikertValue(draft.likertValue ?? null)
+      setPollOptions(['', ''])
+    } else {
+      setPollOptions(['', ''])
+      setLikertValue(null)
+      setActiveOption(null)
     }
 
+    // Restore media
     if (draft.mediaBlob && draft.mediaType) {
       const file = new File([draft.mediaBlob], draft.mediaName ?? 'media', { type: draft.mediaType })
       setImageFile(file)
       setImagePreview(URL.createObjectURL(file))
-    } else {
-      clearImage()
+      // Only set activeOption to 'image' if there's no poll or likert
+      if (!isPoll && draft.activeOption !== 'likert') {
+        setActiveOption('image')
+      }
+    }
+
+    if (editorRef.current) {
+      editorRef.current.innerHTML = draft.bodyHtml ?? ''
+      handleEditorInput()
     }
 
     setDraftsOpen(false)
@@ -512,39 +543,39 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
     <>
     <div className="flex flex-col rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.02] shadow-lg shadow-black/20">
       {/* Sticky header */}
-      <div className="sticky top-0 z-10 bg-inherit px-5 pt-5 pb-2">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-        <NetworthPill
-          networth={user?.balance ?? 0}
-          subscriptionType={user?.subscription_type ?? 1}
-          authorUuid={user?.uuid}
-          role={user?.role}
-          size="small"
-        />
-        {user?.gender && (
-        <span className="flex items-center gap-1.5">
-          <GenderIcon
-            gender={user.gender === 'F' ? 'female' : 'male'}
-            className="h-4 w-4 text-white/40"
-          />
-          {user.age != null && (
-          <span className="text-sm font-semibold text-white/40">
-            {user.age}
-          </span>
-          )}
-        </span>
-        )}
-        {user?.arena && (
-          <span className="flex items-center gap-1 text-sm text-white/40">
-            <img
-              src="https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Flocation-icon.432s1sddmkeug.png&w=48&q=75&dpl=dpl_5ovAARAu8zMP9MtrCL9RTcRsDq7b"
-              alt=""
-              className="h-6 w-6 opacity-60"
+      <div className="sticky top-0 z-10 bg-inherit px-3 pt-4 pb-1 sm:px-4 sm:pt-4">
+        <div className="flex items-center justify-between mb-3.5">
+          <div className="flex items-center gap-3" data-compose-networth-pill>
+            <NetworthPill
+              networth={user?.balance ?? 0}
+              subscriptionType={user?.subscription_type ?? 1}
+              authorUuid={user?.uuid}
+              role={user?.role}
+              size="default"
             />
-            <span className="font-semibold">{user.arena}</span>
-          </span>
-        )}
+            {user?.gender && (
+              <span className="flex h-8 items-center gap-1.5">
+                <GenderIcon
+                  gender={user.gender === 'F' ? 'female' : 'male'}
+                  className="h-4.5 w-4.5 text-white/40"
+                />
+                {user.age != null && (
+                  <span className="text-[15px] font-semibold text-white/40 leading-none">
+                    {user.age}
+                  </span>
+                )}
+              </span>
+            )}
+            {user?.arena && (
+              <span className="flex h-8 items-center gap-1.5 text-[15px] text-white/40">
+                <img
+                  src="https://www.twocents.money/_next/image?url=%2F_next%2Fstatic%2Fmedia%2Flocation-icon.432s1sddmkeug.png&w=48&q=75&dpl=dpl_5ovAARAu8zMP9MtrCL9RTcRsDq7b"
+                  alt=""
+                  className="h-6 w-6 opacity-60"
+                />
+                <span className="font-semibold leading-none">{user.arena}</span>
+              </span>
+            )}
           </div>
           {onClose && (
             <button
@@ -558,21 +589,21 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
         </div>
 
         {/* Title */}
-        <div className="mb-3 flex items-baseline gap-2 pl-1">
+        <div className="mb-2 flex items-baseline gap-2">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Title"
-            className="w-full bg-transparent text-xl font-bold text-white placeholder:text-white/20 focus:outline-none"
+            className="w-full bg-transparent text-[22px] font-bold text-white placeholder:text-white/20 focus:outline-none"
           />
           <span className="shrink-0 text-xs text-white/20">optional</span>
         </div>
 
-        <div className="mb-3 ml-1 border-t border-white/[0.06]" />
+        <div className="mb-3.5 border-t border-white/[0.06]" />
       </div>
 
       {/* Scrollable content */}
-      <div className="overflow-y-auto px-5" style={{ maxHeight: `${scrollHeight}px`, minHeight: '144px', scrollbarWidth: 'thin', scrollbarColor: '#333330 transparent' }}>
+      <div className="overflow-y-auto px-3 pt-1.5 sm:px-4" style={{ maxHeight: `${scrollHeight}px`, minHeight: '160px', scrollbarWidth: 'thin', scrollbarColor: '#333330 transparent' }}>
         {/* Body */}
         <div
           ref={editorRef}
@@ -581,7 +612,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
           onKeyDown={handleEditorKeyDown}
           onPaste={handlePaste}
           data-placeholder="Share your two cents..."
-          className="w-full border-none bg-transparent text-base text-white empty:before:content-[attr(data-placeholder)] empty:before:text-white/40 focus:outline-none min-h-[144px] whitespace-pre-wrap break-words"
+          className="w-full border-none bg-transparent text-base text-white empty:before:content-[attr(data-placeholder)] empty:before:text-white/40 focus:outline-none min-h-[160px] whitespace-pre-wrap break-words"
         />
         <MentionPicker editorRef={editorRef} onMentionInserted={handleEditorInput} />
 
@@ -728,7 +759,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-2 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
+      <div className="flex items-center justify-between gap-2 px-3 pb-3 pt-3 sm:px-4 sm:pb-4">
         <div className="flex min-w-0 items-center gap-2">
           <input
             ref={fileInputRef}
@@ -1000,7 +1031,7 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
                 }}
               >
                 {TOPIC_MENU.map((group, i) => {
-                  const rawItems = group.category === 'General' ? [...group.items, ...customTopics] : group.items
+                  const rawItems = group.items
                   const groupItems = pinnedTopic && rawItems.includes(pinnedTopic)
                     ? [pinnedTopic, ...rawItems.filter((item) => item !== pinnedTopic)]
                     : rawItems
@@ -1014,64 +1045,8 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
                         <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
                           {group.category}
                         </p>
-                        {group.category === 'General' && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setAddingCustomTopic((p) => !p)
-                            }}
-                            className="cursor-pointer text-white/40 transition-colors hover:text-white"
-                            title="Add custom topic"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                        )}
                       </div>
-                      {group.category === 'General' && addingCustomTopic && (
-                        <div className="mx-2 my-1.5 flex items-center gap-1.5 rounded-lg border border-[#c8a44d]/30 bg-white/[0.04] p-1.5">
-                          <input
-                            type="text"
-                            autoFocus
-                            placeholder="Custom topic (e.g. my-topic)..."
-                            value={newTopicInput}
-                            onChange={(e) => setNewTopicInput(e.target.value)}
-                            onKeyDown={async (e) => {
-                              if (e.key === 'Enter' && newTopicInput.trim()) {
-                                e.preventDefault()
-                                const addedName = await addCustomTopic(newTopicInput)
-                                setCustomTopics(getCustomTopics())
-                                setSelectedTopic(addedName)
-                                setNewTopicInput('')
-                                setAddingCustomTopic(false)
-                                setTopicMenuOpen(false)
-                              }
-                              if (e.key === 'Escape') {
-                                setAddingCustomTopic(false)
-                                setNewTopicInput('')
-                              }
-                            }}
-                            className="w-full bg-transparent text-xs text-white placeholder:text-white/30 focus:outline-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (!newTopicInput.trim()) return
-                              const addedName = await addCustomTopic(newTopicInput)
-                              setCustomTopics(getCustomTopics())
-                              setSelectedTopic(addedName)
-                              setNewTopicInput('')
-                              setAddingCustomTopic(false)
-                              setTopicMenuOpen(false)
-                            }}
-                            className="cursor-pointer rounded bg-[#c8a44d] px-2 py-0.5 text-[10px] font-bold text-[#0f0e0a] transition-opacity hover:opacity-90"
-                          >
-                            Add
-                          </button>
-                        </div>
-                      )}
                       {groupItems.map((item) => {
-                        const isCustom = customTopics.includes(item)
                         const isPinned = pinnedTopic === item
                         return (
                           <div key={item} className="group/item relative flex items-center justify-between">
@@ -1106,23 +1081,6 @@ export function ComposePost({ onClose, scrollHeight = 260, quotedPost = null, de
                               >
                                 <Pin className={`h-3.5 w-3.5 ${isPinned ? 'fill-[#c8a44d]' : ''}`} />
                               </button>
-
-                              {isCustom && (
-                                <button
-                                  type="button"
-                                  onClick={async (e) => {
-                                    e.stopPropagation()
-                                    const updated = await removeCustomTopic(item)
-                                    setCustomTopics(updated)
-                                    if (selectedTopic === item) setSelectedTopic(getPinnedTopic())
-                                    if (pinnedTopic === item) setPinnedTopicState(setPinnedTopic(null))
-                                  }}
-                                  className="cursor-pointer text-white/30 transition-colors hover:text-rose-400 opacity-0 group-hover/item:opacity-100"
-                                  title={`Delete ${item}`}
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </button>
-                              )}
                             </div>
                           </div>
                       )

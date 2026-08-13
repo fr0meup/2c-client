@@ -186,7 +186,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
         <div className="min-w-0">
           {/* Header row */}
           <div className="flex items-start justify-between gap-2 sm:items-center">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 sm:flex-nowrap sm:gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 sm:flex-nowrap sm:gap-2" data-postcard-networth-pill>
               <NetworthPill
                 networth={post.author_meta.balance}
                 subscriptionType={post.author_meta.subscription_type}

@@ -1,14 +1,10 @@
 import { createContext, createElement, useContext, useState, type ReactNode } from 'react'
 
 export type LeaderboardType =
-  | 'ppe'
-  | 'picks_szn'
   | 'top_100'
   | 'highest_debt'
-  | 'credit_cards'
   | 'biggest_gains'
   | 'biggest_losses'
-  | 'league'
 
 export interface LeaderboardEntry {
   uuid: string
@@ -38,7 +34,7 @@ interface LeaderboardContextValue {
 const LeaderboardContext = createContext<LeaderboardContextValue | null>(null)
 
 export function LeaderboardProvider({ children }: { children: ReactNode }) {
-  const [board, setBoard] = useState<LeaderboardType>('ppe')
+  const [board, setBoard] = useState<LeaderboardType>('top_100')
   return createElement(LeaderboardContext.Provider, { value: { board, setBoard } }, children)
 }
 
@@ -49,12 +45,8 @@ export function useLeaderboard(): LeaderboardContextValue {
 }
 
 export const LEADERBOARD_META: LeaderboardMeta[] = [
-  { value: 'ppe', label: 'Penny Picks ELO', has_extra: true, extra_label: 'ELO' },
-  { value: 'picks_szn', label: 'Picks Szn', has_extra: true, extra_label: 'Picks' },
   { value: 'top_100', label: 'Top 100', has_extra: false },
   { value: 'highest_debt', label: 'Highest Debt', has_extra: true, extra_label: 'Debt' },
-  { value: 'credit_cards', label: 'Credit Cards', has_extra: true, extra_label: 'Credit' },
   { value: 'biggest_gains', label: 'Biggest Gains', has_extra: true, extra_label: 'Gain' },
   { value: 'biggest_losses', label: 'Biggest Losses', has_extra: true, extra_label: 'Loss' },
-  { value: 'league', label: 'Streaks', has_extra: true, extra_label: 'Streak' },
 ]

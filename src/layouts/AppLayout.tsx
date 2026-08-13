@@ -8,6 +8,7 @@ import { LeaderboardProvider } from '@/components/leaderboard/config'
 import { ToastProvider } from '@/components/toast/ToastContext'
 import { Sidebar, BottomNav } from '@/components/sidebar/Sidebar'
 import { HeaderLeft, HeaderRight } from './Header'
+import { AlignmentGuides } from '@/components/alignment-guides/AlignmentGuides'
 import type { PostCardData } from '@/components/post-card/types'
 import { ONBOARDING_KEY } from '@/components/onboarding/constants'
 import { useQueryClient } from '@tanstack/react-query'
@@ -40,7 +41,7 @@ export function useCompose() { return useContext(ComposeContext) }
 function CenteredPageShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pt-3 pb-6 sm:px-8">
-      <div className="w-full max-w-[670px] space-y-4 xl:-ml-[245px]">
+      <div className="w-full max-w-[670px] space-y-4 xl:-ml-[245px]" data-content-column>
         {children}
       </div>
     </div>
@@ -52,13 +53,7 @@ function PageSkeletonFallback({ pathname: pathnameProp }: { pathname?: string })
   const pathname = pathnameProp ?? location.pathname
 
   if (pathname.startsWith('/user/')) return <ProfileSkeleton />
-  if (pathname.startsWith('/post/')) {
-    return (
-      <CenteredPageShell>
-        <PostDetailSkeleton />
-      </CenteredPageShell>
-    )
-  }
+  if (pathname.startsWith('/post/')) return <PostDetailSkeleton />
   if (pathname === '/notifications') {
     return (
       <CenteredPageShell>
@@ -205,6 +200,7 @@ export function AppLayout() {
     <FollowProvider>
     <LeaderboardProvider>
     <div className={`min-h-screen bg-[#0a0907] ${showBottomNav ? 'pb-[88px] xl:pb-0' : 'pb-0'}`}>
+      <AlignmentGuides />
       <HeaderLeft />
       <Sidebar onNewPostClick={openCompose} />
       {showBottomNav && <BottomNav onNewPostClick={openCompose} />}

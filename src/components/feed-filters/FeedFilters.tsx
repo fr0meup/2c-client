@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { SlidersHorizontal, X, Pin } from 'lucide-react'
+import { SlidersHorizontal, Pin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TOPICS, TOPIC_MENU, FEED_PARAM_TO_TOPIC, getFeedUrl } from './config'
 import { usePrefetch } from '@/hooks/usePrefetch'
@@ -9,7 +9,6 @@ import { preloadRoute } from '@/lib/routePreload'
 import { announceNavigationPending } from '@/lib/navigationPending'
 import { addSearchHistory, clearSearchHistory, getSearchHistory } from '@/lib/searchHistory'
 
-import { getCustomTopics, initCustomTopics, removeCustomTopic } from '@/lib/customTopics'
 import { getPinnedTopic, setPinnedTopic } from '@/lib/pinnedTopic'
 
 export function FeedFilters() {
@@ -21,12 +20,8 @@ export function FeedFilters() {
   const [searchValue, setSearchValue] = useState(currentQuery)
   const [advLoading, setAdvLoading] = useState(false)
   const [topicsOpen, setTopicsOpen] = useState(false)
-  const [customTopics, setCustomTopics] = useState<string[]>(() => getCustomTopics())
   const [pinnedTopic, setPinnedTopicState] = useState<string>(() => getPinnedTopic())
 
-  useEffect(() => {
-    initCustomTopics().then((topics) => setCustomTopics(topics))
-  }, [])
   const [historyOpen, setHistoryOpen] = useState(false)
   const [searchHistory, setSearchHistory] = useState<string[]>(() => getSearchHistory())
   const [pendingTopic, setPendingTopic] = useState<string | null>(null)
@@ -364,7 +359,7 @@ export function FeedFilters() {
               style={{ scrollbarWidth: 'thin', scrollbarColor: '#333330 transparent' }}
             >
             {menuGroups.map((group) => {
-              const rawItems = group.category === 'General' ? [...group.items, ...customTopics] as string[] : [...group.items] as string[]
+              const rawItems = group.items as unknown as string[]
               const groupItems = pinnedTopic && rawItems.includes(pinnedTopic)
                 ? [pinnedTopic, ...rawItems.filter((i) => i !== pinnedTopic)]
                 : rawItems
@@ -375,7 +370,6 @@ export function FeedFilters() {
                     {group.category}
                   </div>
                   {groupItems.map((item) => {
-                    const isCustom = customTopics.includes(item)
                     const isPinned = pinnedTopic === item
                     return (
                       <div key={item} className="group/item relative flex items-center justify-between">
@@ -411,23 +405,6 @@ export function FeedFilters() {
                         >
                           <Pin className={`h-3.5 w-3.5 ${isPinned ? 'fill-[#c8a44d]' : ''}`} />
                         </button>
-
-                        {isCustom && (
-                          <button
-                            type="button"
-                            onClick={async (e) => {
-                              e.stopPropagation()
-                              const updated = await removeCustomTopic(item)
-                              setCustomTopics(updated)
-                              if (activeTopic === item) navigateTopic('New')
-                              if (pinnedTopic === item) setPinnedTopicState(setPinnedTopic(null))
-                            }}
-                            className="cursor-pointer text-white/30 transition-colors hover:text-rose-400 opacity-0 group-hover/item:opacity-100"
-                            title={`Delete ${item}`}
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        )}
                       </div>
                     </div>
                   )

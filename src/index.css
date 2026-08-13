@@ -26,11 +26,10 @@ html, body, #root {
   background-color: #0a0907;
   min-height: 100%;
   max-width: 100%;
-  overflow-x: clip;
 }
 
 html {
-  overflow-y: hidden;
+  scrollbar-gutter: stable;
   overscroll-behavior: none;
   scrollbar-width: thin;
   scrollbar-color: #333330 #0a0907;
@@ -196,4 +195,21 @@ em-emoji-picker {
   overflow: hidden !important;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4) !important;
   font-family: 'DM Sans', sans-serif !important;
+}
+
+/* ── Alignment guides debug mode ── */
+.show-guides-only {
+  display: none;
+}
+.show-alignment-guides .show-guides-only {
+  display: block !important;
+}
+
+.show-alignment-guides button,
+.show-alignment-guides input,
+.show-alignment-guides article,
+.show-alignment-guides aside,
+.show-alignment-guides header,
+.show-alignment-guides main > div {
+  outline: 1px dashed rgba(220, 38, 38, 0.35) !important;
 }

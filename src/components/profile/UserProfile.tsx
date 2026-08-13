@@ -15,7 +15,9 @@ import { ProfileCommentCard } from './ProfileCommentCard'
 import { ProfileTabs } from './ProfileTabs'
 import { useFollow } from './FollowContext'
 import { useFollowsMe } from '@/hooks/useFollow'
-import { FollowingModal } from './FollowingModal'
+import { useIsBlocked } from '@/hooks/useBlock'
+import { NotFoundCard } from '@/components/not-found/NotFoundCard'
+import { CenteredGuidelineShell } from '@/components/not-found/CenteredGuidelineShell'
 
 function joinedAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -185,15 +187,19 @@ export function UserProfile() {
     return () => window.cancelAnimationFrame(frame)
   }, [pendingTab, tab])
 
+  const isTargetBlocked = useIsBlocked(targetUuid)
+  const isFetchedUserBlocked = useIsBlocked(firstPage?.user?.uuid)
+  const isBlocked = isTargetBlocked || isFetchedUserBlocked
+
   if (isLoading) {
     return <ProfileSkeleton />
   }
 
-  if (isError || !firstPage) {
+  if (isBlocked || isError || !firstPage) {
     return (
-      <div className="flex min-h-[calc(100vh-72px)] items-center justify-center px-4">
-        <p className="text-sm text-white/40">User not found</p>
-      </div>
+      <CenteredGuidelineShell>
+        <NotFoundCard type="profile" targetUuid={targetUuid} />
+      </CenteredGuidelineShell>
     )
   }
 
