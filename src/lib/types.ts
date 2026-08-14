@@ -220,6 +220,10 @@ export interface NotificationMeta {
   comment_uuid?: string
   campaign_uuid?: string
   follower_uuid?: string
+  voter_uuid?: string
+  actor_uuid?: string
+  author_uuid?: string
+  replier_uuid?: string
   kind?: string
   elo_tier?: string
   previous_balance?: number

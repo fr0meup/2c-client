@@ -16,6 +16,7 @@ export interface Notification {
   type: NotificationType
   message: string
   actor?: string
+  actorUuid?: string
   preview?: string
   created_at: string
   read_at: string | null

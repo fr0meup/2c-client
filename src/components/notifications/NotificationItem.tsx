@@ -1,3 +1,8 @@
+import { useNavigate } from 'react-router-dom'
+import { usePrefetch } from '@/hooks/usePrefetch'
+import { preloadRoute } from '@/lib/routePreload'
+import { announceNavigationPending } from '@/lib/navigationPending'
+import { saveScrollPosition } from '@/App'
 import {
   ArrowBigDown,
   ArrowBigUp,
@@ -40,6 +45,8 @@ interface Props {
 }
 
 export function NotificationItem({ notif, onRead, onOpen }: Props) {
+  const navigate = useNavigate()
+  const { prefetchUserProfile } = usePrefetch()
   const isUnread = !notif.read_at
   const isVoteType = notif.type === 'post_voted' || notif.type === 'comment_voted'
   const label = isVoteType && notif.isDownvote
@@ -47,6 +54,23 @@ export function NotificationItem({ notif, onRead, onOpen }: Props) {
     : TYPE_LABELS[notif.type]
   const isClickable = Boolean(notif.post_uuid) || notif.type === 'followed'
   const showPreview = Boolean(notif.preview)
+
+  const targetActorUuid = notif.actorUuid || notif.follower_uuid
+
+  function handleActorClick(e: React.MouseEvent) {
+    if (!targetActorUuid) return
+    e.stopPropagation()
+    saveScrollPosition()
+    announceNavigationPending(`/user/${targetActorUuid}`)
+    navigate(`/user/${targetActorUuid}`)
+  }
+
+  function handleActorHover() {
+    if (targetActorUuid) {
+      preloadRoute('profile')
+      prefetchUserProfile(targetActorUuid)
+    }
+  }
 
   return (
     <article
@@ -90,9 +114,12 @@ export function NotificationItem({ notif, onRead, onOpen }: Props) {
             <div className="flex items-center gap-2">
               <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
                 <span
+                  onClick={targetActorUuid ? handleActorClick : undefined}
+                  onMouseEnter={targetActorUuid ? handleActorHover : undefined}
                   className={cn(
-                    'text-sm font-semibold',
-                    isUnread ? 'text-white' : 'text-white/70'
+                    'text-sm font-semibold transition-colors',
+                    isUnread ? 'text-white' : 'text-white/70',
+                    targetActorUuid && 'cursor-pointer hover:text-[#c8a44d] hover:underline'
                   )}
                 >
                   {notif.actor}

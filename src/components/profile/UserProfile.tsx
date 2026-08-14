@@ -28,6 +28,40 @@ function joinedAgo(iso: string): string {
   return `${Math.floor(months / 12)}y`
 }
 
+function formatExactJoinDate(iso: string): string {
+  if (!iso) return ''
+  try {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return iso
+    return d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  } catch {
+    return iso
+  }
+}
+
+function formatExactJoinDateTime(iso: string): string {
+  if (!iso) return ''
+  try {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return iso
+    return d.toLocaleString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+  } catch {
+    return iso
+  }
+}
+
 function formatCompact(n: number): string {
   if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
   if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}k`
@@ -286,7 +320,10 @@ export function UserProfile() {
               arena={profile.arena}
               className="!flex-initial"
             >
-              <span className="flex items-center gap-1 px-3 py-2 text-white/50">
+              <span
+                title={formatExactJoinDateTime(profile.created_at)}
+                className="flex items-center gap-1 px-3 py-2 text-white/50 cursor-help"
+              >
                 <span className="text-[11px] uppercase tracking-wider text-white/30">Joined</span>
                 <span className="font-medium text-white/80">{joinedAgo(profile.created_at)}</span>
               </span>

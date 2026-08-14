@@ -147,7 +147,7 @@ export function renderPostText(raw: string) {
         emptyLineCount++
       } else {
         if (i > 0) {
-          const brCount = Math.max(1, emptyLineCount > 1 ? emptyLineCount - 1 : 1)
+          const brCount = emptyLineCount >= 2 ? 2 : 1
           for (let b = 0; b < brCount; b++) {
             elements.push(createElement('br', { key: `br-${i}-${b}` }))
           }

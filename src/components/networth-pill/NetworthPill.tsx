@@ -33,7 +33,7 @@ const PILL_IMAGES: Record<PillTier, string> = {
   admin: 'https://www.twocents.money/pills/andi2.png',
   mod: 'https://www.twocents.money/pills/mod.png',
   evil: 'https://www.twocents.money/pills/evil2.png',
-  news: 'https://www.twocents.money/pills/news2.png',
+  news: 'https://api.twocents.money/ugc/20260813/images/459874cc-cea1-4802-990a-5d830c871876/f50e9d6a-d7a2-4dda-a21d-7e7674afe664.png',
   staff: 'https://twocents.money/pills/dark_staff_badge_bg.png',
   bronze: 'https://www.twocents.money/pills/bronze2.png',
   silver: 'https://www.twocents.money/pills/silver2.png',
@@ -52,7 +52,7 @@ const PILL_COLORS: Record<PillTier, string> = {
   admin: '#07080A',
   evil: '#FF4E5A',
   mod: '#FFB34B',
-  news: '#FF525B',
+  news: '#253141',
   staff: '#0044BB',
   unverified: '#ACC4C1',
   ultra: '#9590c4',
@@ -75,7 +75,13 @@ const TEXT_STYLES: Record<PillTier, CSSProperties> = {
   admin: gradientText('#07080A', '#22272B'),
   evil: gradientText('#FF4E5A', '#ED3341'),
   mod: gradientText('#FFC294', '#FFB34B'),
-  news: gradientText('#FF7075', '#FF525B'),
+  news: {
+    color: '#253141',
+    fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif",
+    fontWeight: 600,
+    letterSpacing: '0.04em',
+    filter: 'blur(0.2px)',
+  },
   staff: { color: '#ffffff', textShadow: '0 0.5px 1px rgba(0, 0, 0, 0.4)' },
   unverified: { color: '#ffffff' },
   ultra: gradientText('#232323', '#1D1668'),
@@ -88,7 +94,7 @@ const TEXT_STYLES: Record<PillTier, CSSProperties> = {
 const SPECIAL_LABELS: Partial<Record<PillTier, string>> = {
   admin: 'ANDI',
   mod: 'MOD',
-  news: 'NEWS',
+  news: 'POLLS',
   staff: 'STAFF',
   penny: 'PENNY',
 }
@@ -117,8 +123,10 @@ function getTierFromNetworth(networth: number): PillTier {
 const MOD_UUIDS = new Set([
   '3d940646-0265-4c72-bc93-a98dd9b8d68e',
   '4814e409-b55a-4a71-86f6-34da365d4119',
-  'd72a2aa3-df71-4ddb-88a4-a8181254e031',
   'e5dbcd9b-6dc9-4831-ad30-43f50d72487d',
+  '444cc266-c0ca-43f2-bd49-5be4d80114e3',
+  'afbde593-9103-4046-8caf-d28cfd5ced61',
+  '69c8c5e3-135c-43d3-8649-17c3dedea54e',
 ])
 
 const NEWS_UUIDS = new Set([
@@ -208,7 +216,7 @@ export function NetworthPill({
     <div
       onClick={canNavigate ? handleClick : undefined}
       onMouseEnter={canNavigate ? handleHover : undefined}
-      className={`relative inline-flex max-w-full items-center justify-center ${hasSpecialLabel ? 'px-3.5' : 'gap-1 pl-0.5 pr-1.5'} ${config.height} ${config.text} ${config.minWidth} ${className}${canNavigate ? ' cursor-pointer' : ''}`}
+      className={`relative inline-flex max-w-full items-center justify-center ${hasSpecialLabel ? 'px-2' : 'gap-1 pl-0.5 pr-1.5'} ${config.height} ${config.text} ${config.minWidth} ${className}${canNavigate ? ' cursor-pointer' : ''}`}
       style={
         isStaff
           ? {
@@ -255,9 +263,9 @@ export function NetworthPill({
       <span
         className={`${config.text} flex items-center justify-center min-w-0 truncate leading-none text-center`}
         style={{
+          fontWeight: hasSpecialLabel ? 700 : (isStaff ? 700 : 500),
+          marginTop: 0,
           ...textStyle,
-          fontWeight: isStaff ? 700 : 500,
-          marginTop: isStaff ? 0 : '-1px',
         }}
       >
         {displayValue}

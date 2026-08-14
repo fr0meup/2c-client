@@ -75,17 +75,40 @@ function useMarkNotificationRead() {
 /** Transform API notification into the shape the UI expects */
 function mapApiNotification(n: ApiNotification): Notification {
   const { actor, preview, isDownvote } = parseNotificationMessage(n.type, n.message)
+  const meta = (n.notification_meta ?? {}) as Record<string, any>
+  const raw = n as Record<string, any>
+
+  const actorUuid =
+    meta.voter_uuid ||
+    meta.follower_uuid ||
+    meta.replier_uuid ||
+    meta.actor_uuid ||
+    meta.author_uuid ||
+    meta.user_uuid ||
+    meta.from_user_uuid ||
+    meta.sender_uuid ||
+    meta.comment_author_uuid ||
+    meta.post_author_uuid ||
+    raw.voter_uuid ||
+    raw.follower_uuid ||
+    raw.replier_uuid ||
+    raw.actor_uuid ||
+    raw.from_user_uuid ||
+    raw.sender_uuid ||
+    raw.user_uuid
+
   return {
     uuid: n.uuid,
     type: n.type as Notification['type'],
     message: n.message,
     actor,
+    actorUuid,
     preview,
     created_at: n.created_at,
     read_at: n.read_at,
-    post_uuid: n.notification_meta.post_uuid,
-    comment_uuid: n.notification_meta.comment_uuid,
-    follower_uuid: n.notification_meta.follower_uuid,
+    post_uuid: meta.post_uuid || raw.post_uuid,
+    comment_uuid: meta.comment_uuid || raw.comment_uuid,
+    follower_uuid: meta.follower_uuid || raw.follower_uuid || actorUuid,
     isDownvote,
   }
 }

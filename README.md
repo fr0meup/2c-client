@@ -59,7 +59,7 @@ On top of the standard feature set, **2c-client** adds a massive list of power-u
 
 ### 🚀 UX & Performance Polish
 - **Onboarding Tutorial**: Interactive step-by-step walkthrough for new users explaining key client features and data backup warnings.
-- **Custom Topics & Topic Pinning**: Create custom sub-feed topics and pin favorite topics directly to the header navigation bar for instant access.
+- **Topic Pinning**: Pin favorite topics directly to the header navigation bar for instant access.
 - **Smart Route Preloading**: Pre-fetches lazy route assets on hover/intent to eliminate navigation delays and white flashes.
 - **Robust Scroll Position Restoration**: Multi-frame scroll restoration engine that reliably remembers exact scroll positions when navigating between feeds, post details, and user profiles.
 - **Responsive Layout**: Mobile bottom navigation bar (`BottomNav`) combined with a desktop sidebar layout.
