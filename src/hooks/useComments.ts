@@ -46,8 +46,9 @@ interface CreateCommentResponse {
 }
 
 /** Increment comment_count for a post across an array of posts */
-function bumpCommentCount<T extends { uuid: string; comment_count: number }>(posts: T[], postUuid: string): T[] {
-  return posts.map((p) => (p.uuid === postUuid ? { ...p, comment_count: p.comment_count + 1 } : p))
+function bumpCommentCount<T extends { uuid: string; comment_count: number }>(posts: T[] | undefined, postUuid: string): T[] {
+  if (!Array.isArray(posts)) return []
+  return posts.map((p) => (p.uuid === postUuid ? { ...p, comment_count: (p.comment_count ?? 0) + 1 } : p))
 }
 
 export function useCreateComment() {
@@ -86,14 +87,20 @@ export function useCreateComment() {
         { queryKey: ['feed'] },
         (old) => {
           if (!old?.pages) return old
-          return { ...old, pages: old.pages.map((page) => ({ ...page, posts: bumpCommentCount(page.posts, post_uuid) })) }
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              posts: Array.isArray(page?.posts) ? bumpCommentCount(page.posts, post_uuid) : (page?.posts ?? []),
+            })),
+          }
         }
       )
 
       // 2. Single-post cache
       queryClient.setQueryData<PostResponse>(
         ['post', post_uuid],
-        (old) => old ? { ...old, post: { ...old.post, comment_count: old.post.comment_count + 1 } } : old
+        (old) => (old?.post ? { ...old, post: { ...old.post, comment_count: (old.post.comment_count ?? 0) + 1 } } : old)
       )
 
       // 3. User-profile cache
@@ -105,8 +112,22 @@ export function useCreateComment() {
             ...old,
             pages: old.pages.map((page) => ({
               ...page,
-              recentPosts: { ...page.recentPosts, posts: bumpCommentCount(page.recentPosts.posts, post_uuid) },
-              ...(page.votedPosts ? { votedPosts: { ...page.votedPosts, posts: bumpCommentCount(page.votedPosts.posts, post_uuid) } } : {}),
+              ...(page?.recentPosts
+                ? {
+                    recentPosts: {
+                      ...page.recentPosts,
+                      posts: Array.isArray(page.recentPosts?.posts) ? bumpCommentCount(page.recentPosts.posts, post_uuid) : (page.recentPosts?.posts ?? []),
+                    },
+                  }
+                : {}),
+              ...(page?.votedPosts
+                ? {
+                    votedPosts: {
+                      ...page.votedPosts,
+                      posts: Array.isArray(page.votedPosts?.posts) ? bumpCommentCount(page.votedPosts.posts, post_uuid) : (page.votedPosts?.posts ?? []),
+                    },
+                  }
+                : {}),
             })),
           }
         }
@@ -115,7 +136,7 @@ export function useCreateComment() {
       // 4. Bookmarks cache
       queryClient.setQueryData<BookmarksResponse>(
         ['bookmarks'],
-        (old) => old ? { ...old, posts: bumpCommentCount(old.posts, post_uuid) } : old
+        (old) => (old && Array.isArray(old?.posts) ? { ...old, posts: bumpCommentCount(old.posts, post_uuid) } : old)
       )
     },
     onSuccess: (_data, variables) => {

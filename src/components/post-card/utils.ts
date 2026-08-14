@@ -53,7 +53,7 @@ export function cleanPostText(text: string): string {
 
 function parseInline(text: string) {
   // Matches: markdown links [text](url), bold **text**, or plain URLs
-  const INLINE_RE = /(\[([^\]]+)\]\(((?:https?:\/\/|\/)[^\s)]+)\))|(\*\*.*?\*\*)|(https?:\/\/[^\s<>[\]()]+)/g
+  const INLINE_RE = /(\[([^\]]+)\]\(([^)\s]+)\))|(\*\*.*?\*\*)|((?:https?:\/\/|www\.)[^\s<>[\]()]+)/gi
 
   const parts: (string | ReturnType<typeof createElement>)[] = []
   let lastIndex = 0
@@ -67,9 +67,11 @@ function parseInline(text: string) {
 
     if (match[1]) {
       // Markdown link [text](url)
+      const rawHref = match[3]
+      const href = /^https?:\/\//i.test(rawHref) || rawHref.startsWith('/') ? rawHref : `https://${rawHref}`
       parts.push(createElement('a', {
         key: key++,
-        href: match[3],
+        href,
         target: '_blank',
         rel: 'noopener noreferrer',
         className: 'text-[#c8a44d] hover:underline break-all',
@@ -80,9 +82,11 @@ function parseInline(text: string) {
       parts.push(createElement('strong', { key: key++, className: 'font-bold' }, match[4].slice(2, -2)))
     } else if (match[5]) {
       // Plain URL
+      const rawHref = match[5]
+      const href = /^https?:\/\//i.test(rawHref) ? rawHref : `https://${rawHref}`
       parts.push(createElement('a', {
         key: key++,
-        href: match[5],
+        href,
         target: '_blank',
         rel: 'noopener noreferrer',
         className: 'text-[#c8a44d] hover:underline break-all',
