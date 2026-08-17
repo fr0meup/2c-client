@@ -54,7 +54,7 @@ export function usePrefetch() {
   // ── Leaderboard ───────────────────────────────────────────────────
   // Matches useLeaderboardData(board) — same queryKey + mapEntry transform
   const prefetchLeaderboard = useCallback(
-    (board: LeaderboardType = 'ppe') => {
+    (board: LeaderboardType = 'top_100') => {
       if (!auth) return
       const apiName = BOARD_API_NAME[board]
       const queryKey = ['leaderboard', board]

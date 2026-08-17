@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth'
 import { extractMediaUrls, normalizeMediaUrl, saveGif, removeGif, isGifSaved, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
 import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
+import { useFollow } from '@/components/profile/FollowContext'
 import { useMessages } from './MessagesContext'
 import { timeAgo, formatExactTime, type ChatMessage } from './types'
 import { cleanPostText } from '@/components/post-card/utils'
@@ -100,9 +101,16 @@ interface Props {
 export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: Props) {
   const { auth } = useAuth()
   const navigate = useNavigate()
-  const { toggleReaction } = useMessages()
+  const { toggleReaction, getRoom } = useMessages()
+  const { aliasFor } = useFollow()
   const isMine = msg.author_uuid === auth?.userUuid
   const author = msg.author_meta
+
+  const followAlias = aliasFor(msg.author_uuid)
+  const room = getRoom(msg.room_uuid)
+  const member = room?.members?.find((m) => m.user_uuid === msg.author_uuid)
+  const memberAlias = member?.username && !member.username.startsWith('$') && member.username !== 'You' ? member.username : undefined
+  const nickname = followAlias || memberAlias
 
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
@@ -133,15 +141,29 @@ export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: 
       className={cn('group flex gap-2', isMine ? 'justify-end' : 'justify-start')}
     >
       <div className={cn('flex max-w-[78%] min-w-0 flex-col gap-1', isMine ? 'items-end' : 'items-start')}>
-        {/* Author pill (others only, when starting a new turn) */}
+        {/* Author pill + nickname (others only, when starting a new turn) */}
         {!isMine && showAuthor && author && (
-          <NetworthPill
-            networth={author.balance}
-            subscriptionType={author.subscription_type}
-            authorUuid={msg.author_uuid}
-            role={author.role}
-            size="small"
-          />
+          <div className="flex items-center gap-1.5 px-0.5">
+            <NetworthPill
+              networth={author.balance}
+              subscriptionType={author.subscription_type}
+              authorUuid={msg.author_uuid}
+              role={author.role}
+              size="small"
+            />
+            {nickname && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  navigate(`/user/${msg.author_uuid}`)
+                }}
+                className="cursor-pointer truncate text-xs font-semibold text-[#c8a44d] hover:underline"
+              >
+                {nickname}
+              </button>
+            )}
+          </div>
         )}
 
         {/* Reply context */}

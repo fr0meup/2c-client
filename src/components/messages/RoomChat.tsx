@@ -4,6 +4,8 @@ import { ArrowLeft, Hash, Lock, Users, Link2, Check, Terminal, LogOut } from 'lu
 import { useAuth } from '@/lib/auth'
 import { useLeaveRoom } from '@/hooks/useRooms'
 import { useToast } from '@/components/toast/ToastContext'
+import { NetworthPill } from '@/components/networth-pill/NetworthPill'
+import { useFollow } from '@/components/profile/FollowContext'
 import { useMessages } from './MessagesContext'
 import { MessageBubble } from './MessageBubble'
 import { MessageComposer } from './MessageComposer'
@@ -116,9 +118,11 @@ export function ChatHeader() {
   }
 
   const isDm = room.type === 'dm'
+  const { aliasFor } = useFollow()
   const Icon = room.is_private ? Lock : Hash
   const other = isDm ? room.members?.find((m) => m.user_uuid !== auth?.userUuid) : undefined
-  const displayName = other?.username ?? room.name
+  const followAlias = other ? aliasFor(other.user_uuid) : undefined
+  const displayName = (isDm && followAlias) ? followAlias : (other?.username && !other.username.startsWith('$') ? other.username : other?.username ?? room.name)
   const onlineCount = room.stats.online_count ?? 0
   const isGroup = !!roomCode
 
@@ -131,7 +135,16 @@ export function ChatHeader() {
           onClick={() => setInfoOpen(true)}
           className="group flex h-10 cursor-pointer items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 transition-colors hover:bg-gradient-to-b hover:from-white/[0.08] hover:to-white/[0.03] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
         >
-          <span className="h-5 w-5 shrink-0 rounded-full ring-1 ring-white/10" style={{ background: gradientCss(room.gradient) }} />
+          {isDm && other ? (
+            <NetworthPill
+              networth={other.balance}
+              subscriptionType={other.subscription_type}
+              authorUuid={other.user_uuid}
+              size="small"
+            />
+          ) : (
+            <span className="h-5 w-5 shrink-0 rounded-full ring-1 ring-white/10" style={{ background: gradientCss(room.gradient) }} />
+          )}
           {!isDm && <Icon className="h-3.5 w-3.5 shrink-0 text-white/50" strokeWidth={2.4} />}
           <span className="max-w-[180px] truncate text-sm font-semibold text-white">{displayName}</span>
           {!isDm && (

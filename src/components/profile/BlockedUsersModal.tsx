@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Ban, Loader2, ShieldOff, UserX, X } from 'lucide-react'
-import { useBlockedUsers, useUnblockFromList } from '@/hooks/useBlock'
+import { useBlockedUsers, useUnblockFromList, type BlockedEntry } from '@/hooks/useBlock'
 import { useToast } from '@/components/toast/ToastContext'
 import { humanizeError } from '@/lib/api'
 
@@ -28,7 +28,23 @@ export function BlockedUsersModal({ onClose }: Props) {
   const { toast } = useToast()
   const [unblockingUuid, setUnblockingUuid] = useState<string | null>(null)
 
-  const blocked = data?.blocked ?? []
+  const blocked: BlockedEntry[] = useMemo(() => {
+    if (!data) return []
+    if (Array.isArray(data)) {
+      return data.map((item) =>
+        typeof item === 'string' ? { blocked_uuid: item } : item
+      )
+    }
+    const rawList =
+      (data as any).blocked ??
+      (data as any).blocked_users ??
+      (data as any).users ??
+      (data as any).data ??
+      []
+    return rawList.map((item: any) =>
+      typeof item === 'string' ? { blocked_uuid: item } : item
+    )
+  }, [data])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

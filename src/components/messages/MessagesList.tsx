@@ -10,6 +10,7 @@ import { usePrefetch } from '@/hooks/usePrefetch'
 import { preloadRoute } from '@/lib/routePreload'
 import { announceNavigationPending } from '@/lib/navigationPending'
 import { useMessages } from './MessagesContext'
+import { useFollow } from '@/components/profile/FollowContext'
 import { MessagesListSkeleton } from '@/components/skeleton/Skeleton'
 import { ExploreModal } from './ExploreModal'
 import { fmtCount, gradientCss, timeAgo, type Room } from './types'
@@ -181,8 +182,10 @@ function DMRow({ dm }: { dm: Room }) {
   const navigate = useNavigate()
   const { auth } = useAuth()
   const { prefetchMessages } = usePrefetch()
+  const { aliasFor } = useFollow()
   const other = dm.members?.find((m) => m.user_uuid !== auth?.userUuid)
-  const displayName = other?.username ?? other?.user_uuid?.slice(0, 8) ?? 'Unknown'
+  const followAlias = other ? aliasFor(other.user_uuid) : undefined
+  const displayName = followAlias || (other?.username && !other.username.startsWith('$') ? other.username : other?.username ?? other?.user_uuid?.slice(0, 8) ?? 'Unknown')
   const hasUnread = dm.unread_count > 0
 
   return (

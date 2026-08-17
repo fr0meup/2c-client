@@ -182,6 +182,9 @@ function SectionLabel({ label, count, accent }: { label: string; count: number; 
 
 function MemberRow({ m }: { m: RoomMember }) {
   const { aliasFor } = useFollow()
+  const followAlias = aliasFor(m.user_uuid)
+  const nickname = followAlias || (m.username && !m.username.startsWith('$') && m.username !== 'You' ? m.username : undefined)
+
   return (
     <div className="flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/[0.03]">
       <div className="relative shrink-0">
@@ -196,18 +199,17 @@ function MemberRow({ m }: { m: RoomMember }) {
         )}
       </div>
       <div className="flex min-w-0 flex-1 items-center gap-2">
+        {nickname && (
+          <span className="min-w-0 truncate text-[13px] font-semibold text-[#c8a44d]">
+            {nickname}
+          </span>
+        )}
         <UserMetaPill
-          alias={aliasFor(m.user_uuid)}
           gender={m.gender}
           age={m.age}
           arena={m.arena}
           className="!h-7 !text-[11px] !flex-none"
         />
-        {m.username && (
-          <span className="min-w-0 truncate text-[13px] font-semibold text-[#c8a44d]">
-            {m.username}
-          </span>
-        )}
       </div>
     </div>
   )

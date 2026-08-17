@@ -13,6 +13,7 @@ import type { Comment as ApiComment } from '@/lib/types'
 import { BalanceChart } from './BalanceChart'
 import { ProfileCommentCard } from './ProfileCommentCard'
 import { ProfileTabs } from './ProfileTabs'
+import { FollowingModal } from './FollowingModal'
 import { useFollow } from './FollowContext'
 import { useFollowsMe } from '@/hooks/useFollow'
 import { useIsBlocked } from '@/hooks/useBlock'
@@ -26,21 +27,6 @@ function joinedAgo(iso: string): string {
   const months = Math.floor(days / 30)
   if (months < 12) return `${months}mo`
   return `${Math.floor(months / 12)}y`
-}
-
-function formatExactJoinDate(iso: string): string {
-  if (!iso) return ''
-  try {
-    const d = new Date(iso)
-    if (isNaN(d.getTime())) return iso
-    return d.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-  } catch {
-    return iso
-  }
 }
 
 function formatExactJoinDateTime(iso: string): string {
