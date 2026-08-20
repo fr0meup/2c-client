@@ -30,6 +30,7 @@ import { LinkCard } from './LinkCard'
 import { PostImageGallery, getPostImages } from './PostImageGallery'
 import { usePollResults, useLikertResults } from '@/hooks/usePostResults'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
+import { PostQuotesModal } from './PostQuotesModal'
 import { VideoPlayer } from '@/components/video-player/VideoPlayer'
 import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
 import { extractMediaUrls, normalizeMediaUrl, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
@@ -106,6 +107,7 @@ export function PostCard({
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [quotesModalOpen, setQuotesModalOpen] = useState(false)
   const [blocked, setBlocked] = useState(false)
   const [dmLoading, setDmLoading] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -384,6 +386,17 @@ export function PostCard({
                         )}
                         {dmLoading ? 'Starting DM…' : 'Message'}
                       </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setMenuOpen(false)
+                          setQuotesModalOpen(true)
+                        }}
+                        className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
+                      >
+                        <Quote className="h-3.5 w-3.5 text-white/40" />
+                        Quotes
+                      </button>
                       <div className="my-1 h-px bg-white/[0.06]" />
                       <button
                         disabled={blockUser.isPending || unblockUser.isPending}
@@ -417,6 +430,17 @@ export function PostCard({
                   )}
                   {isOwn && (
                     <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setMenuOpen(false)
+                          setQuotesModalOpen(true)
+                        }}
+                        className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
+                      >
+                        <Quote className="h-3.5 w-3.5 text-white/40" />
+                        Quotes
+                      </button>
                       <div className="my-1 h-px bg-white/[0.06]" />
                       <button
                         onClick={(e) => {
@@ -631,6 +655,14 @@ export function PostCard({
           isPending={deleteMutation.isPending}
           onClose={() => setDeleteModalOpen(false)}
           onConfirm={() => deleteMutation.mutate({ post_uuid: post.uuid }, { onSuccess: () => { setDeleteModalOpen(false); toast('success', 'Post deleted') } })}
+        />
+      )}
+
+      {quotesModalOpen && (
+        <PostQuotesModal
+          postUuid={post.uuid}
+          postTitle={post.title}
+          onClose={() => setQuotesModalOpen(false)}
         />
       )}
     </>

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Link2, MoreHorizontal, Trash2, Quote, UserPlus, UserCheck, Mail, Ban, Bookmark, Loader2 } from 'lucide-react'
 import { ConfirmDeleteModal } from '@/components/post-card/ConfirmDeleteModal'
+import { PostQuotesModal } from '@/components/post-card/PostQuotesModal'
 import { useDeletePost } from '@/hooks/usePostMutations'
 import { useToggleBookmark } from '@/hooks/useBookmarks'
 import { useBlockUser, useUnblockUser } from '@/hooks/useBlock'
@@ -31,6 +32,7 @@ export function PostDetailHeader() {
   const isOwn = auth?.userUuid === authorUuid
   const [menuOpen, setMenuOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [quotesModalOpen, setQuotesModalOpen] = useState(false)
   const [blocked, setBlocked] = useState(false)
   const [dmLoading, setDmLoading] = useState(false)
   const [showAliasInput, setShowAliasInput] = useState(false)
@@ -218,6 +220,16 @@ export function PostDetailHeader() {
                   )}
                   {dmLoading ? 'Starting DM…' : 'Message'}
                 </button>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setQuotesModalOpen(true)
+                  }}
+                  className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
+                >
+                  <Quote className="h-3.5 w-3.5 text-white/40" />
+                  Quotes
+                </button>
                 <div className="my-1 h-px bg-white/[0.06]" />
                 <button
                   disabled={blockUser.isPending || unblockUser.isPending}
@@ -250,6 +262,16 @@ export function PostDetailHeader() {
             )}
             {isOwn && (
             <>
+              <button
+                onClick={() => {
+                  setMenuOpen(false)
+                  setQuotesModalOpen(true)
+                }}
+                className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"
+              >
+                <Quote className="h-3.5 w-3.5 text-white/40" />
+                Quotes
+              </button>
               <div className="my-1 h-px bg-white/[0.06]" />
               <button
                 onClick={() => {
@@ -277,6 +299,14 @@ export function PostDetailHeader() {
           }}
           onClose={() => setDeleteModalOpen(false)}
           isPending={deleteMutation.isPending}
+        />
+      )}
+
+      {quotesModalOpen && uuid && (
+        <PostQuotesModal
+          postUuid={uuid}
+          postTitle={postData?.post?.title}
+          onClose={() => setQuotesModalOpen(false)}
         />
       )}
     </div>

@@ -337,26 +337,18 @@ export function Feed() {
     return () => observer.disconnect()
   }, [loadMore, isDateFiltering])
 
-  // Waiting for user to click Apply after page refresh
-  if (isDateFiltering && !searchTriggered) {
-    return (
-      <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pt-3 pb-6 sm:px-8">
-        <div className="w-full max-w-[670px] space-y-4 xl:-ml-[245px]">
-          {hasAdvancedParams(location.search) && <AdvancedSearchPanel />}
+  return (
+    <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pt-3 pb-6 sm:px-8">
+      <div className="w-full max-w-[670px] space-y-4 xl:-ml-[245px]" data-content-column>
+        <div data-onboarding="feed-compose">
+          {hasAdvancedParams(location.search) ? <AdvancedSearchPanel /> : !hideCompose ? <ComposePost defaultTopic={activeTopic} /> : null}
+        </div>
+
+        {isDateFiltering && !searchTriggered ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.02] py-12">
             <p className="text-sm text-white/40">Click <span className="font-medium text-[#c8a44d]/60">Apply Filters</span> to start searching</p>
           </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Bulk fetch progress screen
-  if (isDateFiltering && bulk.isLoading) {
-    return (
-      <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pt-3 pb-6 sm:px-8">
-        <div className="w-full max-w-[670px] space-y-4 xl:-ml-[245px]">
-          {hasAdvancedParams(location.search) && <AdvancedSearchPanel />}
+        ) : isDateFiltering && bulk.isLoading ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.02] py-16">
             <div className="relative flex h-12 w-12 items-center justify-center">
               <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#c8a44d]/60" />
@@ -367,18 +359,7 @@ export function Feed() {
               {bulk.scanned} scanned · {posts.length} match{posts.length !== 1 ? 'es' : ''} · 20 workers
             </p>
           </div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pt-3 pb-6 sm:px-8">
-      <div className="w-full max-w-[670px] space-y-4 xl:-ml-[245px]" data-content-column>
-        <div data-onboarding="feed-compose">
-          {hasAdvancedParams(location.search) ? <AdvancedSearchPanel /> : !hideCompose ? <ComposePost defaultTopic={activeTopic} /> : null}
-        </div>
-        {(pendingFeedNav !== null && !isDateFiltering) || (isLoading && !isDateFiltering) ? (
+        ) : (pendingFeedNav !== null && !isDateFiltering) || (isLoading && !isDateFiltering) ? (
           <div className="space-y-4">
             {[...Array(4)].map((_, i) => <PostCardSkeleton key={i} />)}
           </div>

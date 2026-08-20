@@ -209,21 +209,26 @@ async function clearLocalData() {
   }
 }
 
-async function importBackup(data: BackupData) {
+async function importBackup(data: BackupData, onProgress?: (msg: string) => void) {
+  onProgress?.('Clearing existing local data...')
   await clearLocalData()
   if (data._version) {
+    onProgress?.('Restoring preferences and settings...')
     Object.entries(data.localStorage ?? {}).forEach(([key, value]) => localStorage.setItem(key, value as string))
     if (data.drafts?.length) {
+      onProgress?.(`Restoring ${data.drafts.length} draft${data.drafts.length > 1 ? 's' : ''}...`)
       const { saveDraft } = await import('@/lib/drafts')
       for (const d of data.drafts) {
         await saveDraft({ ...d, mediaBlob: d.mediaBlob ? new Uint8Array(d.mediaBlob).buffer : null })
       }
     }
     if (data.postCache) {
+      onProgress?.('Restoring cached posts...')
       const { importPostCache } = await import('@/lib/postCache')
       await importPostCache(data.postCache)
     }
   } else {
+    onProgress?.('Restoring legacy data...')
     Object.entries(data).forEach(([key, value]) => localStorage.setItem(key, String(value)))
   }
 }
@@ -318,9 +323,104 @@ function LogoutModal({ onExport, onLogout, onCancel }: { onExport: () => void; o
   )
 }
 
+function ImportStatusModal({
+  status,
+  message,
+  onClose,
+}: {
+  status: 'importing' | 'success' | 'error'
+  message: string
+  onClose?: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 backdrop-blur-sm">
+      <div className="mx-4 w-full max-w-[380px] rounded-2xl border border-white/[0.08] bg-[#141410] p-6 text-center shadow-2xl shadow-black/80">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white/[0.04]">
+          {status === 'importing' && (
+            <Loader2 className="h-7 w-7 animate-spin text-[#c8a44d]" strokeWidth={2.2} />
+          )}
+          {status === 'success' && (
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10">
+              <Check className="h-7 w-7 text-emerald-400" strokeWidth={2.5} />
+            </div>
+          )}
+          {status === 'error' && (
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10">
+              <AlertTriangle className="h-7 w-7 text-red-400" strokeWidth={2.2} />
+            </div>
+          )}
+        </div>
+
+        <h3 className="text-base font-semibold text-white/90">
+          {status === 'importing' && 'Importing Data'}
+          {status === 'success' && 'Import Complete'}
+          {status === 'error' && 'Import Failed'}
+        </h3>
+
+        <p className="mt-2 text-[13px] leading-relaxed text-white/60">
+          {message}
+        </p>
+
+        {status === 'importing' && (
+          <div className="mt-5 flex justify-center">
+            <div className="h-1.5 w-36 overflow-hidden rounded-full bg-white/[0.08]">
+              <div className="h-full w-full animate-pulse rounded-full bg-[#c8a44d]" />
+            </div>
+          </div>
+        )}
+
+        {status === 'error' && onClose && (
+          <div className="mt-5 flex justify-center">
+            <button
+              onClick={onClose}
+              className="rounded-lg bg-white/[0.08] px-5 py-2 text-xs font-semibold text-white/80 transition-colors hover:bg-white/[0.12] hover:text-white"
+            >
+              Close
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function ProfileSettingsMenu() {
   const [blockedOpen, setBlockedOpen] = useState(false)
   const [confirm, setConfirm] = useState<{ type: 'clear' | 'import' | 'logout'; onConfirm: () => void } | null>(null)
+  const [importStatus, setImportStatus] = useState<'idle' | 'importing' | 'success' | 'error'>('idle')
+  const [importMessage, setImportMessage] = useState<string>('')
+
+  const handleStartImport = (file: File) => {
+    setImportStatus('importing')
+    setImportMessage('Reading backup file...')
+
+    const reader = new FileReader()
+    reader.onload = async () => {
+      try {
+        setImportMessage('Parsing backup data...')
+        const text = reader.result as string
+        const data = JSON.parse(text)
+        if (typeof data !== 'object' || data === null) throw new Error('Invalid backup file structure.')
+
+        await importBackup(data, (step) => setImportMessage(step))
+
+        setImportStatus('success')
+        setImportMessage('Data imported successfully! Reloading...')
+        setTimeout(() => {
+          window.location.reload()
+        }, 900)
+      } catch (err: unknown) {
+        setImportStatus('error')
+        const msg = err instanceof Error ? err.message : 'Invalid backup file. Please ensure it is a valid 2C JSON backup.'
+        setImportMessage(msg)
+      }
+    }
+    reader.onerror = () => {
+      setImportStatus('error')
+      setImportMessage('Failed to read the file from disk.')
+    }
+    reader.readAsText(file)
+  }
 
   return (
     <>
@@ -334,6 +434,7 @@ export function ProfileSettingsMenu() {
             close={close}
             onOpenBlocked={() => { close(); setBlockedOpen(true) }}
             onConfirm={(type, fn) => { close(); setConfirm({ type, onConfirm: fn }) }}
+            onStartImport={handleStartImport}
           />
         )}
       </PopoverMenu>
@@ -363,11 +464,18 @@ export function ProfileSettingsMenu() {
           onCancel={() => setConfirm(null)}
         />
       )}
+      {importStatus !== 'idle' && (
+        <ImportStatusModal
+          status={importStatus}
+          message={importMessage}
+          onClose={() => setImportStatus('idle')}
+        />
+      )}
     </>
   )
 }
 
-function SettingsContent({ close, onOpenBlocked, onConfirm }: { close: () => void; onOpenBlocked: () => void; onConfirm: (type: 'clear' | 'import' | 'logout', fn: () => void) => void }) {
+function SettingsContent({ close, onOpenBlocked, onConfirm, onStartImport }: { close: () => void; onOpenBlocked: () => void; onConfirm: (type: 'clear' | 'import' | 'logout', fn: () => void) => void; onStartImport: (file: File) => void }) {
   const navigate = useNavigate()
   const { logout } = useAuth()
   const [contactOpen, setContactOpen] = useState(false)
@@ -516,20 +624,7 @@ function SettingsContent({ close, onOpenBlocked, onConfirm }: { close: () => voi
             input.onchange = () => {
               const file = input.files?.[0]
               if (!file) return
-              const reader = new FileReader()
-              reader.onload = async () => {
-                try {
-                  const data = JSON.parse(reader.result as string)
-                  if (typeof data !== 'object' || data === null) throw new Error('bad format')
-
-                  await importBackup(data)
-
-                  window.location.reload()
-                } catch {
-                  alert('Invalid backup file.')
-                }
-              }
-              reader.readAsText(file)
+              onStartImport(file)
             }
             input.click()
           })
