@@ -249,7 +249,7 @@ export function Feed() {
     const fCity = searchParams.get('city')
 
     const contentFilters: ((p: PostCardData) => boolean)[] = []
-    if (fHasImage) contentFilters.push((p) => p.post_meta?.media_type === 'image' || (p.post_type === 4 && p.post_meta?.media_type !== 'video'))
+    if (fHasImage) contentFilters.push((p) => p.post_meta?.media_type === 'image' || (p.post_type === 4 && p.post_meta?.media_type !== 'video') || (Array.isArray(p.post_meta?.imageUrls) && p.post_meta!.imageUrls.length > 0))
     if (fHasVideo) contentFilters.push((p) => p.post_meta?.media_type === 'video')
     if (fHasPoll) contentFilters.push((p) => p.post_type === 2)
     if (fHasLikert) contentFilters.push((p) => p.post_type === 5)

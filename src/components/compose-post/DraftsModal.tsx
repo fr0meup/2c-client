@@ -43,9 +43,16 @@ export function DraftsModal({ onClose, onLoad, onDelete }: Props) {
 
   function getBadges(draft: Draft) {
     const badges: { icon: React.ReactNode; label: string }[] = []
-    if (draft.mediaBlob && draft.mediaType?.startsWith('video/')) {
+    const mediaCount = draft.mediaBlobs && draft.mediaBlobs.length > 0 ? draft.mediaBlobs.length : (draft.mediaBlob ? 1 : 0)
+    if (mediaCount > 1) {
+      badges.push({ icon: <ImagePlus className="h-3 w-3" />, label: `${mediaCount} Images` })
+    } else if (draft.mediaBlob && draft.mediaType?.startsWith('video/')) {
       badges.push({ icon: <Film className="h-3 w-3" />, label: 'Video' })
     } else if (draft.mediaBlob && draft.mediaType?.startsWith('image/')) {
+      badges.push({ icon: <ImagePlus className="h-3 w-3" />, label: 'Image' })
+    } else if (draft.mediaBlobs?.[0]?.type?.startsWith('video/')) {
+      badges.push({ icon: <Film className="h-3 w-3" />, label: 'Video' })
+    } else if (draft.mediaBlobs?.[0]?.type?.startsWith('image/')) {
       badges.push({ icon: <ImagePlus className="h-3 w-3" />, label: 'Image' })
     }
     if (draft.activeOption === 'poll' || (Array.isArray(draft.pollOptions) && draft.pollOptions.length > 0 && draft.pollOptions.some((o) => o.trim() !== ''))) {

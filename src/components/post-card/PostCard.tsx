@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, MessageSquare, Triangle, MoreHorizontal, Link2, Trash2, Eye, Quote, UserPlus, UserCheck, Mail, Ban, Bookmark, Loader2, Star } from 'lucide-react'
+import { X, MessageSquare, Triangle, MoreHorizontal, Link2, Trash2, Eye, Quote, UserPlus, UserCheck, Mail, Ban, Bookmark, Loader2 } from 'lucide-react'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
 import type { PostCardData } from './types'
@@ -26,42 +26,15 @@ import { QuotePostCard } from './QuotePostCard'
 import { TransactionCard } from './TransactionCard'
 import { BudgetCard } from './BudgetCard'
 import { LinkCard } from './LinkCard'
+import { PostImageGallery, getPostImages } from './PostImageGallery'
 import { usePollResults, useLikertResults } from '@/hooks/usePostResults'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 import { VideoPlayer } from '@/components/video-player/VideoPlayer'
 import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
-import { extractMediaUrls, normalizeMediaUrl, saveGif, removeGif, isGifSaved, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
+import { extractMediaUrls, normalizeMediaUrl, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
+import { GifWithStar } from '@/components/gif-picker/GifWithStar'
 
 const TEXT_LIMIT = 280
-
-function GifWithStar({ url }: { url: string }) {
-  const [saved, setSaved] = useState(() => isGifSaved(url))
-
-  useEffect(() => {
-    function onSync() { setSaved(isGifSaved(url)) }
-    window.addEventListener('gif-storage-change', onSync)
-    return () => window.removeEventListener('gif-storage-change', onSync)
-  }, [url])
-
-  return (
-    <div className="group/gif relative mt-1.5 w-fit" onClick={(e) => e.stopPropagation()}>
-      <img src={url} alt="GIF" className="max-w-[240px] rounded-lg" loading="lazy" />
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          if (saved) { removeGif(url); setSaved(false) }
-          else { saveGif(url); setSaved(true) }
-        }}
-        className={`absolute right-1.5 top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full opacity-0 transition-all group-hover/gif:opacity-100 ${
-          saved ? 'bg-[#c8a44d]/90 text-[#0f0e0a]' : 'bg-black/60 text-white/60 hover:bg-black/80 hover:text-white'
-        }`}
-        title={saved ? 'Remove from saved GIFs' : 'Save GIF'}
-      >
-        <Star className={`h-3 w-3 ${saved ? 'fill-current' : ''}`} />
-      </button>
-    </div>
-  )
-}
 
 function PlatformIcon({ platform }: { platform?: string }) {
   if (platform === 'ios') {
@@ -110,11 +83,13 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
   const unblockUser = useUnblockUser()
   const { prefetchComments, prefetchPost } = usePrefetch()
   const alias = aliasFor(post.author_uuid)
-  const imageSrc = post.post_meta?.src || post.post_meta?.imageUrl
+  const images = getPostImages(post.post_meta)
+  const imageSrc = images[0] || post.post_meta?.src || post.post_meta?.imageUrl
   const isVideoPost = post.post_meta?.media_type === 'video'
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [blocked, setBlocked] = useState(false)
   const [dmLoading, setDmLoading] = useState(false)
@@ -180,7 +155,11 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
     <>
       <article
         onClick={() => { saveScrollPosition(); announceNavigationPending(`/post/${post.uuid}`); navigate(`/post/${post.uuid}`) }}
-        onMouseEnter={() => { preloadRoute('post'); prefetchPost(post.uuid); prefetchComments(post.uuid) }}
+        onMouseEnter={() => {
+          preloadRoute('post')
+          prefetchPost(post.uuid)
+          prefetchComments(post.uuid)
+        }}
         className="cursor-pointer rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 transition-colors hover:bg-white/[0.05] sm:p-4"
       >
         <div className="min-w-0">
@@ -494,19 +473,22 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
           )}
 
           {/* Media */}
-          {imageSrc && !isTransaction && (
-            isVideoPost ? (
+          {!isTransaction && (
+            isVideoPost && imageSrc ? (
               <div className="mx-auto mt-3 w-[85%]" onClick={(e) => e.stopPropagation()}>
                 <VideoPlayer src={imageSrc} compact />
               </div>
-            ) : (
-              <img
-                src={imageSrc}
-                alt=""
-                onClick={(e) => { e.stopPropagation(); setLightboxOpen(true) }}
-                className="mx-auto mt-3 w-[85%] max-h-[26rem] cursor-zoom-in rounded-2xl object-cover"
-              />
-            )
+            ) : images.length > 0 ? (
+              <div className="mt-3">
+                <PostImageGallery
+                  images={images}
+                  onImageClick={(idx) => {
+                    setLightboxIndex(idx)
+                    setLightboxOpen(true)
+                  }}
+                />
+              </div>
+            ) : null
           )}
 
 
@@ -594,8 +576,8 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
       </article>
 
       {/* Lightbox */}
-      {lightboxOpen && imageSrc && (
-        isVideoPost ? (
+      {lightboxOpen && (
+        isVideoPost && imageSrc ? (
           <div
             className="fixed inset-0 z-[9999] flex h-screen w-screen items-center justify-center overflow-hidden bg-black/90 backdrop-blur-md select-none"
             onClick={(e) => { e.stopPropagation(); setLightboxOpen(false) }}
@@ -612,13 +594,14 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
               <VideoPlayer src={imageSrc} />
             </div>
           </div>
-        ) : (
+        ) : images.length > 0 ? (
           <ImageLightbox
-            src={imageSrc}
+            images={images}
+            initialIndex={lightboxIndex}
             downloadName={`post-${post.uuid}.jpg`}
             onClose={() => setLightboxOpen(false)}
           />
-        )
+        ) : null
       )}
 
       {deleteModalOpen && (

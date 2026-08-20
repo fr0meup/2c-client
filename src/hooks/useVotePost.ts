@@ -3,6 +3,7 @@ import { rpc } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import type { ArenaResponse, UserProfileResponse, BookmarksResponse, Vote } from '@/lib/types'
 import type { PostResponse } from './usePost'
+import { patchVotesAndPosts, snapshotPostCaches, rollbackPostCaches, type CacheSnapshot } from '@/lib/cacheHelpers'
 
 interface VoteParams {
   post_uuid: string
@@ -11,36 +12,6 @@ interface VoteParams {
 
 interface VoteResponse {
   message: string
-}
-
-interface PatchablePosts {
-  votes?: Vote[]
-  posts?: { uuid: string; upvote_count: number }[]
-}
-
-/** Patch a votes array + posts array for a given post_uuid / vote_type */
-function patchVotesAndPosts<T extends PatchablePosts>(
-  section: T,
-  postUuid: string,
-  voteType: 1 | -1 | 0,
-): T {
-  if (!section?.posts) return section
-  const oldVote = (section.votes ?? []).find((v) => v.content_uuid === postUuid)
-  const oldVoteType = oldVote?.vote_type ?? 0
-  const delta = voteType - oldVoteType
-
-  return {
-    ...section,
-    votes: [
-      ...(section.votes ?? []).filter((v) => v.content_uuid !== postUuid),
-      ...(voteType !== 0
-        ? [{ ...oldVote, content_uuid: postUuid, vote_type: voteType } as Vote]
-        : []),
-    ],
-    posts: (section.posts ?? []).map((p) =>
-      p.uuid === postUuid ? { ...p, upvote_count: p.upvote_count + delta } : p,
-    ),
-  }
 }
 
 export function useVotePost() {
@@ -58,8 +29,9 @@ export function useVotePost() {
         auth.userUuid
       )
     },
-    onMutate: (variables) => {
+    onMutate: async (variables): Promise<{ previous: CacheSnapshot }> => {
       const { post_uuid, vote_type } = variables
+      const previous = await snapshotPostCaches(queryClient, post_uuid)
 
       // 1. Feed cache
       queryClient.setQueriesData<{ pages: ArenaResponse[] }>(
@@ -116,9 +88,13 @@ export function useVotePost() {
           return patchVotesAndPosts(old, post_uuid, vote_type)
         }
       )
+
+      return { previous }
+    },
+    onError: (_err, variables, context) => {
+      rollbackPostCaches(queryClient, variables.post_uuid, context?.previous)
     },
     onSuccess: (_data, variables) => {
-      // Invalidate the single post query so comment_count / upvote_count stay fresh
       queryClient.invalidateQueries({ queryKey: ['post', variables.post_uuid] })
     },
   })

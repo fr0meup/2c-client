@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import type { PostCardData } from './types'
 import { timeAgo, renderPostText, formatExactDateTime } from './utils'
+import { getPostImages } from './PostImageGallery'
 
 interface QuotePostCardProps {
   quote: PostCardData
@@ -10,7 +11,8 @@ interface QuotePostCardProps {
 
 export function QuotePostCard({ quote, className = '' }: QuotePostCardProps) {
   const navigate = useNavigate()
-  const imageSrc = quote.post_meta?.src
+  const images = getPostImages(quote.post_meta)
+  const imageSrc = images[0] || quote.post_meta?.src
   const isVideo = quote.post_meta?.media_type === 'video'
 
   if (!quote?.author_meta) return null
@@ -80,12 +82,19 @@ export function QuotePostCard({ quote, className = '' }: QuotePostCardProps) {
         </div>
 
         {/* Image thumbnail — avoids cut-off by showing as a compact square */}
-        {imageSrc && !isVideo && (
-          <img
-            src={imageSrc}
-            alt=""
-            className="h-[56px] w-[56px] shrink-0 self-center rounded-lg object-cover ring-1 ring-white/[0.06] transition-opacity group-hover:opacity-80"
-          />
+        {images.length > 0 && !isVideo && (
+          <div className="relative h-[56px] w-[56px] shrink-0 self-center overflow-hidden rounded-lg ring-1 ring-white/[0.06]">
+            <img
+              src={images[0]}
+              alt=""
+              className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
+            />
+            {images.length > 1 && (
+              <span className="absolute bottom-1 right-1 rounded-md bg-black/75 px-1 py-0.5 text-[9px] font-bold leading-none text-white backdrop-blur-[2px]">
+                +{images.length - 1}
+              </span>
+            )}
+          </div>
         )}
 
         {/* Video badge thumbnail */}

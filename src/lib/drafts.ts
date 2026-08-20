@@ -1,5 +1,11 @@
 import type { PostOption } from '@/components/compose-post/config'
 
+export interface DraftMediaItem {
+  blob: ArrayBuffer
+  type: string
+  name: string
+}
+
 export interface Draft {
   id: string
   createdAt: number
@@ -13,6 +19,7 @@ export interface Draft {
   mediaBlob: ArrayBuffer | null
   mediaType: string | null
   mediaName: string | null
+  mediaBlobs?: DraftMediaItem[]
 }
 
 const DB_NAME = '2c-drafts'

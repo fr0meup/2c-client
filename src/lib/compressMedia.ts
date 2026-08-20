@@ -5,36 +5,48 @@ const MAX_TARGET_BYTES = 9.9 * 1024 * 1024 // 9.9 MB
  * Preserves exact file format (GIF animation, video format, image type)
  * and targets a file size between 9.4 MB and 9.9 MB.
  */
-export async function compressMediaIfNeeded(file: File): Promise<File> {
+export async function compressMediaIfNeeded(file: File, signal?: AbortSignal): Promise<File> {
+  if (signal?.aborted) return file
   if (file.size <= MAX_TARGET_BYTES) {
     return file
   }
 
   if (file.type.startsWith('video/')) {
-    return compressVideo(file)
+    return compressVideo(file, signal)
   }
 
   if (file.type === 'image/gif' || file.name.endsWith('.gif')) {
-    return compressGifBinary(file)
+    return compressGifBinary(file, signal)
   }
 
   if (file.type.startsWith('image/')) {
-    return compressImage(file)
+    return compressImage(file, signal)
   }
 
   return file
 }
 
 /** Compress static images (PNG, JPEG, WEBP) preserving exact MIME type */
-async function compressImage(file: File): Promise<File> {
+async function compressImage(file: File, signal?: AbortSignal): Promise<File> {
   const mimeType = file.type || 'image/jpeg'
 
   return new Promise((resolve) => {
+    if (signal?.aborted) return resolve(file)
+
     const img = new Image()
     const url = URL.createObjectURL(file)
 
-    img.onload = async () => {
+    const onAbort = () => {
       URL.revokeObjectURL(url)
+      resolve(file)
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+
+    img.onload = async () => {
+      signal?.removeEventListener('abort', onAbort)
+      URL.revokeObjectURL(url)
+      if (signal?.aborted) return resolve(file)
+
       let scale = 0.98
       let quality = 0.95
 
@@ -55,7 +67,7 @@ async function compressImage(file: File): Promise<File> {
       let blob = await getBlob(scale, quality)
 
       // Step down in small increments to land in 9.4MB - 9.9MB window
-      while (blob && blob.size > MAX_TARGET_BYTES && (scale > 0.2 || quality > 0.3)) {
+      while (blob && blob.size > MAX_TARGET_BYTES && (scale > 0.2 || quality > 0.3) && !signal?.aborted) {
         if (mimeType !== 'image/png' && quality > 0.4) {
           quality -= 0.04
         } else {
@@ -64,7 +76,7 @@ async function compressImage(file: File): Promise<File> {
         blob = await getBlob(scale, quality)
       }
 
-      if (blob && blob.size <= MAX_TARGET_BYTES) {
+      if (blob && blob.size <= MAX_TARGET_BYTES && !signal?.aborted) {
         const compressedFile = new File([blob], file.name, {
           type: mimeType,
           lastModified: Date.now(),
@@ -76,6 +88,7 @@ async function compressImage(file: File): Promise<File> {
     }
 
     img.onerror = () => {
+      signal?.removeEventListener('abort', onAbort)
       URL.revokeObjectURL(url)
       resolve(file)
     }
@@ -89,9 +102,11 @@ async function compressImage(file: File): Promise<File> {
  * Preserves GIF animation, color palette, and visual quality by skipping
  * intermediate frames and adjusting frame delays to target 9.4 MB - 9.9 MB.
  */
-async function compressGifBinary(file: File): Promise<File> {
+async function compressGifBinary(file: File, signal?: AbortSignal): Promise<File> {
+  if (signal?.aborted) return file
   try {
     const arrayBuffer = await file.arrayBuffer()
+    if (signal?.aborted) return file
     const bytes = new Uint8Array(arrayBuffer)
 
     // Check GIF header
@@ -120,7 +135,7 @@ async function compressGifBinary(file: File): Promise<File> {
     let currentGce: { raw: Uint8Array; delay: number } | undefined
     const globalMetaChunks: Uint8Array[] = []
 
-    while (pos < bytes.length) {
+    while (pos < bytes.length && !signal?.aborted) {
       const blockType = bytes[pos]
 
       if (blockType === 0x3b) {
@@ -176,7 +191,7 @@ async function compressGifBinary(file: File): Promise<File> {
       }
     }
 
-    if (frames.length <= 1) {
+    if (signal?.aborted || frames.length <= 1) {
       return file
     }
 
@@ -213,7 +228,7 @@ async function compressGifBinary(file: File): Promise<File> {
     newChunks.push(new Uint8Array([0x3b]))
 
     const blob = new Blob(newChunks as unknown as BlobPart[], { type: 'image/gif' })
-    if (blob.size <= MAX_TARGET_BYTES && blob.size > 0) {
+    if (blob.size <= MAX_TARGET_BYTES && blob.size > 0 && !signal?.aborted) {
       return new File([blob], file.name, {
         type: 'image/gif',
         lastModified: Date.now(),
@@ -228,14 +243,41 @@ async function compressGifBinary(file: File): Promise<File> {
 }
 
 /** Compress video preserving video/mp4 MIME type and targeting 9.4 MB - 9.9 MB */
-async function compressVideo(file: File): Promise<File> {
+async function compressVideo(file: File, signal?: AbortSignal): Promise<File> {
   return new Promise((resolve) => {
+    if (signal?.aborted) return resolve(file)
+
     const video = document.createElement('video')
     video.muted = true
     video.playsInline = true
     const url = URL.createObjectURL(file)
 
+    let animId: number | null = null
+    let recorder: MediaRecorder | null = null
+
+    const cleanup = () => {
+      if (animId !== null) cancelAnimationFrame(animId)
+      if (recorder && recorder.state !== 'inactive') {
+        try { recorder.stop() } catch { /* ignore */ }
+      }
+      video.pause()
+      video.removeAttribute('src')
+      video.load()
+      URL.revokeObjectURL(url)
+    }
+
+    const onAbort = () => {
+      cleanup()
+      resolve(file)
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+
     video.onloadedmetadata = async () => {
+      if (signal?.aborted) {
+        cleanup()
+        return resolve(file)
+      }
+
       const duration = video.duration || 10
       // Target 9.65 MB (right in the middle of 9.4 MB and 9.9 MB)
       const targetBytes = 9.65 * 1024 * 1024
@@ -251,7 +293,7 @@ async function compressVideo(file: File): Promise<File> {
       const ctx = canvas.getContext('2d')
 
       if (!ctx || !('MediaRecorder' in window)) {
-        URL.revokeObjectURL(url)
+        cleanup()
         return resolve(file)
       }
 
@@ -262,14 +304,13 @@ async function compressVideo(file: File): Promise<File> {
           ? 'video/webm;codecs=vp8'
           : ''
 
-      let recorder: MediaRecorder
       try {
         recorder = new MediaRecorder(stream, {
           mimeType: mimeType || undefined,
           videoBitsPerSecond: Math.max(500_000, Math.min(targetBps, 5_000_000)),
         })
       } catch {
-        URL.revokeObjectURL(url)
+        cleanup()
         return resolve(file)
       }
 
@@ -279,7 +320,10 @@ async function compressVideo(file: File): Promise<File> {
       }
 
       recorder.onstop = () => {
+        signal?.removeEventListener('abort', onAbort)
         URL.revokeObjectURL(url)
+        if (signal?.aborted) return resolve(file)
+
         const blob = new Blob(chunks, { type: 'video/mp4' })
         const compressedFile = new File([blob], file.name.endsWith('.mp4') ? file.name : file.name.replace(/\.[^.]+$/, '.mp4'), {
           type: 'video/mp4',
@@ -288,9 +332,8 @@ async function compressVideo(file: File): Promise<File> {
         resolve(compressedFile)
       }
 
-      let animId: number
       const drawFrame = () => {
-        if (video.ended || video.paused) return
+        if (video.ended || video.paused || signal?.aborted) return
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
         animId = requestAnimationFrame(drawFrame)
       }
@@ -303,18 +346,19 @@ async function compressVideo(file: File): Promise<File> {
           drawFrame()
         })
         .catch(() => {
-          URL.revokeObjectURL(url)
+          cleanup()
           resolve(file)
         })
 
       video.onended = () => {
-        cancelAnimationFrame(animId)
-        if (recorder.state !== 'inactive') recorder.stop()
+        if (animId !== null) cancelAnimationFrame(animId)
+        if (recorder && recorder.state !== 'inactive') recorder.stop()
       }
     }
 
     video.onerror = () => {
-      URL.revokeObjectURL(url)
+      signal?.removeEventListener('abort', onAbort)
+      cleanup()
       resolve(file)
     }
 

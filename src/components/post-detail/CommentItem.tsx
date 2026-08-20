@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { MessageSquare, MoreHorizontal, Link2, Trash2, Triangle, Star, ImagePlus, X, Loader2 } from 'lucide-react'
+import { MessageSquare, MoreHorizontal, Link2, Trash2, Triangle, ImagePlus, X, Loader2 } from 'lucide-react'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
@@ -12,62 +12,13 @@ import { useToast } from '@/components/toast/ToastContext'
 import { humanizeError } from '@/lib/api'
 import type { Comment } from './CommentThread'
 import { obfuscateText } from '@/lib/utils'
-import { extractMediaUrls, firstMediaUrl, saveGif, removeGif, isGifSaved, getTextWithGifs, insertGifImage, normalizeMediaUrl, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT, isUploadedUrl, fetchOrConvertImageToFile } from '@/lib/gif'
+import { extractMediaUrls, firstMediaUrl, getTextWithGifs, insertGifImage, normalizeMediaUrl, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT, isUploadedUrl, fetchOrConvertImageToFile } from '@/lib/gif'
+import { GifWithStar } from '@/components/gif-picker/GifWithStar'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
 import { MentionPicker } from '@/components/mention-picker/MentionPicker'
 import { extractMentionUuids, notifyMentions } from '@/lib/mentionNotifications'
 import { useUploadImage } from '@/hooks/useUploadImage'
 import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
-
-function GifWithStar({ url, onOpenLightbox }: { url: string; onOpenLightbox?: (url: string) => void }) {
-  const [saved, setSaved] = useState(() => isGifSaved(url))
-
-  useEffect(() => {
-    function onSync() { setSaved(isGifSaved(url)) }
-    window.addEventListener('gif-storage-change', onSync)
-    return () => window.removeEventListener('gif-storage-change', onSync)
-  }, [url])
-
-  return (
-    <div className="group/gif relative mt-1.5 w-fit">
-      <img
-        src={url}
-        alt=""
-        onClick={(e) => {
-          if (onOpenLightbox) {
-            e.stopPropagation()
-            onOpenLightbox(url)
-          }
-        }}
-        className={`max-w-[320px] max-h-[280px] rounded-xl object-cover transition-opacity ${
-          onOpenLightbox ? 'cursor-pointer hover:opacity-90' : ''
-        }`}
-        loading="lazy"
-      />
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          if (saved) {
-            removeGif(url)
-            setSaved(false)
-          } else {
-            saveGif(url)
-            setSaved(true)
-          }
-        }}
-        className={`absolute right-1.5 top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full opacity-0 transition-all group-hover/gif:opacity-100 ${
-          saved
-            ? 'bg-[#c8a44d]/90 text-[#0f0e0a]'
-            : 'bg-black/60 text-white/60 hover:bg-black/80 hover:text-white'
-        }`}
-        title={saved ? 'Remove from saved GIFs' : 'Save to GIF picker'}
-      >
-        <Star className={`h-3 w-3 ${saved ? 'fill-current' : ''}`} />
-      </button>
-    </div>
-  )
-}
 
 interface CommentItemProps {
   comment: Comment

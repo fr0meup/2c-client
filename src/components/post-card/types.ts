@@ -16,9 +16,11 @@ export interface PriceHistoryPoint {
 
 export interface PostMeta {
   platform?: 'ios' | 'android' | 'web'
-  version?: number
+  version?: number | string
   src?: string
   imageUrl?: string
+  imageUrls?: string[]
+  image_urls?: string[]
   sensitive?: boolean
   media_type?: 'image' | 'video'
   poll?: string[]

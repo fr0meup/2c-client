@@ -1,56 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageSquare, Triangle, Star } from 'lucide-react'
+import { MessageSquare, Triangle } from 'lucide-react'
 import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
 import { timeAgo, cleanPostText, renderPostText, formatExactDateTime } from '@/components/post-card/utils'
 import { useFollow } from './FollowContext'
 import { useVoteComment } from '@/hooks/useVotes'
 import type { Comment } from '@/lib/types'
-import { extractMediaUrls, normalizeMediaUrl, saveGif, removeGif, isGifSaved, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
+import { extractMediaUrls, normalizeMediaUrl, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT } from '@/lib/gif'
+import { GifWithStar } from '@/components/gif-picker/GifWithStar'
 import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
 import { saveScrollPosition } from '@/App'
 import { announceNavigationPending } from '@/lib/navigationPending'
-
-function GifWithStar({ url }: { url: string }) {
-  const [saved, setSaved] = useState(() => isGifSaved(url))
-
-  useEffect(() => {
-    function onSync() { setSaved(isGifSaved(url)) }
-    window.addEventListener('gif-storage-change', onSync)
-    return () => window.removeEventListener('gif-storage-change', onSync)
-  }, [url])
-
-  return (
-    <div className="group/gif relative w-fit" onClick={(e) => e.stopPropagation()}>
-      <img
-        src={url}
-        alt="GIF"
-        className="max-w-[240px] rounded-lg"
-        loading="lazy"
-      />
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          if (saved) {
-            removeGif(url)
-            setSaved(false)
-          } else {
-            saveGif(url)
-            setSaved(true)
-          }
-        }}
-        className={`absolute right-1.5 top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full opacity-0 transition-all group-hover/gif:opacity-100 ${
-          saved
-            ? 'bg-[#c8a44d]/90 text-[#0f0e0a]'
-            : 'bg-black/60 text-white/60 hover:bg-black/80 hover:text-white'
-        }`}
-        title={saved ? 'Remove from saved GIFs' : 'Save GIF'}
-      >
-        <Star className={`h-3 w-3 ${saved ? 'fill-current' : ''}`} />
-      </button>
-    </div>
-  )
-}
 
 interface Props {
   comment: Comment

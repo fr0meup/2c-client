@@ -64,8 +64,14 @@ export function useVoteComment() {
         auth.userUuid
       )
     },
-    onMutate: (variables) => {
+    onMutate: async (variables) => {
       const { comment_uuid, post_uuid, vote_type } = variables
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: ['comments', post_uuid] }),
+        queryClient.cancelQueries({ queryKey: ['userProfile'] }),
+      ])
+      const previousComments = queryClient.getQueryData<CommentsResponse>(['comments', post_uuid])
+      const previousProfile = queryClient.getQueriesData<{ pages: UserProfileResponse[] }>({ queryKey: ['userProfile'] })
 
       // 1. Comments cache (post detail page)
       queryClient.setQueryData<CommentsResponse>(
@@ -90,6 +96,18 @@ export function useVoteComment() {
           }
         }
       )
+
+      return { previousComments, previousProfile }
+    },
+    onError: (_err, variables, context) => {
+      if (context?.previousComments !== undefined) {
+        queryClient.setQueryData(['comments', variables.post_uuid], context.previousComments)
+      }
+      if (context?.previousProfile) {
+        for (const [key, data] of context.previousProfile) {
+          queryClient.setQueryData(key, data)
+        }
+      }
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['comments', variables.post_uuid] })

@@ -6,7 +6,6 @@ import {
   Triangle,
   Eye,
   X,
-  Star,
   ImagePlus,
   Loader2,
 } from 'lucide-react'
@@ -24,6 +23,7 @@ import { TransactionCard } from '@/components/post-card/TransactionCard'
 import { BudgetCard } from '@/components/post-card/BudgetCard'
 import { LinkCard } from '@/components/post-card/LinkCard'
 import { VideoPlayer } from '@/components/video-player/VideoPlayer'
+import { PostImageGallery, getPostImages } from '@/components/post-card/PostImageGallery'
 import { CommentThread, type Comment } from './CommentThread'
 import { usePost, type PostResponse } from '@/hooks/usePost'
 import { useComments } from '@/hooks/useComments'
@@ -41,7 +41,8 @@ import type { ArenaResponse, UserProfileResponse } from '@/lib/types'
 import { PostDetailSkeleton, CommentsSkeleton } from '@/components/skeleton/Skeleton'
 import { obfuscateText } from '@/lib/utils'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
-import { extractMediaUrls, firstMediaUrl, getTextWithGifs, insertGifImage, normalizeMediaUrl, saveGif, removeGif, isGifSaved, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT, isUploadedUrl, fetchOrConvertImageToFile } from '@/lib/gif'
+import { extractMediaUrls, firstMediaUrl, getTextWithGifs, insertGifImage, normalizeMediaUrl, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT, isUploadedUrl, fetchOrConvertImageToFile } from '@/lib/gif'
+import { GifWithStar } from '@/components/gif-picker/GifWithStar'
 import { MentionPicker } from '@/components/mention-picker/MentionPicker'
 import { extractMentionUuids, notifyMentions } from '@/lib/mentionNotifications'
 import { useUploadImage } from '@/hooks/useUploadImage'
@@ -49,34 +50,6 @@ import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
 
 export function PostDetailPage() {
   return <PostDetail />
-}
-
-function GifWithStar({ url }: { url: string }) {
-  const [saved, setSaved] = useState(() => isGifSaved(url))
-
-  useEffect(() => {
-    function onSync() { setSaved(isGifSaved(url)) }
-    window.addEventListener('gif-storage-change', onSync)
-    return () => window.removeEventListener('gif-storage-change', onSync)
-  }, [url])
-
-  return (
-    <div className="group/gif relative mt-1.5 w-fit">
-      <img src={url} alt="GIF" className="max-w-[240px] rounded-lg" loading="lazy" />
-      <button
-        onClick={() => {
-          if (saved) { removeGif(url); setSaved(false) }
-          else { saveGif(url); setSaved(true) }
-        }}
-        className={`absolute right-1.5 top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full opacity-0 transition-all group-hover/gif:opacity-100 ${
-          saved ? 'bg-[#c8a44d]/90 text-[#0f0e0a]' : 'bg-black/60 text-white/60 hover:bg-black/80 hover:text-white'
-        }`}
-        title={saved ? 'Remove from saved GIFs' : 'Save GIF'}
-      >
-        <Star className={`h-3 w-3 ${saved ? 'fill-current' : ''}`} />
-      </button>
-    </div>
-  )
 }
 
 export function PostDetail() {
@@ -182,6 +155,7 @@ export function PostDetail() {
   const [commentHasText, setCommentHasText] = useState(false)
   const [hasCommentSelection, setHasCommentSelection] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
   const [commentImageFile, setCommentImageFile] = useState<File | null>(null)
   const [commentImagePreview, setCommentImagePreview] = useState<string | null>(null)
   const commentRef = useRef<HTMLDivElement>(null)
@@ -398,17 +372,24 @@ export function PostDetail() {
     )
   }
 
-  const imageSrc = post.post_meta?.src || post.post_meta?.imageUrl
+  const images = getPostImages(post.post_meta)
+  const imageSrc = images[0] || post.post_meta?.src || post.post_meta?.imageUrl
   const isVideoPost = post.post_meta?.media_type === 'video'
   const isPicks = post.post_type === 7
   const isTransaction = post.post_type === 8
   const isBudget = post.post_type === 9
   const isLink = post.post_type === 1 && !!post.post_meta?.link
 
+  const [cardHovered, setCardHovered] = useState(false)
+
   return (
     <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pb-6 sm:px-8">
       <div className="w-full max-w-[670px] xl:-ml-[245px]" data-content-column>
-        <div className="w-full flex flex-col">
+        <div
+          className="w-full flex flex-col"
+          onMouseEnter={() => setCardHovered(true)}
+          onMouseLeave={() => setCardHovered(false)}
+        >
       <div className="pb-4 pt-1.5">
         {/* Author info row */}
         <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 sm:flex-nowrap sm:gap-2" data-postcard-networth-pill>
@@ -500,24 +481,29 @@ export function PostDetail() {
         )}
 
         {/* Media */}
-        {imageSrc && !isTransaction && (
-          <div className="mt-3 overflow-hidden rounded-2xl">
-            {isVideoPost ? (
+        {!isTransaction && (
+          isVideoPost && imageSrc ? (
+            <div className="mt-3 overflow-hidden rounded-2xl">
               <VideoPlayer src={imageSrc} />
-            ) : (
-              <img
-                src={imageSrc}
-                alt=""
-                onClick={(e) => { e.stopPropagation(); setLightboxOpen(true) }}
-                className="max-h-[32rem] w-full cursor-zoom-in object-contain transition-opacity hover:opacity-90"
+            </div>
+          ) : images.length > 0 ? (
+            <div className="mt-3">
+              <PostImageGallery
+                images={images}
+                fullWidth
+                isCardHovered={cardHovered}
+                onImageClick={(idx) => {
+                  setLightboxIndex(idx)
+                  setLightboxOpen(true)
+                }}
               />
-            )}
-          </div>
+            </div>
+          ) : null
         )}
 
         {/* Lightbox */}
-        {lightboxOpen && imageSrc && (
-          isVideoPost ? (
+        {lightboxOpen && (
+          isVideoPost && imageSrc ? (
             <div
               className="fixed inset-0 z-[9999] flex h-screen w-screen items-center justify-center overflow-hidden bg-black/90 backdrop-blur-md select-none"
               onClick={() => setLightboxOpen(false)}
@@ -534,13 +520,14 @@ export function PostDetail() {
                 <VideoPlayer src={imageSrc} />
               </div>
             </div>
-          ) : (
+          ) : images.length > 0 ? (
             <ImageLightbox
-              src={imageSrc}
+              images={images}
+              initialIndex={lightboxIndex}
               downloadName={`post-${post.uuid}.jpg`}
               onClose={() => setLightboxOpen(false)}
             />
-          )
+          ) : null
         )}
 
         {/* Transaction card */}

@@ -1,26 +1,30 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ImagePlus, X, ChevronDown, BarChart3, List, Bold, Plus, Minus, Loader2, FileText, Save, Check, MoreHorizontal, Pin } from 'lucide-react'
+import { ImagePlus, X, BarChart3, List, Bold, Loader2, FileText, Save, Check, MoreHorizontal } from 'lucide-react'
 import { EmojiPickerButton } from '@/components/emoji-picker/EmojiPickerButton'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
 import { firstMediaUrl, insertGifImage, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT, fetchOrConvertImageToFile, isUploadedUrl } from '@/lib/gif'
 import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { GenderIcon } from '@/components/gender-icon/GenderIcon'
 import { QuotePostCard } from '@/components/post-card/QuotePostCard'
+import { ImageLightbox } from '@/components/lightbox/ImageLightbox'
 import { useAuth } from '@/lib/auth'
 import { useUserProfile } from '@/hooks/useUserProfile'
 import { useCreatePost } from '@/hooks/usePostMutations'
-import { useUploadImage } from '@/hooks/useUploadImage'
+import { useUploadImage, useUploadImagesBulk } from '@/hooks/useUploadImage'
 import { useToast } from '@/components/toast/ToastContext'
 import { humanizeError } from '@/lib/api'
 import { saveDraft, getDraftCount } from '@/lib/drafts'
-import type { Draft } from '@/lib/drafts'
+import type { Draft, DraftMediaItem } from '@/lib/drafts'
 import { DraftsModal } from './DraftsModal'
+import { PollComposer } from './PollComposer'
+import { LikertComposer } from './LikertComposer'
+import { TopicDropdown } from './TopicDropdown'
 import { TOPIC_MENU, TOPIC_SLUG, type PostOption } from './config'
 import type { PostCardData } from '@/components/post-card/types'
 import { obfuscateText, formatTopicSlug } from '@/lib/utils'
 import { MentionPicker } from '@/components/mention-picker/MentionPicker'
 import { extractMentionUuids, notifyMentions } from '@/lib/mentionNotifications'
-import { getPinnedTopic, setPinnedTopic } from '@/lib/pinnedTopic'
+import { getPinnedTopic } from '@/lib/pinnedTopic'
 
 interface ComposePostProps {
   onClose?: () => void
@@ -38,11 +42,12 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
   const user = profileData?.pages[0]?.user
   const createPost = useCreatePost()
   const uploadImage = useUploadImage()
+  const uploadBulk = useUploadImagesBulk()
   const { toast } = useToast()
 
   const [title, setTitle] = useState('')
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [body, setBody] = useState('')
   const [pinnedTopic, setPinnedTopicState] = useState<string>(() => getPinnedTopic())
@@ -62,6 +67,7 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
   const [draftCount, setDraftCount] = useState(0)
   const [savedFeedback, setSavedFeedback] = useState(false)
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false)
+  const [previewLightboxIndex, setPreviewLightboxIndex] = useState<number | null>(null)
 
   useEffect(() => {
     getDraftCount().then(setDraftCount)
@@ -263,8 +269,12 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
         e.preventDefault()
         const file = item.getAsFile()
         if (!file) return
-        setImageFile(file)
-        setImagePreview(URL.createObjectURL(file))
+        if (imageFiles.length >= 4) {
+          toast('error', 'You can upload a maximum of 4 images')
+          return
+        }
+        setImageFiles((prev) => [...prev, file])
+        setImagePreviews((prev) => [...prev, URL.createObjectURL(file)])
         setActiveOption('image')
         return
       }
@@ -284,18 +294,7 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
     if (text) document.execCommand('insertText', false, text)
   }
 
-  const topicRef = useRef<HTMLDivElement>(null)
   const toolsRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (topicRef.current && !topicRef.current.contains(e.target as Node)) {
-        setTopicMenuOpen(false)
-      }
-    }
-    if (topicMenuOpen) document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [topicMenuOpen])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -322,33 +321,71 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
   const canPost =
     title.trim().length > 0 ||
     body.trim().length > 0 ||
-    imageFile !== null ||
+    imageFiles.length > 0 ||
     gifUrl !== null ||
     hasPollContent ||
     hasLikertContent
 
-  const isSubmitting = createPost.isPending || uploadImage.isPending
+  const isSubmitting = createPost.isPending || uploadImage.isPending || uploadBulk.isPending
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setImageFile(file)
-    setImagePreview(URL.createObjectURL(file))
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
+
+    const remainingSlots = 4 - imageFiles.length
+    if (remainingSlots <= 0) {
+      toast('error', 'You can upload a maximum of 4 images')
+      e.target.value = ''
+      return
+    }
+
+    if (files.length > remainingSlots) {
+      toast('error', `You can only add ${remainingSlots} more image${remainingSlots === 1 ? '' : 's'} (max 4)`)
+    }
+
+    const allowedFiles = files.slice(0, remainingSlots)
+    const newPreviews = allowedFiles.map((f) => URL.createObjectURL(f))
+
+    setImageFiles((prev) => [...prev, ...allowedFiles])
+    setImagePreviews((prev) => [...prev, ...newPreviews])
     setActiveOption('image')
     // Reset so the same file can be re-selected
     e.target.value = ''
   }
 
-  function clearImage() {
-    if (imagePreview) URL.revokeObjectURL(imagePreview)
-    setImageFile(null)
-    setImagePreview(null)
-    setActiveOption(null)
+  function removeImage(index: number) {
+    setImagePreviews((prev) => {
+      const url = prev[index]
+      if (url) URL.revokeObjectURL(url)
+      return prev.filter((_, i) => i !== index)
+    })
+    setImageFiles((prev) => {
+      const next = prev.filter((_, i) => i !== index)
+      if (next.length === 0 && activeOption === 'image') {
+        setActiveOption(null)
+      }
+      return next
+    })
+  }
+
+  function clearAllImages() {
+    imagePreviews.forEach((url) => URL.revokeObjectURL(url))
+    setImageFiles([])
+    setImagePreviews([])
+    if (activeOption === 'image') setActiveOption(null)
   }
 
   async function handleSaveDraft() {
     if (!canPost) return
     const isPoll = activeOption === 'poll' || (Array.isArray(pollOptions) && pollOptions.some((o) => o.trim() !== ''))
+
+    const mediaBlobs: DraftMediaItem[] = await Promise.all(
+      imageFiles.map(async (file) => ({
+        blob: await file.arrayBuffer(),
+        type: file.type,
+        name: file.name,
+      }))
+    )
 
     const draft: Draft = {
       id: crypto.randomUUID(),
@@ -360,9 +397,10 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
       activeOption: isPoll ? 'poll' : activeOption,
       pollOptions: isPoll ? pollOptions : [],
       likertValue: activeOption === 'likert' ? likertValue : null,
-      mediaBlob: imageFile ? await imageFile.arrayBuffer() : null,
-      mediaType: imageFile?.type ?? null,
-      mediaName: imageFile?.name ?? null,
+      mediaBlob: mediaBlobs[0]?.blob ?? null,
+      mediaType: mediaBlobs[0]?.type ?? null,
+      mediaName: mediaBlobs[0]?.name ?? null,
+      mediaBlobs,
     }
     await saveDraft(draft)
     setDraftCount((c) => c + 1)
@@ -374,10 +412,8 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
     setTitle(draft.title)
     setSelectedTopic(draft.topic)
 
-    // Clear image state without calling clearImage() (which clobbers activeOption)
-    if (imagePreview) URL.revokeObjectURL(imagePreview)
-    setImageFile(null)
-    setImagePreview(null)
+    // Clear existing images without clobbering activeOption
+    clearAllImages()
 
     // Restore poll / likert / image option
     const hasFilledPoll = Array.isArray(draft.pollOptions) && draft.pollOptions.some((o) => o.trim() !== '')
@@ -398,10 +434,18 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
     }
 
     // Restore media
-    if (draft.mediaBlob && draft.mediaType) {
-      const file = new File([draft.mediaBlob], draft.mediaName ?? 'media', { type: draft.mediaType })
-      setImageFile(file)
-      setImagePreview(URL.createObjectURL(file))
+    const restoredFiles: File[] = []
+    if (draft.mediaBlobs && draft.mediaBlobs.length > 0) {
+      draft.mediaBlobs.forEach((item) => {
+        restoredFiles.push(new File([item.blob], item.name, { type: item.type }))
+      })
+    } else if (draft.mediaBlob && draft.mediaType) {
+      restoredFiles.push(new File([draft.mediaBlob], draft.mediaName ?? 'media', { type: draft.mediaType }))
+    }
+
+    if (restoredFiles.length > 0) {
+      setImageFiles(restoredFiles)
+      setImagePreviews(restoredFiles.map((f) => URL.createObjectURL(f)))
       // Only set activeOption to 'image' if there's no poll or likert
       if (!isPoll && draft.activeOption !== 'likert') {
         setActiveOption('image')
@@ -462,18 +506,21 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
         created_at: quotedPost.created_at,
         updated_at: quotedPost.updated_at ?? quotedPost.created_at,
       }
-      if (imageFile) {
+      if (imageFiles.length > 0) {
         postType = 4
         try {
-          const result = await uploadImage.mutateAsync(imageFile)
-          const mediaSrc = result.isVideo && !result.publicURL.includes('#') ? `${result.publicURL}#video.mp4` : result.publicURL
-          meta.src = mediaSrc
-          if (result.isVideo) {
+          const uploadResults = await uploadBulk.mutateAsync(imageFiles)
+          const urls = uploadResults.map((r) => r.publicURL)
+          meta.src = urls[0]
+          meta.imageUrls = urls
+          const hasVideo = uploadResults.some((r) => r.isVideo)
+          if (hasVideo) {
             meta.media_type = 'video'
-            meta.video_url = mediaSrc
-            meta.video = mediaSrc
+            meta.video_url = urls[0]
+            meta.video = urls[0]
           }
-        } catch {
+        } catch (err) {
+          toast('error', humanizeError(err))
           return
         }
       } else {
@@ -484,20 +531,22 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
       meta.poll = pollOptions.filter((o) => o.trim().length > 0)
     } else if (activeOption === 'likert') {
       postType = 5
-    } else if (imageFile) {
+    } else if (imageFiles.length > 0) {
       postType = 4
-      // Upload media first, then attach the public URL
       try {
-        const result = await uploadImage.mutateAsync(imageFile)
-        const mediaSrc = result.isVideo && !result.publicURL.includes('#') ? `${result.publicURL}#video.mp4` : result.publicURL
-        meta.src = mediaSrc
-        if (result.isVideo) {
+        const uploadResults = await uploadBulk.mutateAsync(imageFiles)
+        const urls = uploadResults.map((r) => r.publicURL)
+        meta.src = urls[0]
+        meta.imageUrls = urls
+        const hasVideo = uploadResults.some((r) => r.isVideo)
+        if (hasVideo) {
           meta.media_type = 'video'
-          meta.video_url = mediaSrc
-          meta.video = mediaSrc
+          meta.video_url = urls[0]
+          meta.video = urls[0]
         }
-      } catch {
-        return // upload failed, don't create the post
+      } catch (err) {
+        toast('error', humanizeError(err))
+        return
       }
     }
 
@@ -518,7 +567,7 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
           setActiveOption(null)
           setPollOptions(['', ''])
           setLikertValue(null)
-          clearImage()
+          clearAllImages()
           onClose?.()
           toast('success', 'Posted successfully')
           if (auth && mentionedUuids.length > 0) {
@@ -618,134 +667,145 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
 
       {/* Poll UI */}
       {activeOption === 'poll' && (
-        <div className="mb-3 space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
-              Poll
-            </p>
-            <button
-              onClick={() => setActiveOption(null)}
-              className="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full text-white/40 hover:bg-white/[0.06] hover:text-white"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-          {pollOptions.map((opt, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <input
-                  value={opt}
-                  onChange={(e) => {
-                    const updated = [...pollOptions]
-                    updated[i] = e.target.value
-                    setPollOptions(updated)
-                  }}
-                  placeholder={`Option ${i + 1}`}
-                  className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 pr-12 text-sm text-white placeholder:text-white/20 focus:border-[#c8a44d]/30 focus:outline-none"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-white/20">
-                  {50 - opt.length}
-                </span>
-              </div>
-              {pollOptions.length > 2 && (
-                <button
-                  onClick={() =>
-                    setPollOptions((prev) => prev.filter((_, idx) => idx !== i))
-                  }
-                  className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-white/40 hover:bg-white/[0.06] hover:text-white"
-                >
-                  <Minus className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          ))}
-          {pollOptions.length < MAX_POLL_OPTIONS && (
-            <button
-              onClick={() => setPollOptions((prev) => [...prev, ''])}
-              className="flex cursor-pointer items-center gap-1 text-xs text-white/40 transition-colors hover:text-white"
-            >
-              <Plus className="h-3 w-3" />
-              <span>Add option</span>
-            </button>
-          )}
-        </div>
+        <PollComposer
+          pollOptions={pollOptions}
+          setPollOptions={setPollOptions}
+          onClose={() => setActiveOption(null)}
+          maxOptions={MAX_POLL_OPTIONS}
+        />
       )}
 
       {/* Likert UI */}
       {activeOption === 'likert' && (
-        <div className="mb-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
-              Likert Scale
-            </p>
-            <button
-              onClick={() => setActiveOption(null)}
-              className="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full text-white/40 hover:bg-white/[0.06] hover:text-white"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-          <div className="flex justify-between gap-1">
-            {[
-              'Strongly Disagree',
-              'Disagree',
-              'Neutral',
-              'Agree',
-              'Strongly Agree',
-            ].map((label, i) => (
-              <div key={label} className="flex flex-col items-center" style={{ flex: '1 1 0', minWidth: 0 }}>
-                <button
-                  onClick={() => setLikertValue(i)}
-                  className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition-all duration-200 ${
-                    likertValue === i
-                      ? 'scale-110'
-                      : 'hover:scale-105 hover:border-white/15'
-                  }`}
-                  style={{
-                    background: likertValue === i
-                      ? 'radial-gradient(circle at 40% 35%, rgba(200,164,77,0.2) 0%, rgba(200,164,77,0.04) 80%)'
-                      : 'rgba(255,255,255,0.03)',
-                    border: likertValue === i
-                      ? '1.5px solid rgba(200,164,77,0.45)'
-                      : '1px solid rgba(255,255,255,0.08)',
-                    boxShadow: likertValue === i
-                      ? '0 0 20px rgba(200,164,77,0.12), inset 0 1px 0 rgba(255,255,255,0.06)'
-                      : 'inset 0 1px 0 rgba(255,255,255,0.03)',
-                  }}
-                >
-                  <span
-                    className="text-xs font-medium"
-                    style={{ color: likertValue === i ? '#c8a44d' : 'rgba(255,255,255,0.2)' }}
-                  >
-                    •
-                  </span>
-                </button>
-                <span
-                  className="mt-1.5 text-center text-[9px] font-semibold leading-tight"
-                  style={{ color: likertValue === i ? '#c8a44d' : 'rgba(255,255,255,0.25)' }}
-                >
-                  {label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <LikertComposer
+          likertValue={likertValue}
+          setLikertValue={setLikertValue}
+          onClose={() => setActiveOption(null)}
+        />
       )}
 
-      {/* Media preview */}
-      {imagePreview && (
-        <div className="relative mb-3 overflow-hidden rounded-xl border border-white/[0.06]">
-          {imageFile?.type.startsWith('video/') ? (
-            <video src={imagePreview} controls className="max-h-64 w-full bg-black/20" />
+      {/* Clean Media Preview */}
+      {imagePreviews.length > 0 && (
+        <div className="relative mb-3">
+          {imagePreviews.length === 1 ? (
+            <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-black/20">
+              {imageFiles[0]?.type.startsWith('video/') ? (
+                <video src={imagePreviews[0]} controls className="max-h-72 w-full bg-black/20" />
+              ) : (
+                <img
+                  src={imagePreviews[0]}
+                  alt=""
+                  onClick={() => setPreviewLightboxIndex(0)}
+                  className="max-h-72 w-full cursor-zoom-in object-contain bg-black/20"
+                />
+              )}
+              <button
+                type="button"
+                onClick={() => removeImage(0)}
+                className="absolute right-2 top-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-black/70 text-white/80 backdrop-blur-sm transition-colors hover:bg-rose-500 hover:text-white shadow-md"
+                title="Remove image"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : imagePreviews.length === 2 ? (
+            <div className="grid grid-cols-2 gap-1.5 h-48 sm:h-56 overflow-hidden rounded-xl border border-white/[0.08] bg-black/20">
+              {imagePreviews.map((preview, idx) => (
+                <div key={idx} className="relative h-full w-full overflow-hidden bg-white/[0.02]">
+                  <img
+                    src={preview}
+                    alt=""
+                    onClick={() => setPreviewLightboxIndex(idx)}
+                    className="h-full w-full cursor-zoom-in object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(idx)}
+                    className="absolute right-1.5 top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-black/70 text-white/80 backdrop-blur-sm transition-colors hover:bg-rose-500 hover:text-white shadow-md"
+                    title="Remove image"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : imagePreviews.length === 3 ? (
+            <div className="grid grid-cols-2 gap-1.5 h-52 sm:h-60 overflow-hidden rounded-xl border border-white/[0.08] bg-black/20">
+              {/* Left tall */}
+              <div className="relative h-full w-full overflow-hidden bg-white/[0.02]">
+                <img
+                  src={imagePreviews[0]}
+                  alt=""
+                  onClick={() => setPreviewLightboxIndex(0)}
+                  className="h-full w-full cursor-zoom-in object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeImage(0)}
+                  className="absolute right-1.5 top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-black/70 text-white/80 backdrop-blur-sm transition-colors hover:bg-rose-500 hover:text-white shadow-md"
+                  title="Remove image"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {/* Right 2 stacked */}
+              <div className="flex h-full flex-col gap-1.5 overflow-hidden">
+                <div className="relative h-[calc(50%-3px)] w-full overflow-hidden bg-white/[0.02]">
+                  <img
+                    src={imagePreviews[1]}
+                    alt=""
+                    onClick={() => setPreviewLightboxIndex(1)}
+                    className="h-full w-full cursor-zoom-in object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(1)}
+                    className="absolute right-1.5 top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-black/70 text-white/80 backdrop-blur-sm transition-colors hover:bg-rose-500 hover:text-white shadow-md"
+                    title="Remove image"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div className="relative h-[calc(50%-3px)] w-full overflow-hidden bg-white/[0.02]">
+                  <img
+                    src={imagePreviews[2]}
+                    alt=""
+                    onClick={() => setPreviewLightboxIndex(2)}
+                    className="h-full w-full cursor-zoom-in object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(2)}
+                    className="absolute right-1.5 top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-black/70 text-white/80 backdrop-blur-sm transition-colors hover:bg-rose-500 hover:text-white shadow-md"
+                    title="Remove image"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
           ) : (
-            <img src={imagePreview} alt="" className="max-h-64 w-full object-contain bg-black/20" />
+            <div className="grid grid-cols-2 grid-rows-2 gap-1.5 h-52 sm:h-64 overflow-hidden rounded-xl border border-white/[0.08] bg-black/20">
+              {imagePreviews.slice(0, 4).map((preview, idx) => (
+                <div key={idx} className="relative h-full w-full overflow-hidden bg-white/[0.02]">
+                  <img
+                    src={preview}
+                    alt=""
+                    onClick={() => setPreviewLightboxIndex(idx)}
+                    className="h-full w-full cursor-zoom-in object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(idx)}
+                    className="absolute right-1.5 top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-black/70 text-white/80 backdrop-blur-sm transition-colors hover:bg-rose-500 hover:text-white shadow-md"
+                    title="Remove image"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
-          <button
-            onClick={clearImage}
-            className="absolute right-2 top-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white/80 backdrop-blur-sm transition-colors hover:bg-black/80 hover:text-white"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
       )}
 
@@ -765,20 +825,32 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
             ref={fileInputRef}
             type="file"
             accept="image/*,video/*"
+            multiple
             onChange={handleImageSelect}
             className="hidden"
           />
           <button
             data-onboarding="media"
-            onClick={() => imageFile ? clearImage() : fileInputRef.current?.click()}
-            className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors ${
-              imageFile
+            onClick={() => {
+              if (imageFiles.length >= 4) {
+                toast('error', 'Maximum 4 images allowed')
+                return
+              }
+              fileInputRef.current?.click()
+            }}
+            className={`relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors ${
+              imageFiles.length > 0
                 ? 'bg-[#c8a44d]/10 text-[#c8a44d]'
                 : 'text-white/40 hover:bg-white/[0.06] hover:text-white'
             }`}
-            title="Image"
+            title={imageFiles.length > 0 ? `Images (${imageFiles.length}/4)` : 'Add image (up to 4)'}
           >
             <ImagePlus className="h-4 w-4" />
+            {imageFiles.length > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#c8a44d] px-0.5 text-[9px] font-bold text-[#0f0e0a]">
+                {imageFiles.length}
+              </span>
+            )}
           </button>
 
           <div className="relative min-[521px]:hidden" ref={toolsRef}>
@@ -1012,84 +1084,14 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
             {savedFeedback ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
           </button>
           {/* Topic dropdown */}
-          <div className="relative" ref={topicRef}>
-            <button
-              onClick={() => setTopicMenuOpen((prev) => !prev)}
-              className="flex h-8 max-w-[7rem] cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border border-white/[0.08] bg-white/[0.04] px-3 text-xs font-medium text-white/40 transition-all hover:border-[#c8a44d]/20 hover:text-white/60 sm:max-w-[9rem]"
-            >
-              <span className="truncate">{selectedTopic.replace(/^\$/, '')}</span>
-              <ChevronDown
-                className={`h-3 w-3 transition-transform duration-200 ${topicMenuOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-            {topicMenuOpen && (
-              <div
-                className="absolute right-0 bottom-full z-50 mb-2 w-72 max-w-[calc(100vw-2rem)] max-h-72 overflow-y-auto rounded-xl border border-white/[0.08] bg-[#141410] p-2 shadow-xl shadow-black/40"
-                style={{
-                  scrollbarWidth: 'thin',
-                  scrollbarColor: '#333330 transparent',
-                }}
-              >
-                {TOPIC_MENU.map((group, i) => {
-                  const rawItems = group.items
-                  const groupItems = pinnedTopic && rawItems.includes(pinnedTopic)
-                    ? [pinnedTopic, ...rawItems.filter((item) => item !== pinnedTopic)]
-                    : rawItems
-
-                  return (
-                    <div key={group.category}>
-                      {i > 0 && (
-                        <div className="my-1.5 border-t border-white/[0.06]" />
-                      )}
-                      <div className="flex items-center justify-between px-2.5 py-1.5">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
-                          {group.category}
-                        </p>
-                      </div>
-                      {groupItems.map((item) => {
-                        const isPinned = pinnedTopic === item
-                        return (
-                          <div key={item} className="group/item relative flex items-center justify-between">
-                            <button
-                              onClick={() => {
-                                setSelectedTopic(item)
-                                setTopicMenuOpen(false)
-                              }}
-                              className={`flex w-full items-center px-3 py-2 text-sm transition-colors ${
-                                item === selectedTopic
-                                  ? 'bg-white/[0.03] text-[#c8a44d]'
-                                  : 'text-white/60 hover:bg-white/[0.03] hover:text-white/80'
-                              }`}
-                            >
-                              {item.replace(/^\$/, '')}
-                            </button>
-
-                            <div className="absolute right-3 flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  const nextPin = setPinnedTopic(item)
-                                  setPinnedTopicState(nextPin)
-                                }}
-                                className={`cursor-pointer transition-colors ${
-                                  isPinned
-                                    ? 'text-[#c8a44d]'
-                                    : 'text-white/20 hover:text-white/70 opacity-0 group-hover/item:opacity-100'
-                                }`}
-                                title={isPinned ? 'Unpin default posting topic' : 'Pin as default posting topic'}
-                              >
-                                <Pin className={`h-3.5 w-3.5 ${isPinned ? 'fill-[#c8a44d]' : ''}`} />
-                              </button>
-                            </div>
-                          </div>
-                      )
-                    })}
-                  </div>
-                )})}
-              </div>
-            )}
-          </div>
+          <TopicDropdown
+            selectedTopic={selectedTopic}
+            setSelectedTopic={setSelectedTopic}
+            pinnedTopic={pinnedTopic}
+            setPinnedTopicState={setPinnedTopicState}
+            isOpen={topicMenuOpen}
+            setIsOpen={setTopicMenuOpen}
+          />
           <button
             onClick={handleSubmit}
             disabled={!canPost || isSubmitting}
@@ -1114,6 +1116,14 @@ export function ComposePost({ onClose, scrollHeight = 285, quotedPost = null, de
         onClose={() => setDraftsOpen(false)}
         onLoad={handleLoadDraft}
         onDelete={() => setDraftCount((c) => Math.max(0, c - 1))}
+      />
+    )}
+
+    {previewLightboxIndex !== null && imagePreviews.length > 0 && (
+      <ImageLightbox
+        images={imagePreviews}
+        initialIndex={previewLightboxIndex}
+        onClose={() => setPreviewLightboxIndex(null)}
       />
     )}
     </>

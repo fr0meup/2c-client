@@ -29,7 +29,7 @@ export function useComments(postUuid: string | undefined) {
   })
 }
 
-// ── Create Comment ──
+import { bumpCommentCount, snapshotPostCaches, rollbackPostCaches, type CacheSnapshot } from '@/lib/cacheHelpers'
 
 interface CreateCommentParams {
   post_uuid: string
@@ -43,12 +43,6 @@ interface CreateCommentParams {
 interface CreateCommentResponse {
   comment: Comment
   message: string
-}
-
-/** Increment comment_count for a post across an array of posts */
-function bumpCommentCount<T extends { uuid: string; comment_count: number }>(posts: T[] | undefined, postUuid: string): T[] {
-  if (!Array.isArray(posts)) return []
-  return posts.map((p) => (p.uuid === postUuid ? { ...p, comment_count: (p.comment_count ?? 0) + 1 } : p))
 }
 
 export function useCreateComment() {
@@ -79,8 +73,9 @@ export function useCreateComment() {
         auth.userUuid
       )
     },
-    onMutate: (variables) => {
+    onMutate: async (variables): Promise<{ previous: CacheSnapshot }> => {
       const { post_uuid } = variables
+      const previous = await snapshotPostCaches(queryClient, post_uuid)
 
       // 1. Feed cache
       queryClient.setQueriesData<{ pages: ArenaResponse[] }>(
@@ -138,6 +133,11 @@ export function useCreateComment() {
         ['bookmarks'],
         (old) => (old && Array.isArray(old?.posts) ? { ...old, posts: bumpCommentCount(old.posts, post_uuid) } : old)
       )
+
+      return { previous }
+    },
+    onError: (_err, variables, context) => {
+      rollbackPostCaches(queryClient, variables.post_uuid, context?.previous)
     },
     onSuccess: (_data, variables) => {
       // Refresh comments list
