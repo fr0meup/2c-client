@@ -12,6 +12,7 @@ import { useToast } from '@/components/toast/ToastContext'
 import { useCompose } from '@/layouts/AppLayout'
 import { humanizeError } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
+import { cn } from '@/lib/utils'
 
 export function PostDetailHeader() {
   const { uuid } = useParams<{ uuid: string }>()
@@ -54,7 +55,7 @@ export function PostDetailHeader() {
         <ArrowLeft className="h-5 w-5 text-white" />
       </button>
       <span className="text-sm font-bold tracking-wide text-white/40">slop</span>
-      <div className="relative" ref={menuRef}>
+      <div className={cn("relative", menuOpen && "z-40")} ref={menuRef}>
         <button
           onClick={() => setMenuOpen((p) => !p)}
           className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.06] transition-all hover:bg-gradient-to-b hover:from-white/[0.09] hover:to-white/[0.04] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
@@ -62,7 +63,7 @@ export function PostDetailHeader() {
           <MoreHorizontal className="h-5 w-5 text-white/40" />
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl border border-white/[0.08] bg-[#141410] p-1 shadow-xl shadow-black/40">
+          <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-white/[0.08] bg-[#141410] p-1 shadow-xl shadow-black/40">
             <button
               onClick={() => { navigator.clipboard.writeText(`https://twocents.money/post/${uuid}`); setMenuOpen(false); toast('success', 'Link copied') }}
               className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"

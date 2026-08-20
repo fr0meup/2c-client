@@ -11,7 +11,7 @@ import { useFollow } from '@/components/profile/FollowContext'
 import { useToast } from '@/components/toast/ToastContext'
 import { humanizeError } from '@/lib/api'
 import type { Comment } from './CommentThread'
-import { obfuscateText } from '@/lib/utils'
+import { obfuscateText, cn } from '@/lib/utils'
 import { extractMediaUrls, firstMediaUrl, getTextWithGifs, insertGifImage, normalizeMediaUrl, stripMediaUrls, ZERO_WIDTH_MEDIA_TEXT, isUploadedUrl, fetchOrConvertImageToFile } from '@/lib/gif'
 import { GifWithStar } from '@/components/gif-picker/GifWithStar'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
@@ -206,7 +206,7 @@ export function CommentItem({
           />
           <span className="text-xs text-white/40 cursor-help hover:text-white/60 transition-colors" title={formatExactDateTime(comment.created_at)}>{timeAgo(comment.created_at)}</span>
         </div>
-        <div className="relative" ref={menuRef}>
+        <div className={cn("relative", menuOpen && "z-40")} ref={menuRef}>
           <button
             onClick={() => setMenuOpen((p) => !p)}
             className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-white/25 transition-colors hover:bg-white/[0.06] hover:text-white/40"
@@ -214,7 +214,7 @@ export function CommentItem({
             <MoreHorizontal className="h-3.5 w-3.5" />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-xl border border-white/[0.08] bg-[#141410] p-1 shadow-xl shadow-black/40">
+            <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl border border-white/[0.08] bg-[#141410] p-1 shadow-xl shadow-black/40">
               <button
                 onClick={() => setMenuOpen(false)}
                 className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/[0.06]"

@@ -5,6 +5,7 @@ import { NetworthPill } from '@/components/networth-pill/NetworthPill'
 import { UserMetaPill } from '@/components/user-meta-pill/UserMetaPill'
 import type { PostCardData } from './types'
 import { cleanPostText, renderPostText, timeAgo, formatExactDateTime } from './utils'
+import { cn } from '@/lib/utils'
 import { useVotePost } from '@/hooks/useVotePost'
 import { useDeletePost } from '@/hooks/usePostMutations'
 import { useToggleBookmark } from '@/hooks/useBookmarks'
@@ -164,7 +165,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
       >
         <div className="min-w-0">
           {/* Header row */}
-          <div className="flex items-start justify-between gap-2 sm:items-center">
+          <div className={cn("flex items-start justify-between gap-2 sm:items-center", menuOpen && "relative z-30")}>
             <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 sm:flex-nowrap sm:gap-2" data-postcard-networth-pill>
               <NetworthPill
                 networth={post.author_meta.balance}
@@ -192,7 +193,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
             </div>
 
             {/* Menu */}
-            <div className="relative" ref={menuRef}>
+            <div className={cn("relative", menuOpen && "z-40")} ref={menuRef}>
               <button
                 onClick={(e) => { e.stopPropagation(); setMenuOpen((p) => !p) }}
                 className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white"
@@ -200,7 +201,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-full z-20 mt-1 w-48 max-w-[calc(100vw-2rem)] rounded-xl border border-white/[0.08] bg-[#141410] p-1 shadow-xl shadow-black/40">
+                <div className="absolute right-0 top-full z-50 mt-1 w-48 max-w-[calc(100vw-2rem)] rounded-xl border border-white/[0.08] bg-[#141410] p-1 shadow-xl shadow-black/40">
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
