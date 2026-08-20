@@ -37,7 +37,7 @@ import { useToast } from '@/components/toast/ToastContext'
 import { humanizeError } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { useQueryClient } from '@tanstack/react-query'
-import type { ArenaResponse, UserProfileResponse } from '@/lib/types'
+import type { ArenaResponse, UserProfileResponse, Post } from '@/lib/types'
 import { PostDetailSkeleton, CommentsSkeleton } from '@/components/skeleton/Skeleton'
 import { obfuscateText } from '@/lib/utils'
 import { GifPickerButton } from '@/components/gif-picker/GifPickerButton'
@@ -101,13 +101,23 @@ export function PostDetail() {
     const single = queryClient.getQueryData<PostResponse>(['post', uuid])
     if (single?.post) return single.post
 
-    const feedQueries = queryClient.getQueriesData<any>({ queryKey: ['feed'] })
+    interface FeedPageShape {
+      posts?: Post[]
+      recentPosts?: { posts?: Post[] }
+    }
+    interface FeedCacheShape {
+      pages?: FeedPageShape[]
+      posts?: Post[]
+      recentPosts?: { posts?: Post[] }
+    }
+
+    const feedQueries = queryClient.getQueriesData<FeedCacheShape>({ queryKey: ['feed'] })
     for (const [, feedData] of feedQueries) {
       if (!feedData) continue
-      const pages = feedData.pages || [feedData]
+      const pages: FeedPageShape[] = Array.isArray(feedData.pages) ? feedData.pages : [feedData]
       for (const page of pages) {
         const posts = page?.posts || page?.recentPosts?.posts || []
-        const found = posts.find((p: any) => p.uuid === uuid)
+        const found = posts.find((p: Post) => p.uuid === uuid)
         if (found) return found
       }
     }
@@ -303,7 +313,7 @@ export function PostDetail() {
       commentMutation.mutate(
         { post_uuid: uuid, text, in_reply_to_uuid: uuid, ...(finalImageUrl ? { image_url: finalImageUrl } : {}) },
         {
-          onSuccess: async (data: any) => {
+          onSuccess: async (data: { comment?: { uuid: string }; uuid?: string }) => {
             if (commentRef.current) {
               commentRef.current.innerHTML = ''
               setCommentHasText(false)
@@ -380,16 +390,10 @@ export function PostDetail() {
   const isBudget = post.post_type === 9
   const isLink = post.post_type === 1 && !!post.post_meta?.link
 
-  const [cardHovered, setCardHovered] = useState(false)
-
   return (
     <div className="flex min-h-[calc(100vh-72px)] items-start justify-center px-4 pb-6 sm:px-8">
       <div className="w-full max-w-[670px] xl:-ml-[245px]" data-content-column>
-        <div
-          className="w-full flex flex-col"
-          onMouseEnter={() => setCardHovered(true)}
-          onMouseLeave={() => setCardHovered(false)}
-        >
+        <div className="w-full flex flex-col">
       <div className="pb-4 pt-1.5">
         {/* Author info row */}
         <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 sm:flex-nowrap sm:gap-2" data-postcard-networth-pill>
@@ -491,7 +495,6 @@ export function PostDetail() {
               <PostImageGallery
                 images={images}
                 fullWidth
-                isCardHovered={cardHovered}
                 onImageClick={(idx) => {
                   setLightboxIndex(idx)
                   setLightboxOpen(true)

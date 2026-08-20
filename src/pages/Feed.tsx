@@ -305,7 +305,7 @@ export function Feed() {
     }
   }
   return nextPosts
-  }, [hasAdv, isDateFiltering, rawPosts, resultSort, searchParams, searchQuery])
+  }, [isDateFiltering, rawPosts, resultSort, searchParams, searchQuery])
 
   // Client-side pagination for bulk results (avoid rendering 1000+ cards)
   const PAGE_SIZE = 100

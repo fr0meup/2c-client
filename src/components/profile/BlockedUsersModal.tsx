@@ -35,14 +35,15 @@ export function BlockedUsersModal({ onClose }: Props) {
         typeof item === 'string' ? { blocked_uuid: item } : item
       )
     }
+    const obj = data as Record<string, unknown>
     const rawList =
-      (data as any).blocked ??
-      (data as any).blocked_users ??
-      (data as any).users ??
-      (data as any).data ??
+      (Array.isArray(obj.blocked) ? obj.blocked : undefined) ??
+      (Array.isArray(obj.blocked_users) ? obj.blocked_users : undefined) ??
+      (Array.isArray(obj.users) ? obj.users : undefined) ??
+      (Array.isArray(obj.data) ? obj.data : undefined) ??
       []
-    return rawList.map((item: any) =>
-      typeof item === 'string' ? { blocked_uuid: item } : item
+    return rawList.map((item: unknown): BlockedEntry =>
+      typeof item === 'string' ? { blocked_uuid: item } : (item as BlockedEntry)
     )
   }, [data])
 

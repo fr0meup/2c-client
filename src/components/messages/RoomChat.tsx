@@ -80,6 +80,7 @@ function buildJoinScript(roomUuid: string, roomCode: string) {
 export function ChatHeader() {
   const navigate = useNavigate()
   const { auth } = useAuth()
+  const { aliasFor } = useFollow()
   const { uuid } = useParams<{ uuid: string }>()
   const { getRoom } = useMessages()
   const [infoOpen, setInfoOpen] = useState(false)
@@ -118,7 +119,6 @@ export function ChatHeader() {
   }
 
   const isDm = room.type === 'dm'
-  const { aliasFor } = useFollow()
   const Icon = room.is_private ? Lock : Hash
   const other = isDm ? room.members?.find((m) => m.user_uuid !== auth?.userUuid) : undefined
   const followAlias = other ? aliasFor(other.user_uuid) : undefined

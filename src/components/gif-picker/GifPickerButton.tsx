@@ -51,9 +51,12 @@ export function GifPickerButton({ onSelect, position = 'below' }: GifPickerButto
     const spaceAbove = rect.top - 12
 
     let top: number
-    let maxHeight = preferredHeight
+    let maxHeight: number
 
-    if (spaceBelow >= preferredHeight) {
+    if (position === 'above' && spaceAbove >= preferredHeight) {
+      maxHeight = preferredHeight
+      top = rect.top - preferredHeight - 8
+    } else if (spaceBelow >= preferredHeight) {
       maxHeight = preferredHeight
       top = rect.bottom + 8
     } else if (spaceAbove >= preferredHeight) {
@@ -71,7 +74,7 @@ export function GifPickerButton({ onSelect, position = 'below' }: GifPickerButto
     left = Math.max(12, Math.min(left, window.innerWidth - pickerWidth - 12))
 
     setCoords({ top, left, maxHeight })
-  }, [])
+  }, [position])
 
   useLayoutEffect(() => {
     if (!open) return

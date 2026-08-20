@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useMyAliases } from '@/hooks/useFollow'
 import type { Alias } from '@/hooks/useFollow'
@@ -49,7 +49,6 @@ function getMentionContext(el: HTMLElement): MentionContext | null {
 
 export function MentionPicker({ editorRef, onMentionInserted }: MentionPickerProps) {
   const { data } = useMyAliases()
-  const aliases = data?.aliases ?? []
 
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -88,11 +87,15 @@ export function MentionPicker({ editorRef, onMentionInserted }: MentionPickerPro
       .finally(() => setUuidLoading(false))
   }, [open, query, auth])
 
-  const filteredAliases = aliases.filter((a) =>
-    a.alias.toLowerCase().includes(query.toLowerCase())
-  ).slice(0, 8)
-
-  const filtered: Alias[] = UUID_RE.test(query) && uuidUser ? [uuidUser] : filteredAliases
+  const filtered = useMemo<Alias[]>(() => {
+    if (UUID_RE.test(query) && uuidUser) {
+      return [uuidUser]
+    }
+    const aliases = data?.aliases ?? []
+    return aliases
+      .filter((a) => a.alias.toLowerCase().includes(query.toLowerCase()))
+      .slice(0, 8)
+  }, [data?.aliases, query, uuidUser])
 
   const check = useCallback(() => {
     const el = editorRef.current

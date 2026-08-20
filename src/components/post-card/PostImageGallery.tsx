@@ -23,7 +23,6 @@ interface PostImageGalleryProps {
   onImageClick: (index: number) => void
   className?: string
   fullWidth?: boolean
-  isCardHovered?: boolean
 }
 
 export function PostImageGallery({
@@ -31,15 +30,15 @@ export function PostImageGallery({
   onImageClick,
   className = '',
   fullWidth = false,
-  isCardHovered,
 }: PostImageGalleryProps) {
   const [activeIndex, setActiveIndex] = useState(0)
-  const [aspectRatio, setAspectRatio] = useState<number | null>(null)
   const [showControls, setShowControls] = useState(false)
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const isIntersectingRef = useRef(false)
+  const isManualNavRef = useRef(false)
+  const manualNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleMouseEnter = useCallback(() => {
     if (hideTimerRef.current) {
@@ -89,15 +88,6 @@ export function PostImageGallery({
   }, [handleMouseEnter, handleMouseLeave])
 
   useEffect(() => {
-    if (isCardHovered === undefined) return
-    if (isCardHovered) {
-      handleMouseEnter()
-    } else {
-      handleMouseLeave()
-    }
-  }, [isCardHovered, handleMouseEnter, handleMouseLeave])
-
-  useEffect(() => {
     return () => {
       if (hideTimerRef.current) {
         clearTimeout(hideTimerRef.current)
@@ -109,11 +99,34 @@ export function PostImageGallery({
 
   // ── Single Image ──
   if (images.length === 1) {
+    if (fullWidth) {
+      // PostDetail: natural uncropped sizing, tight border
+      return (
+        <div
+          className={cn(
+            'w-fit max-w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.02]',
+            className,
+          )}
+        >
+          <img
+            src={images[0]}
+            alt=""
+            onClick={(e) => {
+              e.stopPropagation()
+              onImageClick(0)
+            }}
+            loading="lazy"
+            className="block w-auto h-auto max-w-full max-h-[38rem] cursor-zoom-in transition-opacity duration-200 hover:opacity-95"
+          />
+        </div>
+      )
+    }
+
+    // PostCard / Feed: standard 85% width frame, 26rem max-h, object-cover
     return (
       <div
         className={cn(
-          'overflow-hidden rounded-2xl border border-white/[0.08] bg-black/20',
-          fullWidth ? 'w-full' : 'mx-auto w-[85%]',
+          'mx-auto w-[85%] overflow-hidden rounded-2xl border border-white/[0.08] bg-black/20',
           className,
         )}
       >
@@ -125,17 +138,11 @@ export function PostImageGallery({
             onImageClick(0)
           }}
           loading="lazy"
-          className={cn(
-            'w-full cursor-zoom-in transition-opacity duration-200 hover:opacity-95',
-            fullWidth ? 'max-h-[32rem] object-contain' : 'max-h-[26rem] object-cover',
-          )}
+          className="w-full max-h-[26rem] object-cover cursor-zoom-in transition-opacity duration-200 hover:opacity-95"
         />
       </div>
     )
   }
-
-  const isManualNavRef = useRef(false)
-  const manualNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Multi-Image Carousel + Peek Track ──
   const handleScroll = () => {
@@ -180,15 +187,6 @@ export function PostImageGallery({
       targetChild.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' })
     }
     handleMouseLeave()
-  }
-
-  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>, idx: number) => {
-    if (idx === 0 && !aspectRatio) {
-      const { naturalWidth, naturalHeight } = e.currentTarget
-      if (naturalWidth && naturalHeight) {
-        setAspectRatio(naturalWidth / naturalHeight)
-      }
-    }
   }
 
   return (
@@ -273,7 +271,7 @@ export function PostImageGallery({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex w-full gap-2 overflow-x-auto px-0.5 py-0.5 snap-x snap-mandatory scroll-smooth no-scrollbar"
+        className="flex w-full items-center gap-2 overflow-x-auto px-0.5 py-0.5 snap-x snap-mandatory scroll-smooth no-scrollbar"
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
@@ -293,29 +291,22 @@ export function PostImageGallery({
                 }
               }}
               className={cn(
-                'relative shrink-0 snap-start overflow-hidden rounded-2xl border transition-all duration-200',
+                'relative shrink-0 snap-start overflow-hidden rounded-2xl border transition-all duration-200 w-fit',
                 isCurrent
-                  ? 'border-white/[0.12] bg-black/40 shadow-lg cursor-zoom-in'
-                  : 'border-white/[0.06] bg-black/20 opacity-75 hover:opacity-95 hover:border-white/15 cursor-pointer',
-                'w-[88%] sm:w-[90%]',
+                  ? 'border-white/[0.15] bg-white/[0.02] shadow-lg cursor-zoom-in'
+                  : 'border-white/[0.06] bg-white/[0.02] opacity-75 hover:opacity-95 hover:border-white/15 cursor-pointer',
               )}
-              style={{
-                aspectRatio: aspectRatio ? `${aspectRatio}` : '16/10',
-                maxHeight: fullWidth ? '32rem' : '26rem',
-                height: aspectRatio ? 'auto' : fullWidth ? '360px' : '300px',
-              }}
             >
               {/* Main Image */}
               <img
                 src={img}
                 alt=""
                 loading="lazy"
-                onLoad={(e) => handleImageLoad(e, idx)}
                 className={cn(
-                  'h-full w-full transition-transform duration-300',
+                  'block w-auto max-w-[85vw] sm:max-w-[620px] transition-transform duration-300',
                   fullWidth
-                    ? 'object-contain'
-                    : 'object-cover',
+                    ? 'h-[340px] sm:h-[440px]'
+                    : 'h-[280px] sm:h-[360px]',
                   isCurrent && 'group-hover/gallery:scale-[1.005]',
                 )}
               />

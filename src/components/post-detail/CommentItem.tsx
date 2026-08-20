@@ -118,7 +118,7 @@ export function CommentItem({
           ...(finalImageUrl ? { image_url: finalImageUrl } : {}),
         },
         {
-          onSuccess: async (data: any) => {
+          onSuccess: async (data: { comment?: { uuid: string }; uuid?: string }) => {
             if (replyRef.current) {
               replyRef.current.innerHTML = ''
               setReplyHasText(false)

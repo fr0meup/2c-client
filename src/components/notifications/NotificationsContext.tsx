@@ -75,27 +75,25 @@ function useMarkNotificationRead() {
 /** Transform API notification into the shape the UI expects */
 function mapApiNotification(n: ApiNotification): Notification {
   const { actor, preview, isDownvote } = parseNotificationMessage(n.type, n.message)
-  const meta = (n.notification_meta ?? {}) as Record<string, any>
-  const raw = n as Record<string, any>
+  const meta = (n.notification_meta ?? {}) as Record<string, unknown>
+  const raw = n as unknown as Record<string, unknown>
+
+  const getStr = (key: string): string | undefined => {
+    const v = meta[key] ?? raw[key]
+    return typeof v === 'string' ? v : undefined
+  }
 
   const actorUuid =
-    meta.voter_uuid ||
-    meta.follower_uuid ||
-    meta.replier_uuid ||
-    meta.actor_uuid ||
-    meta.author_uuid ||
-    meta.user_uuid ||
-    meta.from_user_uuid ||
-    meta.sender_uuid ||
-    meta.comment_author_uuid ||
-    meta.post_author_uuid ||
-    raw.voter_uuid ||
-    raw.follower_uuid ||
-    raw.replier_uuid ||
-    raw.actor_uuid ||
-    raw.from_user_uuid ||
-    raw.sender_uuid ||
-    raw.user_uuid
+    getStr('voter_uuid') ||
+    getStr('follower_uuid') ||
+    getStr('replier_uuid') ||
+    getStr('actor_uuid') ||
+    getStr('author_uuid') ||
+    getStr('user_uuid') ||
+    getStr('from_user_uuid') ||
+    getStr('sender_uuid') ||
+    getStr('comment_author_uuid') ||
+    getStr('post_author_uuid')
 
   return {
     uuid: n.uuid,
@@ -106,9 +104,9 @@ function mapApiNotification(n: ApiNotification): Notification {
     preview,
     created_at: n.created_at,
     read_at: n.read_at,
-    post_uuid: meta.post_uuid || raw.post_uuid,
-    comment_uuid: meta.comment_uuid || raw.comment_uuid,
-    follower_uuid: meta.follower_uuid || raw.follower_uuid || actorUuid,
+    post_uuid: getStr('post_uuid'),
+    comment_uuid: getStr('comment_uuid'),
+    follower_uuid: getStr('follower_uuid') || actorUuid,
     isDownvote,
   }
 }

@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, useEffect, useLayoutEffect, type ReactNode } from 'react'
+import { Component, Suspense, lazy, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigationType } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import { routeLoaders } from './lib/routePreload'
@@ -137,19 +137,7 @@ function restoreScrollPosition(targetY: number) {
 function ScrollToTop() {
   const location = useLocation()
   const navType = useNavigationType()
-
-  // Lock and save previous location's scroll position before switching routes
-  if (_currentLocationKey && _currentLocationKey !== (location.key ?? '')) {
-    if (!lockedKeys.has(_currentLocationKey)) {
-      const y = getPageScrollTop()
-      if (y > 0) {
-        scrollMap.set(_currentLocationKey, y)
-      }
-      lockedKeys.add(_currentLocationKey)
-    }
-  }
-
-  _currentLocationKey = location.key ?? ''
+  const prevKeyRef = useRef(_currentLocationKey)
 
   useEffect(() => {
     window.history.scrollRestoration = 'manual'
@@ -168,10 +156,25 @@ function ScrollToTop() {
   }, [])
 
   useLayoutEffect(() => {
+    const prevKey = prevKeyRef.current
+    const currKey = location.key ?? ''
+
+    if (prevKey && prevKey !== currKey) {
+      if (!lockedKeys.has(prevKey)) {
+        const y = getPageScrollTop()
+        if (y > 0) {
+          scrollMap.set(prevKey, y)
+        }
+        lockedKeys.add(prevKey)
+      }
+    }
+
+    _currentLocationKey = currKey
+    prevKeyRef.current = currKey
     lockedKeys.clear()
 
     if (navType === 'POP') {
-      const saved = scrollMap.get(location.key ?? '')
+      const saved = scrollMap.get(currKey)
       if (saved != null && saved > 0) {
         return restoreScrollPosition(saved)
       }
