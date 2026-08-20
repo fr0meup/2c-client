@@ -70,8 +70,14 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 }
 
 // ── Scroll position management ──
-const scrollMap = new Map<string, number>()
-const scrollMapByPath = new Map<string, number>()
+interface ScrollTarget {
+  y: number
+  postUuid?: string
+  viewportOffset?: number
+}
+
+const scrollMap = new Map<string, ScrollTarget>()
+const scrollMapByPath = new Map<string, ScrollTarget>()
 const lockedKeys = new Set<string>()
 let _currentLocationKey = ''
 let _currentPathKey = ''
@@ -91,22 +97,76 @@ function setPageScrollTop(y: number) {
   window.scrollTo(0, y)
 }
 
-export function saveScrollPosition() {
+export function saveScrollPosition(postUuid?: string) {
   const y = getPageScrollTop()
+  let targetPostUuid = postUuid
+  let viewportOffset: number | undefined
+
+  if (targetPostUuid) {
+    const el = document.getElementById(`post-${targetPostUuid}`) || document.querySelector(`[data-post-uuid="${targetPostUuid}"]`)
+    if (el) {
+      viewportOffset = el.getBoundingClientRect().top
+    }
+  } else {
+    // Find topmost visible post in the viewport
+    const cards = document.querySelectorAll<HTMLElement>('[data-post-uuid]')
+    for (const card of cards) {
+      const rect = card.getBoundingClientRect()
+      if (rect.bottom > 80 && rect.top < window.innerHeight) {
+        targetPostUuid = card.dataset.postUuid
+        viewportOffset = rect.top
+        break
+      }
+    }
+  }
+
+  const target: ScrollTarget = { y, postUuid: targetPostUuid, viewportOffset }
+
   if (_currentLocationKey) {
-    if (y > 0) {
-      scrollMap.set(_currentLocationKey, y)
+    if (y > 0 || targetPostUuid) {
+      scrollMap.set(_currentLocationKey, target)
     }
     lockedKeys.add(_currentLocationKey)
   }
-  if (_currentPathKey && y > 0) {
-    scrollMapByPath.set(_currentPathKey, y)
+  if (_currentPathKey && (y > 0 || targetPostUuid)) {
+    scrollMapByPath.set(_currentPathKey, target)
   }
 }
 
-function restoreScrollPosition(targetY: number) {
+function restoreScrollPosition(target: ScrollTarget | number) {
+  const targetY = typeof target === 'number' ? target : target.y
+  const targetPostUuid = typeof target === 'object' ? target.postUuid : undefined
+  const targetViewportOffset = typeof target === 'object' ? target.viewportOffset : undefined
+
   isRestoringScroll = true
-  setPageScrollTop(targetY)
+
+  const align = () => {
+    if (targetPostUuid) {
+      const el = document.getElementById(`post-${targetPostUuid}`) || document.querySelector(`[data-post-uuid="${targetPostUuid}"]`)
+      if (el) {
+        const currentTop = el.getBoundingClientRect().top
+        const desiredOffset = targetViewportOffset ?? 80
+        const diff = currentTop - desiredOffset
+        if (Math.abs(diff) > 1) {
+          setPageScrollTop(getPageScrollTop() + diff)
+        }
+        return
+      }
+    }
+
+    const maxScroll = Math.max(
+      0,
+      document.documentElement.scrollHeight - window.innerHeight,
+      document.body.scrollHeight - window.innerHeight,
+    )
+    if (maxScroll >= targetY - 20) {
+      setPageScrollTop(targetY)
+    } else if (maxScroll > 0) {
+      setPageScrollTop(Math.min(targetY, maxScroll))
+    }
+  }
+
+  align()
 
   let animationFrameId: number | null = null
   let resizeObserver: ResizeObserver | null = null
@@ -127,7 +187,7 @@ function restoreScrollPosition(targetY: number) {
     }, 150)
   }
 
-  // Release control if user manually scrolls/touches
+  // Release control immediately if user manually interacts
   const onUserInteract = () => {
     cleanup()
   }
@@ -137,51 +197,26 @@ function restoreScrollPosition(targetY: number) {
   window.addEventListener('keydown', onUserInteract, { passive: true })
 
   let attempts = 0
-  const maxAttempts = 90
+  const maxAttempts = 75 // ~1.2s
 
   const step = () => {
     if (isDone) return
     attempts++
-
-    const maxScroll = Math.max(
-      0,
-      document.documentElement.scrollHeight - window.innerHeight,
-      document.body.scrollHeight - window.innerHeight,
-    )
-
-    if (maxScroll >= targetY - 20) {
-      setPageScrollTop(targetY)
-      const current = getPageScrollTop()
-      if (Math.abs(current - targetY) < 5) {
-        cleanup()
-        return
-      }
-    } else if (maxScroll > 0) {
-      setPageScrollTop(Math.min(targetY, maxScroll))
-    }
+    align()
 
     if (attempts < maxAttempts) {
       animationFrameId = requestAnimationFrame(step)
     } else {
-      setPageScrollTop(targetY)
       cleanup()
     }
   }
 
   animationFrameId = requestAnimationFrame(step)
 
-  // Re-apply when DOM resizes or elements mutate (posts/images load in)
   if (typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(() => {
       if (isDone) return
-      const maxScroll = Math.max(
-        0,
-        document.documentElement.scrollHeight - window.innerHeight,
-        document.body.scrollHeight - window.innerHeight,
-      )
-      if (maxScroll >= targetY - 20) {
-        setPageScrollTop(targetY)
-      }
+      align()
     })
     if (document.documentElement) resizeObserver.observe(document.documentElement)
     if (document.body) resizeObserver.observe(document.body)
@@ -190,14 +225,7 @@ function restoreScrollPosition(targetY: number) {
   if (typeof MutationObserver !== 'undefined') {
     mutationObserver = new MutationObserver(() => {
       if (isDone) return
-      const maxScroll = Math.max(
-        0,
-        document.documentElement.scrollHeight - window.innerHeight,
-        document.body.scrollHeight - window.innerHeight,
-      )
-      if (maxScroll >= targetY - 20) {
-        setPageScrollTop(targetY)
-      }
+      align()
     })
     const root = document.getElementById('root') || document.body
     if (root) {
@@ -205,7 +233,7 @@ function restoreScrollPosition(targetY: number) {
     }
   }
 
-  const timeoutId = setTimeout(cleanup, 1500)
+  const timeoutId = setTimeout(cleanup, 1200)
 
   return () => {
     clearTimeout(timeoutId)
@@ -227,10 +255,10 @@ function ScrollToTop() {
       const y = getPageScrollTop()
       if (y > 0) {
         if (_currentLocationKey && !lockedKeys.has(_currentLocationKey)) {
-          scrollMap.set(_currentLocationKey, y)
+          scrollMap.set(_currentLocationKey, { y })
         }
         if (_currentPathKey) {
-          scrollMapByPath.set(_currentPathKey, y)
+          scrollMapByPath.set(_currentPathKey, { y })
         }
       }
     }
@@ -249,8 +277,8 @@ function ScrollToTop() {
       if (!lockedKeys.has(prevKey)) {
         const y = getPageScrollTop()
         if (y > 0) {
-          scrollMap.set(prevKey, y)
-          if (prevPath) scrollMapByPath.set(prevPath, y)
+          scrollMap.set(prevKey, { y })
+          if (prevPath) scrollMapByPath.set(prevPath, { y })
         }
         lockedKeys.add(prevKey)
       }
@@ -264,7 +292,7 @@ function ScrollToTop() {
 
     if (navType === 'POP') {
       const saved = scrollMap.get(currKey) ?? scrollMapByPath.get(currPath)
-      if (saved != null && saved > 0) {
+      if (saved != null && (saved.y > 0 || saved.postUuid)) {
         return restoreScrollPosition(saved)
       }
     }

@@ -40,7 +40,9 @@ export function ProfileCommentCard({ comment, postTitle, initialVote = 0 }: Prop
 
   return (
     <div
-      onClick={() => { saveScrollPosition(); announceNavigationPending(`/post/${comment.post_uuid}`); navigate(`/post/${comment.post_uuid}#comment-${comment.uuid}`) }}
+      id={`comment-card-${comment.uuid}`}
+      data-post-uuid={comment.post_uuid}
+      onClick={() => { saveScrollPosition(comment.post_uuid); announceNavigationPending(`/post/${comment.post_uuid}`); navigate(`/post/${comment.post_uuid}#comment-${comment.uuid}`) }}
       className="flex w-full cursor-pointer flex-col gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3.5 text-left transition-colors hover:bg-white/[0.04]"
     >
       {/* Post context */}

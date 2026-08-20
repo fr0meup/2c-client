@@ -100,24 +100,26 @@ export function PostImageGallery({
   // ── Single Image ──
   if (images.length === 1) {
     if (fullWidth) {
-      // PostDetail: natural uncropped sizing, tight border
+      // PostDetail: natural uncropped sizing, tight border, centered
       return (
-        <div
-          className={cn(
-            'w-fit max-w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.02]',
-            className,
-          )}
-        >
-          <img
-            src={images[0]}
-            alt=""
-            onClick={(e) => {
-              e.stopPropagation()
-              onImageClick(0)
-            }}
-            loading="lazy"
-            className="block w-auto h-auto max-w-full max-h-[38rem] cursor-zoom-in transition-opacity duration-200 hover:opacity-95"
-          />
+        <div className="flex w-full justify-center">
+          <div
+            className={cn(
+              'w-fit max-w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.02]',
+              className,
+            )}
+          >
+            <img
+              src={images[0]}
+              alt=""
+              onClick={(e) => {
+                e.stopPropagation()
+                onImageClick(0)
+              }}
+              loading="lazy"
+              className="block w-auto h-auto max-w-full max-h-[38rem] cursor-zoom-in transition-opacity duration-200 hover:opacity-95"
+            />
+          </div>
         </div>
       )
     }
