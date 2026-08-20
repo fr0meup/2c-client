@@ -8,7 +8,7 @@ import { useNotifications } from '@/components/notifications/NotificationsContex
 import { useMessages } from '@/components/messages/MessagesContext'
 import { navItems, type NavItem } from './navItems'
 import { announceNavigationPending } from '@/lib/navigationPending'
-import { saveScrollPosition } from '@/App'
+import { saveScrollPosition, clearScrollPosition } from '@/App'
 
 interface BottomNavProps {
   onNewPostClick?: () => void
@@ -104,7 +104,12 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
         {/* Primary items: always visible */}
         {primary.map((item) => (
           <BottomNavItem key={item.path} item={item} isActive={isItemActive(item)} onClick={() => {
-            saveScrollPosition()
+            if (item.label === 'Feed') {
+              clearScrollPosition('/')
+              window.scrollTo({ top: 0, behavior: 'instant' })
+            } else {
+              saveScrollPosition()
+            }
             announceNavigationPending(item.label === 'Feed' ? '/' : item.path)
             prefetchItem(item)
           }} onPreload={() => prefetchItem(item)} />

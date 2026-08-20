@@ -129,8 +129,8 @@ export function PostImageGallery({
         maxOverlapIdx = idx
       }
 
-      // An image is considered shown only if at least 45% of its width is in view (excludes tiny peek slivers)
-      if (overlap / childWidth >= 0.45) {
+      // An image is considered shown ONLY if the ENTIRE image is fully visible in view
+      if (overlap >= childWidth - 3 || overlap / childWidth >= 0.96) {
         visibleIndices.push(idx)
       }
     })

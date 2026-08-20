@@ -171,13 +171,14 @@ export function Feed() {
       if (detail?.pathname !== '/') return
       const nextSearch = detail.search ?? ''
       setPendingFeedNav({ search: nextSearch, run: detail.run ?? Date.now() })
-      if (location.pathname === '/' && nextSearch === location.search && !isDateFiltering) {
+      window.scrollTo({ top: 0, behavior: 'instant' })
+      if (!isDateFiltering) {
         refetch()
       }
     }
     window.addEventListener(NAVIGATION_PENDING_EVENT, handlePending)
     return () => window.removeEventListener(NAVIGATION_PENDING_EVENT, handlePending)
-  }, [isDateFiltering, location.pathname, location.search, refetch])
+  }, [isDateFiltering, refetch])
 
   // ── Concurrent bulk fetch — enabled when date/search filtering ──
   // serverParams is empty so changing client-side filters won't re-fetch

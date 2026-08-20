@@ -4,6 +4,7 @@ import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { headerLoaders } from '@/lib/routePreload'
 import { NAVIGATION_PENDING_EVENT, announceNavigationPending } from '@/lib/navigationPending'
+import { clearScrollPosition } from '@/App'
 
 const FeedFilters = lazy(headerLoaders.feed)
 const PostDetailHeader = lazy(headerLoaders.post)
@@ -102,7 +103,11 @@ export function HeaderLeft() {
       <div className="fixed top-0 flex h-[72px] w-60 items-start justify-start pl-7 pt-6" style={{ left: 'calc(50% - 600px)' }}>
         <Link
           to="/"
-          onClick={() => announceNavigationPending('/')}
+          onClick={() => {
+            clearScrollPosition('/')
+            window.scrollTo({ top: 0, behavior: 'instant' })
+            announceNavigationPending('/')
+          }}
           className="cursor-pointer transition-opacity hover:opacity-85 active:scale-[0.98]"
         >
           <img

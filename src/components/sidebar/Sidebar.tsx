@@ -8,7 +8,7 @@ import { preloadRoute, routeForPath } from '@/lib/routePreload'
 import { usePrefetch } from '@/hooks/usePrefetch'
 import { navItems, type NavItem } from './navItems'
 import { announceNavigationPending } from '@/lib/navigationPending'
-import { saveScrollPosition } from '@/App'
+import { saveScrollPosition, clearScrollPosition } from '@/App'
 export { BottomNav } from './BottomNav'
 
 const baseInactive = 'text-[#6b6b6b] font-bold hover:bg-gradient-to-b hover:from-white/[0.06] hover:to-white/[0.02] hover:text-white hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
@@ -83,10 +83,17 @@ function SidebarNavLink({ item }: { item: NavItem }) {
     handlePreload()
   }
 
+  function handleFeedClick() {
+    clearScrollPosition('/')
+    window.scrollTo({ top: 0, behavior: 'instant' })
+    announceNavigationPending('/')
+    handlePreload()
+  }
+
   if (item.label === 'Feed') {
     const isActive = isFeedPath(location.pathname, location.search)
     return (
-      <NavLink to="/" end data-feed-nav-item onClick={handleClick} onMouseEnter={handlePreload} onFocus={handlePreload} className={`${baseClass} ${isActive ? baseActive : baseInactive}`}>
+      <NavLink to="/" end data-feed-nav-item onClick={handleFeedClick} onMouseEnter={handlePreload} onFocus={handlePreload} className={`${baseClass} ${isActive ? baseActive : baseInactive}`}>
         <NavIcon item={item} isActive={isActive} />
         <span>{item.label}</span>
       </NavLink>

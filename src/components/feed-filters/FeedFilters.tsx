@@ -10,6 +10,7 @@ import { announceNavigationPending } from '@/lib/navigationPending'
 import { addSearchHistory, clearSearchHistory, getSearchHistory } from '@/lib/searchHistory'
 
 import { getPinnedTopic, setPinnedTopic } from '@/lib/pinnedTopic'
+import { clearScrollPosition } from '@/App'
 
 export function FeedFilters() {
   const navigate = useNavigate()
@@ -45,6 +46,9 @@ export function FeedFilters() {
 
   function navigateTopic(topic: string) {
     const url = getFeedUrl(topic)
+    clearScrollPosition('/')
+    clearScrollPosition(url)
+    window.scrollTo({ top: 0, behavior: 'instant' })
     flushSync(() => {
       setPendingTopic(topic)
     })

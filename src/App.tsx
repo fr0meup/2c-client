@@ -135,6 +135,17 @@ export function saveScrollPosition(postUuid?: string) {
   }
 }
 
+export function clearScrollPosition(path = '/') {
+  scrollMapByPath.delete(path)
+  if (path === '/') {
+    for (const key of Array.from(scrollMapByPath.keys())) {
+      if (key === '/' || key.startsWith('/?')) {
+        scrollMapByPath.delete(key)
+      }
+    }
+  }
+}
+
 function restoreScrollPosition(target: ScrollTarget | number) {
   const targetY = typeof target === 'number' ? target : target.y
   const targetPostUuid = typeof target === 'object' ? target.postUuid : undefined
@@ -292,7 +303,7 @@ function ScrollToTop() {
     prevPathRef.current = currPath
     lockedKeys.clear()
 
-    if (navType === 'POP' || (currPath === '/' && prevPath !== '/' && prevPath !== '')) {
+    if (navType === 'POP') {
       const saved = scrollMap.get(currKey) ?? scrollMapByPath.get(currPath)
       if (saved != null && (saved.y > 0 || saved.postUuid)) {
         return restoreScrollPosition(saved)
