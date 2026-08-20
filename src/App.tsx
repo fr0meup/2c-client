@@ -107,7 +107,9 @@ export function saveScrollPosition(postUuid?: string) {
     if (el) {
       viewportOffset = el.getBoundingClientRect().top
     }
-  } else {
+  }
+
+  if (viewportOffset === undefined) {
     // Find topmost visible post in the viewport
     const cards = document.querySelectorAll<HTMLElement>('[data-post-uuid]')
     for (const card of cards) {
@@ -290,7 +292,7 @@ function ScrollToTop() {
     prevPathRef.current = currPath
     lockedKeys.clear()
 
-    if (navType === 'POP') {
+    if (navType === 'POP' || (currPath === '/' && prevPath !== '/' && prevPath !== '')) {
       const saved = scrollMap.get(currKey) ?? scrollMapByPath.get(currPath)
       if (saved != null && (saved.y > 0 || saved.postUuid)) {
         return restoreScrollPosition(saved)

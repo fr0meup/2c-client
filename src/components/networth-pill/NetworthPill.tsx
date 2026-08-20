@@ -160,7 +160,9 @@ export function NetworthPill({
   function handleClick(e: MouseEvent<HTMLDivElement>) {
     if (!canNavigate) return
     e.stopPropagation()
-    saveScrollPosition()
+    const parentCard = (e.currentTarget as HTMLElement).closest<HTMLElement>('[data-post-uuid]')
+    const postUuid = parentCard?.dataset.postUuid
+    saveScrollPosition(postUuid)
     announceNavigationPending(`/user/${authorUuid}`)
     navigate(`/user/${authorUuid}`)
   }

@@ -68,12 +68,26 @@ interface PostCardProps {
   post: PostCardData
   initialVote?: 1 | -1 | 0
   pollUserVote?: number
+  likertUserVote?: number
   pickUserVote?: 'yes' | 'no'
+  pollVoteMap?: Map<string, number>
+  likertVoteMap?: Map<string, number>
+  pickVoteMap?: Map<string, 'yes' | 'no'>
   alias?: string
   onQuote?: (post: PostCardData) => void
 }
 
-export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, onQuote }: PostCardProps) {
+export function PostCard({
+  post,
+  initialVote = 0,
+  pollUserVote,
+  likertUserVote,
+  pickUserVote,
+  pollVoteMap,
+  likertVoteMap,
+  pickVoteMap,
+  onQuote,
+}: PostCardProps) {
   const navigate = useNavigate()
   const { auth } = useAuth()
   const compose = useCompose()
@@ -459,7 +473,7 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
             <LikertScale
               postUuid={post.uuid}
               results={likertData?.results}
-              userVote={likertData?.myVote}
+              userVote={likertUserVote ?? likertData?.myVote}
               isOwner={isOwn}
             />
           )}
@@ -527,7 +541,12 @@ export function PostCard({ post, initialVote = 0, pollUserVote, pickUserVote, on
 
           {/* Quote post preview */}
           {post.post_meta?.quote_post && (
-            <QuotePostCard quote={post.post_meta.quote_post} />
+            <QuotePostCard
+              quote={post.post_meta.quote_post}
+              pollUserVote={pollVoteMap?.get(post.post_meta.quote_post.uuid)}
+              likertUserVote={likertVoteMap?.get(post.post_meta.quote_post.uuid)}
+              pickUserVote={pickVoteMap?.get(post.post_meta.quote_post.uuid)}
+            />
           )}
 
           {/* Bottom row */}

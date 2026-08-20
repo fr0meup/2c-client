@@ -171,13 +171,13 @@ export function Feed() {
       if (detail?.pathname !== '/') return
       const nextSearch = detail.search ?? ''
       setPendingFeedNav({ search: nextSearch, run: detail.run ?? Date.now() })
-      if (nextSearch === location.search && !isDateFiltering) {
+      if (location.pathname === '/' && nextSearch === location.search && !isDateFiltering) {
         refetch()
       }
     }
     window.addEventListener(NAVIGATION_PENDING_EVENT, handlePending)
     return () => window.removeEventListener(NAVIGATION_PENDING_EVENT, handlePending)
-  }, [isDateFiltering, location.search, refetch])
+  }, [isDateFiltering, location.pathname, location.search, refetch])
 
   // ── Concurrent bulk fetch — enabled when date/search filtering ──
   // serverParams is empty so changing client-side filters won't re-fetch
@@ -202,10 +202,11 @@ export function Feed() {
   }, [bulk.isLoading, isDateFiltering, isFetching, isLoading, location.search, pendingFeedNav])
 
   // ── Merge data from the active source ──
-  const { rawPosts, voteMap, pollVoteMap, pickVoteMap } = useMemo(() => {
+  const { rawPosts, voteMap, pollVoteMap, pickVoteMap, likertVoteMap } = useMemo(() => {
     const voteMap = new Map<string, 1 | -1 | 0>()
     const pollVoteMap = new Map<string, number>()
     const pickVoteMap = new Map<string, 'yes' | 'no'>()
+    const likertVoteMap = new Map<string, number>()
     const rawPosts: PostCardData[] = []
 
     if (isDateFiltering) {
@@ -218,11 +219,12 @@ export function Feed() {
         rawPosts.push(...(page.posts as unknown as PostCardData[]))
         for (const v of page.votes ?? []) voteMap.set(v.content_uuid, v.vote_type)
         for (const p of page.polls ?? []) pollVoteMap.set(p.post_uuid, p.option)
+        for (const lk of page.likertVotes ?? []) likertVoteMap.set(lk.post_uuid, lk.option)
         for (const pk of page.pickVotes ?? []) pickVoteMap.set(pk.post_uuid, pk.vote)
       }
     }
 
-    return { rawPosts, voteMap, pollVoteMap, pickVoteMap }
+    return { rawPosts, voteMap, pollVoteMap, pickVoteMap, likertVoteMap }
   }, [bulk.pickVotes, bulk.polls, bulk.posts, bulk.votes, data, isDateFiltering])
 
   // Client-side filtering for worker results
@@ -458,7 +460,11 @@ export function Feed() {
                 post={post}
                 initialVote={voteMap.get(post.uuid) ?? 0}
                 pollUserVote={pollVoteMap.get(post.uuid) ?? undefined}
+                likertUserVote={likertVoteMap.get(post.uuid) ?? undefined}
                 pickUserVote={pickVoteMap.get(post.uuid) ?? undefined}
+                pollVoteMap={pollVoteMap}
+                likertVoteMap={likertVoteMap}
+                pickVoteMap={pickVoteMap}
                 onQuote={openQuote}
               />
             ))}

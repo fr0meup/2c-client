@@ -42,16 +42,20 @@ export function LikertScale({
   const voteMutation = useVoteLikert()
   const [localVote, setLocalVote] = useState<number | null>(userVote ?? null)
 
-  useEffect(() => {
-    if (userVote != null) setLocalVote(userVote)
-  }, [userVote])
-
-  // Fetch results internally once the user has voted (so we don't wait on the parent)
+  // Fetch results internally so we can resolve myVote and show results when voted
   const { data: internalData } = useLikertResults(
     postUuid,
-    localVote !== null && !results
+    !results || localVote !== null
   )
   const effectiveResults = results ?? internalData?.results
+
+  useEffect(() => {
+    if (userVote != null) {
+      setLocalVote(userVote)
+    } else if (internalData?.myVote != null) {
+      setLocalVote(internalData.myVote)
+    }
+  }, [userVote, internalData?.myVote])
 
   function handleLikertVote(option: number) {
     if (localVote !== null) return

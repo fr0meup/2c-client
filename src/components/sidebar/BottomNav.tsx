@@ -8,6 +8,7 @@ import { useNotifications } from '@/components/notifications/NotificationsContex
 import { useMessages } from '@/components/messages/MessagesContext'
 import { navItems, type NavItem } from './navItems'
 import { announceNavigationPending } from '@/lib/navigationPending'
+import { saveScrollPosition } from '@/App'
 
 interface BottomNavProps {
   onNewPostClick?: () => void
@@ -103,6 +104,7 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
         {/* Primary items: always visible */}
         {primary.map((item) => (
           <BottomNavItem key={item.path} item={item} isActive={isItemActive(item)} onClick={() => {
+            saveScrollPosition()
             announceNavigationPending(item.label === 'Feed' ? '/' : item.path)
             prefetchItem(item)
           }} onPreload={() => prefetchItem(item)} />
@@ -112,6 +114,7 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
         <div className="hidden items-center gap-1.5 sm:flex">
           {overflow.map((item) => (
             <BottomNavItem key={item.path} item={item} isActive={isItemActive(item)} onClick={() => {
+              saveScrollPosition()
               announceNavigationPending(item.path)
               prefetchItem(item)
             }} onPreload={() => prefetchItem(item)} />
@@ -136,6 +139,7 @@ export function BottomNav({ onNewPostClick }: BottomNavProps) {
                   key={item.path}
                   to={item.path}
                   onClick={() => {
+                    saveScrollPosition()
                     setMoreOpen(false)
                     announceNavigationPending(item.path)
                     prefetchItem(item)

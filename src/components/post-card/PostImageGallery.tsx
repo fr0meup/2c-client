@@ -23,6 +23,7 @@ interface PostImageGalleryProps {
   onImageClick: (index: number) => void
   className?: string
   fullWidth?: boolean
+  compact?: boolean
 }
 
 export function PostImageGallery({
@@ -30,15 +31,16 @@ export function PostImageGallery({
   onImageClick,
   className = '',
   fullWidth = false,
+  compact = false,
 }: PostImageGalleryProps) {
-  const [activeIndex, setActiveIndex] = useState(0)
+  const [visibleRange, setVisibleRange] = useState<{ start: number; end: number }>({ start: 0, end: 0 })
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
   const [showControls, setShowControls] = useState(false)
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const isIntersectingRef = useRef(false)
-  const isManualNavRef = useRef(false)
-  const manualNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleMouseEnter = useCallback(() => {
     if (hideTimerRef.current) {
@@ -58,7 +60,7 @@ export function PostImageGallery({
     }, 5000)
   }, [])
 
-  // Trigger 5-second reveal when the gallery enters the viewport
+  // Reveal controls for 5 seconds when entering viewport without any auto-scroll
   useEffect(() => {
     const el = containerRef.current
     if (!el || typeof IntersectionObserver === 'undefined') return
@@ -68,7 +70,6 @@ export function PostImageGallery({
         const entry = entries[0]
         if (!entry) return
         if (entry.isIntersecting) {
-          // Only trigger if transitioning from NOT visible to VISIBLE
           if (!isIntersectingRef.current) {
             isIntersectingRef.current = true
             handleMouseEnter()
@@ -78,9 +79,7 @@ export function PostImageGallery({
           isIntersectingRef.current = false
         }
       },
-      {
-        threshold: 0.2, // When at least 20% enters the viewport
-      }
+      { threshold: 0.2 }
     )
 
     observer.observe(el)
@@ -95,17 +94,99 @@ export function PostImageGallery({
     }
   }, [])
 
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+
+    const { scrollLeft, clientWidth, scrollWidth } = el
+    const maxScroll = scrollWidth - clientWidth
+
+    // Arrow bounds
+    const atStart = scrollLeft <= 4
+    const atEnd = maxScroll <= 4 || scrollLeft >= maxScroll - 6
+
+    setCanScrollLeft(!atStart && maxScroll > 4)
+    setCanScrollRight(!atEnd && maxScroll > 4)
+
+    const children = Array.from(el.children) as HTMLElement[]
+    if (children.length === 0) return
+
+    const viewLeft = scrollLeft
+    const viewRight = scrollLeft + clientWidth
+
+    const visibleIndices: number[] = []
+    let maxOverlapIdx = 0
+    let maxOverlap = 0
+
+    children.forEach((child, idx) => {
+      const childLeft = child.offsetLeft
+      const childRight = child.offsetLeft + child.offsetWidth
+      const childWidth = child.offsetWidth || 1
+
+      const overlap = Math.max(0, Math.min(childRight, viewRight) - Math.max(childLeft, viewLeft))
+      if (overlap > maxOverlap) {
+        maxOverlap = overlap
+        maxOverlapIdx = idx
+      }
+
+      // An image is considered shown only if at least 45% of its width is in view (excludes tiny peek slivers)
+      if (overlap / childWidth >= 0.45) {
+        visibleIndices.push(idx)
+      }
+    })
+
+    if (visibleIndices.length > 0) {
+      const start = visibleIndices[0]
+      const end = visibleIndices[visibleIndices.length - 1]
+      setVisibleRange((prev) => (prev.start !== start || prev.end !== end ? { start, end } : prev))
+    } else {
+      setVisibleRange({ start: maxOverlapIdx, end: maxOverlapIdx })
+    }
+  }, [])
+
+  useEffect(() => {
+    updateScrollState()
+    const el = scrollRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => updateScrollState())
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [images, updateScrollState])
+
   if (!images || images.length === 0) return null
 
   // ── Single Image ──
   if (images.length === 1) {
+    if (compact) {
+      // Quote post: full-width cropped image
+      return (
+        <div
+          className={cn(
+            'w-full overflow-hidden rounded-xl',
+            className,
+          )}
+        >
+          <img
+            src={images[0]}
+            alt=""
+            onClick={(e) => {
+              e.stopPropagation()
+              onImageClick(0)
+            }}
+            loading="lazy"
+            className="w-full max-h-[16rem] sm:max-h-[18rem] object-cover cursor-zoom-in transition-transform duration-300 hover:scale-[1.008]"
+          />
+        </div>
+      )
+    }
+
     if (fullWidth) {
-      // PostDetail: natural uncropped sizing, tight border, centered
+      // PostDetail: natural uncropped sizing, centered
       return (
         <div className="flex w-full justify-center">
           <div
             className={cn(
-              'w-fit max-w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.02]',
+              'w-fit max-w-full overflow-hidden rounded-2xl',
               className,
             )}
           >
@@ -128,7 +209,7 @@ export function PostImageGallery({
     return (
       <div
         className={cn(
-          'mx-auto w-[85%] overflow-hidden rounded-2xl border border-white/[0.08] bg-black/20',
+          'mx-auto w-[85%] overflow-hidden rounded-2xl',
           className,
         )}
       >
@@ -148,26 +229,7 @@ export function PostImageGallery({
 
   // ── Multi-Image Carousel + Peek Track ──
   const handleScroll = () => {
-    if (isManualNavRef.current) return // Don't jitter during programmatic smooth scrolling
-
-    const el = scrollRef.current
-    if (!el) return
-    const scrollLeft = el.scrollLeft
-    const children = Array.from(el.children) as HTMLElement[]
-    if (children.length === 0) return
-
-    let closestIndex = 0
-    let minDistance = Infinity
-
-    children.forEach((child, idx) => {
-      const distance = Math.abs(scrollLeft - child.offsetLeft)
-      if (distance < minDistance) {
-        minDistance = distance
-        closestIndex = idx
-      }
-    })
-
-    setActiveIndex((prev) => (prev !== closestIndex ? closestIndex : prev))
+    updateScrollState()
   }
 
   const scrollToIndex = (idx: number) => {
@@ -175,21 +237,15 @@ export function PostImageGallery({
     const el = scrollRef.current
     if (!el) return
 
-    // Lock out handleScroll jitter while smooth scrolling
-    isManualNavRef.current = true
-    if (manualNavTimerRef.current) clearTimeout(manualNavTimerRef.current)
-    manualNavTimerRef.current = setTimeout(() => {
-      isManualNavRef.current = false
-    }, 450)
-
-    setActiveIndex(idx)
-
     const targetChild = el.children[idx] as HTMLElement | undefined
     if (targetChild) {
-      targetChild.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' })
+      targetChild.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
     }
+
     handleMouseLeave()
   }
+
+  const visibleCount = visibleRange.end - visibleRange.start + 1
 
   return (
     <div
@@ -201,71 +257,78 @@ export function PostImageGallery({
         className,
       )}
     >
-      {/* Top right unified segmented page indicator with smooth sliding gold highlight */}
+      {/* Top right unified segmented page indicator with smooth sliding gold highlight spanning all visible images */}
       <div
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          'absolute right-3 top-3 z-20 flex items-center rounded-full border border-white/12 bg-black/75 p-0.5 text-xs font-semibold tabular-nums shadow-lg backdrop-blur-md transition-opacity duration-300',
+          'absolute z-20 flex items-center rounded-full border border-white/12 bg-black/75 p-0.5 text-xs font-semibold tabular-nums shadow-lg backdrop-blur-md transition-opacity duration-300',
+          compact ? 'right-2 top-2 scale-90' : 'right-3 top-3',
           showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
         )}
       >
         {/* Sliding active gold indicator pill */}
         <div
-          className="absolute bottom-0.5 top-0.5 rounded-full bg-[#c8a44d] shadow-[0_0_8px_rgba(200,164,77,0.5)] transition-transform duration-200 ease-out pointer-events-none"
+          className="absolute bottom-0.5 top-0.5 rounded-full bg-[#c8a44d] shadow-[0_0_8px_rgba(200,164,77,0.5)] transition-all duration-100 ease-out pointer-events-none"
           style={{
-            width: '22px',
-            transform: `translateX(${activeIndex * 22}px)`,
+            left: '2px',
+            width: `${visibleCount * 22}px`,
+            transform: `translateX(${visibleRange.start * 22}px)`,
           }}
         />
 
-        {images.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => scrollToIndex(i)}
-            className={cn(
-              'relative z-10 flex h-5 w-[22px] items-center justify-center rounded-full text-[11px] font-bold transition-colors duration-200 cursor-pointer',
-              i === activeIndex
-                ? 'text-[#0f0e0a]'
-                : 'text-white/50 hover:text-white',
-            )}
-            title={`Go to image ${i + 1}`}
-          >
-            {i + 1}
-          </button>
-        ))}
+        {images.map((_, i) => {
+          const isVisible = i >= visibleRange.start && i <= visibleRange.end
+          return (
+            <button
+              key={i}
+              onClick={() => scrollToIndex(i)}
+              className={cn(
+                'relative z-10 flex h-5 w-[22px] items-center justify-center rounded-full text-[11px] font-bold transition-colors duration-200 cursor-pointer',
+                isVisible
+                  ? 'text-[#0f0e0a]'
+                  : 'text-white/50 hover:text-white',
+              )}
+              title={`Go to image ${i + 1}`}
+            >
+              {i + 1}
+            </button>
+          )
+        })}
       </div>
 
       {/* Left Navigation Arrow Button */}
-      {activeIndex > 0 && (
+      {canScrollLeft && (
         <button
           onClick={(e) => {
             e.stopPropagation()
-            scrollToIndex(activeIndex - 1)
+            scrollToIndex(Math.max(0, visibleRange.start - 1))
           }}
           className={cn(
-            'absolute left-2.5 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-black/75 text-white/90 shadow-xl backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/95 hover:text-white active:scale-95',
+            'absolute top-1/2 z-20 flex -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-black/75 text-white/90 shadow-xl backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/95 hover:text-white active:scale-95',
+            compact ? 'left-1.5 h-7 w-7' : 'left-2.5 h-9 w-9',
             showControls ? 'opacity-90 hover:opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
           )}
           title="Previous image"
         >
-          <ChevronLeft className="h-5 w-5" strokeWidth={2.2} />
+          <ChevronLeft className={compact ? 'h-4 w-4' : 'h-5 w-5'} strokeWidth={2.2} />
         </button>
       )}
 
       {/* Right Navigation Arrow Button */}
-      {activeIndex < images.length - 1 && (
+      {canScrollRight && (
         <button
           onClick={(e) => {
             e.stopPropagation()
-            scrollToIndex(activeIndex + 1)
+            scrollToIndex(Math.min(images.length - 1, visibleRange.end + 1))
           }}
           className={cn(
-            'absolute right-2.5 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-black/75 text-white/90 shadow-xl backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/95 hover:text-white active:scale-95',
+            'absolute top-1/2 z-20 flex -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-black/75 text-white/90 shadow-xl backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-black/95 hover:text-white active:scale-95',
+            compact ? 'right-1.5 h-7 w-7' : 'right-2.5 h-9 w-9',
             showControls ? 'opacity-90 hover:opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
           )}
           title="Next image"
         >
-          <ChevronRight className="h-5 w-5" strokeWidth={2.2} />
+          <ChevronRight className={compact ? 'h-4 w-4' : 'h-5 w-5'} strokeWidth={2.2} />
         </button>
       )}
 
@@ -280,23 +343,18 @@ export function PostImageGallery({
         }}
       >
         {images.map((img, idx) => {
-          const isCurrent = idx === activeIndex
+          const isVisible = idx >= visibleRange.start && idx <= visibleRange.end
           return (
             <div
               key={idx}
               onClick={(e) => {
                 e.stopPropagation()
-                if (isCurrent) {
-                  onImageClick(idx)
-                } else {
-                  scrollToIndex(idx)
-                }
+                onImageClick(idx)
               }}
               className={cn(
-                'relative shrink-0 snap-start overflow-hidden rounded-2xl border transition-all duration-200 w-fit',
-                isCurrent
-                  ? 'border-white/[0.15] bg-white/[0.02] shadow-lg cursor-zoom-in'
-                  : 'border-white/[0.06] bg-white/[0.02] opacity-75 hover:opacity-95 hover:border-white/15 cursor-pointer',
+                'relative shrink-0 snap-start overflow-hidden transition-all duration-200 w-fit cursor-zoom-in',
+                compact ? 'rounded-xl' : 'rounded-2xl',
+                !isVisible && 'opacity-75 hover:opacity-95',
               )}
             >
               {/* Main Image */}
@@ -305,11 +363,13 @@ export function PostImageGallery({
                 alt=""
                 loading="lazy"
                 className={cn(
-                  'block w-auto max-w-[85vw] sm:max-w-[620px] transition-transform duration-300',
-                  fullWidth
-                    ? 'h-[340px] sm:h-[440px]'
-                    : 'h-[280px] sm:h-[360px]',
-                  isCurrent && 'group-hover/gallery:scale-[1.005]',
+                  'block w-auto max-w-[85vw] transition-transform duration-300',
+                  compact
+                    ? 'h-[160px] sm:h-[200px] sm:max-w-[440px]'
+                    : fullWidth
+                      ? 'h-[340px] sm:h-[440px] sm:max-w-[620px]'
+                      : 'h-[280px] sm:h-[360px] sm:max-w-[620px]',
+                  isVisible && 'group-hover/gallery:scale-[1.005]',
                 )}
               />
             </div>
