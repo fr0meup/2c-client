@@ -48,8 +48,8 @@ export function useUserProfile(userUuid: string | undefined) {
       }
     },
     enabled: !!auth?.token && !!userUuid,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 1000 * 60 * 2,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
   })
 }

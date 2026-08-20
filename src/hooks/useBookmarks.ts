@@ -18,8 +18,8 @@ export function useBookmarks() {
       )
     },
     enabled: !!auth?.token,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 1000 * 60 * 2,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
   })
 }

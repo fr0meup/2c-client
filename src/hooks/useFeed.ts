@@ -101,8 +101,8 @@ export function useFeed(topic: string, searchQuery?: string, advanced?: Advanced
     getNextPageParam: (lastPage) =>
       lastPage.pagination.has_more ? (lastPage.pagination.next_cursor ?? undefined) : undefined,
     enabled: enabled && !!auth,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 1000 * 60 * 5,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
   })
 }

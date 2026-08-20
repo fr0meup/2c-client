@@ -71,8 +71,11 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 
 // ── Scroll position management ──
 const scrollMap = new Map<string, number>()
+const scrollMapByPath = new Map<string, number>()
 const lockedKeys = new Set<string>()
 let _currentLocationKey = ''
+let _currentPathKey = ''
+let isRestoringScroll = false
 
 function getPageScrollTop() {
   return Math.max(
@@ -89,48 +92,124 @@ function setPageScrollTop(y: number) {
 }
 
 export function saveScrollPosition() {
+  const y = getPageScrollTop()
   if (_currentLocationKey) {
-    const y = getPageScrollTop()
     if (y > 0) {
       scrollMap.set(_currentLocationKey, y)
     }
     lockedKeys.add(_currentLocationKey)
   }
+  if (_currentPathKey && y > 0) {
+    scrollMapByPath.set(_currentPathKey, y)
+  }
 }
 
 function restoreScrollPosition(targetY: number) {
+  isRestoringScroll = true
   setPageScrollTop(targetY)
 
-  let attempts = 0
-  let animationFrameId: number
+  let animationFrameId: number | null = null
   let resizeObserver: ResizeObserver | null = null
+  let mutationObserver: MutationObserver | null = null
+  let isDone = false
 
-  const restore = () => {
+  const cleanup = () => {
+    if (isDone) return
+    isDone = true
+    if (animationFrameId !== null) cancelAnimationFrame(animationFrameId)
+    if (resizeObserver) resizeObserver.disconnect()
+    if (mutationObserver) mutationObserver.disconnect()
+    window.removeEventListener('wheel', onUserInteract)
+    window.removeEventListener('touchmove', onUserInteract)
+    window.removeEventListener('keydown', onUserInteract)
+    setTimeout(() => {
+      isRestoringScroll = false
+    }, 150)
+  }
+
+  // Release control if user manually scrolls/touches
+  const onUserInteract = () => {
+    cleanup()
+  }
+
+  window.addEventListener('wheel', onUserInteract, { passive: true })
+  window.addEventListener('touchmove', onUserInteract, { passive: true })
+  window.addEventListener('keydown', onUserInteract, { passive: true })
+
+  let attempts = 0
+  const maxAttempts = 90
+
+  const step = () => {
+    if (isDone) return
     attempts++
-    setPageScrollTop(targetY)
-    const current = getPageScrollTop()
 
-    // Continue attempting until we reach target Y or max attempts (~3 seconds)
-    if (Math.abs(current - targetY) >= 5 && attempts < 180) {
-      animationFrameId = requestAnimationFrame(restore)
+    const maxScroll = Math.max(
+      0,
+      document.documentElement.scrollHeight - window.innerHeight,
+      document.body.scrollHeight - window.innerHeight,
+    )
+
+    if (maxScroll >= targetY - 20) {
+      setPageScrollTop(targetY)
+      const current = getPageScrollTop()
+      if (Math.abs(current - targetY) < 5) {
+        cleanup()
+        return
+      }
+    } else if (maxScroll > 0) {
+      setPageScrollTop(Math.min(targetY, maxScroll))
+    }
+
+    if (attempts < maxAttempts) {
+      animationFrameId = requestAnimationFrame(step)
+    } else {
+      setPageScrollTop(targetY)
+      cleanup()
     }
   }
 
-  animationFrameId = requestAnimationFrame(restore)
+  animationFrameId = requestAnimationFrame(step)
 
-  // Re-apply when DOM resizes as images/posts render in
-  if (typeof ResizeObserver !== 'undefined' && document.body) {
+  // Re-apply when DOM resizes or elements mutate (posts/images load in)
+  if (typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(() => {
-      if (getPageScrollTop() < Math.floor(targetY) - 5) {
+      if (isDone) return
+      const maxScroll = Math.max(
+        0,
+        document.documentElement.scrollHeight - window.innerHeight,
+        document.body.scrollHeight - window.innerHeight,
+      )
+      if (maxScroll >= targetY - 20) {
         setPageScrollTop(targetY)
       }
     })
-    resizeObserver.observe(document.body)
+    if (document.documentElement) resizeObserver.observe(document.documentElement)
+    if (document.body) resizeObserver.observe(document.body)
   }
 
+  if (typeof MutationObserver !== 'undefined') {
+    mutationObserver = new MutationObserver(() => {
+      if (isDone) return
+      const maxScroll = Math.max(
+        0,
+        document.documentElement.scrollHeight - window.innerHeight,
+        document.body.scrollHeight - window.innerHeight,
+      )
+      if (maxScroll >= targetY - 20) {
+        setPageScrollTop(targetY)
+      }
+    })
+    const root = document.getElementById('root') || document.body
+    if (root) {
+      mutationObserver.observe(root, { childList: true, subtree: true })
+    }
+  }
+
+  const timeoutId = setTimeout(cleanup, 1500)
+
   return () => {
-    cancelAnimationFrame(animationFrameId)
-    if (resizeObserver) resizeObserver.disconnect()
+    clearTimeout(timeoutId)
+    cleanup()
   }
 }
 
@@ -138,15 +217,20 @@ function ScrollToTop() {
   const location = useLocation()
   const navType = useNavigationType()
   const prevKeyRef = useRef(_currentLocationKey)
+  const prevPathRef = useRef(_currentPathKey)
 
   useEffect(() => {
     window.history.scrollRestoration = 'manual'
 
     const onScroll = () => {
-      if (_currentLocationKey && !lockedKeys.has(_currentLocationKey)) {
-        const y = getPageScrollTop()
-        if (y > 0) {
+      if (isRestoringScroll) return
+      const y = getPageScrollTop()
+      if (y > 0) {
+        if (_currentLocationKey && !lockedKeys.has(_currentLocationKey)) {
           scrollMap.set(_currentLocationKey, y)
+        }
+        if (_currentPathKey) {
+          scrollMapByPath.set(_currentPathKey, y)
         }
       }
     }
@@ -157,31 +241,36 @@ function ScrollToTop() {
 
   useLayoutEffect(() => {
     const prevKey = prevKeyRef.current
+    const prevPath = prevPathRef.current
     const currKey = location.key ?? ''
+    const currPath = location.pathname + location.search
 
-    if (prevKey && prevKey !== currKey) {
+    if (prevKey && prevKey !== currKey && !isRestoringScroll) {
       if (!lockedKeys.has(prevKey)) {
         const y = getPageScrollTop()
         if (y > 0) {
           scrollMap.set(prevKey, y)
+          if (prevPath) scrollMapByPath.set(prevPath, y)
         }
         lockedKeys.add(prevKey)
       }
     }
 
     _currentLocationKey = currKey
+    _currentPathKey = currPath
     prevKeyRef.current = currKey
+    prevPathRef.current = currPath
     lockedKeys.clear()
 
     if (navType === 'POP') {
-      const saved = scrollMap.get(currKey)
+      const saved = scrollMap.get(currKey) ?? scrollMapByPath.get(currPath)
       if (saved != null && saved > 0) {
         return restoreScrollPosition(saved)
       }
     }
 
     setPageScrollTop(0)
-  }, [location.key, navType])
+  }, [location.key, location.pathname, location.search, navType])
 
   return null
 }
