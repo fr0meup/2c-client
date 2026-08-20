@@ -199,17 +199,17 @@ function MemberRow({ m }: { m: RoomMember }) {
         )}
       </div>
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        {nickname && (
-          <span className="min-w-0 truncate text-[13px] font-semibold text-[#c8a44d]">
-            {nickname}
-          </span>
-        )}
         <UserMetaPill
           gender={m.gender}
           age={m.age}
           arena={m.arena}
           className="!h-7 !text-[11px] !flex-none"
         />
+        {nickname && (
+          <span className="min-w-0 truncate text-[13px] font-semibold text-white">
+            {nickname}
+          </span>
+        )}
       </div>
     </div>
   )

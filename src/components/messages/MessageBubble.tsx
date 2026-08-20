@@ -158,7 +158,7 @@ export function MessageBubble({ msg, showAuthor, onReply, onJumpTo, innerRef }: 
                   e.stopPropagation()
                   navigate(`/user/${msg.author_uuid}`)
                 }}
-                className="cursor-pointer truncate text-xs font-semibold text-[#c8a44d] hover:underline"
+                className="cursor-pointer truncate text-xs font-semibold text-white hover:underline"
               >
                 {nickname}
               </button>
